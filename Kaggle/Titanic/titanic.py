@@ -18,6 +18,7 @@ selected_features = ['Pclass', 'Sex', 'Age', 'Embarked', 'SibSp', 'Parch', 'Fare
 X_train = train[selected_features]
 X_test = test[selected_features]
 y_train = train_all.iloc[:, [1]]
+y_train = train_all['Survived']
 
 X_train.shape
 y_train.shape
@@ -58,9 +59,18 @@ df_vec.fit_transform(measurements)
 # -------开始训练模型--------------
 # 导入随机森林
 from sklearn.ensemble import RandomForestClassifier
+# 这里使用默认的配置会显示warning，提示n_estimators的变化
 rfc = RandomForestClassifier()
+rfc = RandomForestClassifier(n_estimators=25, random_state=2)
+
 # 导入XGBoost
 from xgboost import XGBClassifier
 xgbc = XGBClassifier()
 # 导入交叉验证
-from sklearn.model_selection import cross_validate
+from sklearn.model_selection import cross_val_score
+
+cross_val_score(rfc, X_train_vec, y_train, cv=5)
+cross_val_score(rfc, X_train_vec, y_train, cv=5).mean()
+
+cross_val_score(xgbc, X_train_vec, y_train, cv=5)
+cross_val_score(xgbc, X_train_vec, y_train, cv=5).mean()
