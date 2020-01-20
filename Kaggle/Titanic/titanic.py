@@ -18,6 +18,7 @@ selected_features = ['Pclass', 'Sex', 'Age', 'Embarked', 'SibSp', 'Parch', 'Fare
 X_train = train[selected_features]
 X_test = test[selected_features]
 y_train = train_all.iloc[:, [1]]
+
 X_train.shape
 y_train.shape
 
@@ -34,6 +35,29 @@ X_test['Embarked'].fillna('S', inplace=True)
 
 # 对特征进行向量化
 from sklearn.feature_extraction import DictVectorizer
+# DictVectorizer只能处理字典元素的列表
 dict_vec = DictVectorizer(sparse=False)
+# 需要先将X_train转成dict, orient='record'表示转成list形式的dict
 X_train_vec = dict_vec.fit_transform(X_train.to_dict(orient='record'))
 dict_vec.feature_names_
+X_test_vec = dict_vec.transform(X_test.to_dict('record'))
+
+# DictVectorizer示例
+measurements = [
+    {'city': 'Dubai', 'temperature': 33.},
+    {'city': 'London', 'temperature': 12.},
+    {'city': 'San Francisco', 'temperature': 18.},
+]
+df_vec = DictVectorizer(sparse=False)
+# 下面这两个会报错
+df = pd.DataFrame(measurements)
+df_vec.fit_transform(df)
+# 这个才是正确的
+df_vec.fit_transform(measurements)
+
+# -------开始训练模型--------------
+# 导入随机森林
+from sklearn.ensemble import RandomForestClassifier
+rfc = RandomForestClassifier()
+# 导入XGBoost
+from xgboost
