@@ -60,4 +60,7 @@ df_vec.fit_transform(measurements)
 from sklearn.ensemble import RandomForestClassifier
 rfc = RandomForestClassifier()
 # 导入XGBoost
-from xgboost
+from xgboost import XGBClassifier
+xgbc = XGBClassifier()
+# 导入交叉验证
+from sklearn.model_selection import cross_validate
