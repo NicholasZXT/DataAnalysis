@@ -4,6 +4,8 @@ import requests
 import json
 import jsonpath
 import bs4
+from selenium import webdriver
+
 
 # 没有这个headers会被豆瓣判定为机器人，返回的状态码是418
 headers = {
@@ -69,3 +71,6 @@ r_json = r.content.decode('utf-8')
 r_dict = json.loads(r_json)
 result_json_list = jsonpath.jsonpath(r_dict, "$.content.positionResult.result")[0]
 df = pd.DataFrame(result_json_list)
+
+# ------ 拉勾网使用Selenium爬取 ---------
+
