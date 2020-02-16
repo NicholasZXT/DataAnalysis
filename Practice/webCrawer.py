@@ -4,7 +4,6 @@ import requests
 import json
 import jsonpath
 import bs4
-from selenium import webdriver
 
 
 # 没有这个headers会被豆瓣判定为机器人，返回的状态码是418
@@ -72,5 +71,32 @@ r_dict = json.loads(r_json)
 result_json_list = jsonpath.jsonpath(r_dict, "$.content.positionResult.result")[0]
 df = pd.DataFrame(result_json_list)
 
-# ------ 拉勾网使用Selenium爬取 ---------
+# ------ 使用Selenium爬取拉勾网 ---------
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.wait import WebDriverWait
+# 开启浏览器
+browser = webdriver.Chrome(executable_path='/usr/local/chromedriver/chromedriver')
+# 打开网页
+# browser.get("https://www.baidu.com")
+browser.get("https://www.lagou.com")
+# 查看当前的网页地址
+# browser.current_url
+# browser.refresh()
+# 这里对于的class名称显示的是 tab focus
+ele = browser.find_element_by_class_name('tab.focus')
+ele.text
+ele.click()
+input = browser.find_element_by_id('search_input')
+# input.tag_name
+input.send_keys("python")
+input.send_keys(Keys.ENTER)
+# 上面两句也可以写成
+input.send_keys(r"python\n")
+ele = browser.find_element_by_class_name('body-btn')
+ele.text
+ele.click()
+wait = WebDriverWait(browser, 10)
+
+browser.quit()
 
