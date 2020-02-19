@@ -28,7 +28,7 @@ json_dict = json.loads(json_str)
 # 使用jsonpath提取title信息
 title_list = jsonpath.jsonpath(json_dict, "$..title")
 
-# ----------拉勾网-----------
+#TODO ----------拉勾网ajax方式-----------
 lagou_url = 'https://www.lagou.com/jobs/positionAjax.json'
 # 使用sublime将header批量处理成字典的形式
 # 正则查找：^(.*):\s(.*)$
@@ -71,7 +71,7 @@ r_dict = json.loads(r_json)
 result_json_list = jsonpath.jsonpath(r_dict, "$.content.positionResult.result")[0]
 df = pd.DataFrame(result_json_list)
 
-# ------ 使用Selenium爬取拉勾网 ---------
+#TODO ------ 练习使用Selenium爬取拉勾网 ---------
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
