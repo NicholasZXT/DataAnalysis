@@ -3,7 +3,6 @@ import pandas as pd
 import requests
 import json
 import jsonpath
-import bs4
 
 
 # 没有这个headers会被豆瓣判定为机器人，返回的状态码是418
@@ -100,3 +99,41 @@ wait = WebDriverWait(browser, 10)
 
 browser.quit()
 
+
+#TODO ----beautifulsoup库的使用--------------
+import requests
+from bs4 import BeautifulSoup
+import webbrowser
+url = "http://www.pythonscraping.com/pages/page1.html"
+url = 'https://www.baidu.com'
+url = 'http://www.pythonscraping.com/pages/warandpeace.html'
+r = requests.get(url)
+with open('./Practice/warandpeace.html', 'r') as file:
+    html = file.read()
+soup = BeautifulSoup(html, 'html.parser')
+soup.title
+soup.title.string
+soup.meta
+soup.name
+soup.title.name
+# 返回这个tag的所有属性值，以字典的形式
+soup.meta.attrs
+soup.contents
+
+# 使用find_all方式
+soup.find_all(['h1', 'h2'])
+soup.find_all({'span'})
+soup.find_all({'span'},limit=2)
+# 返回的结果是bs4.element.ResultSet，但是可以当做列表使用
+t = soup.find_all({'span'}, {'class': 'green'})
+type(t)
+len(t)
+t[0]
+t[0].text
+
+# CSS选择器
+t = soup.select('span.green')
+# 返回的是list
+type(t)
+t[0]
+t[0].text
