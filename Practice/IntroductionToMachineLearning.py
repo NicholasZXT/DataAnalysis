@@ -90,3 +90,24 @@ vectorizer.get_feature_names()
 X = vectorizer.transform(corpus)
 type(X)
 X.toarray()
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+corpus = [
+    'This is the first document.',
+    'This document is the second document.',
+    'And this is the third one.',
+    'Is this the first document?',
+]
+vectorizer = TfidfVectorizer()
+vectorizer.fit(corpus)
+
+vectorizer.vocabulary_
+vectorizer.stop_words_
+
+vectorizer.get_stop_words()
+vectorizer.get_feature_names()
+
+X = vectorizer.transform(corpus)
+type(X)
+X.shape
+X.toarray()
