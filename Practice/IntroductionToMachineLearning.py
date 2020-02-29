@@ -111,3 +111,86 @@ X = vectorizer.transform(corpus)
 type(X)
 X.shape
 X.toarray()
+
+import numpy as np
+from sklearn.impute import SimpleImputer
+imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
+imp_data = [[7, 2, 3], [4, np.nan, 6], [10, 5, 9]]
+imp_mean.fit(imp_data)
+imp_mean.statistics_
+X = [[np.nan, 2, 3], [4, np.nan, 6], [10, np.nan, 9]]
+imp_mean.get_params()
+imp_mean.transform(X)
+
+from sklearn.preprocessing import Binarizer
+X = [[ 1., -1.,  2.],
+     [ 2.,  0.,  0.],
+     [ 0.,  1., -1.]]
+transformer = Binarizer()
+type(transformer)
+transformer.fit(X)
+
+transformer.transform(X)
+
+from sklearn.preprocessing import MinMaxScaler
+data = [[-1, 2], [-0.5, 6], [0, 10], [1, 18]]
+scaler = MinMaxScaler()
+scaler.fit(data)
+scaler.data_max_
+scaler.min_
+scaler.scale_
+scaler.data_min_
+scaler.data_max_
+scaler.data_range_
+scaler.transform(data)
+
+from sklearn.preprocessing import Normalizer
+X = [[4, 1, 2, 2],
+     [1, 3, 9, 3],
+     [5, 7, 5, 1]]
+X = np.array(X)
+X_norm = Normalizer().fit_transform(X)
+X_norm
+X_norm[0, :]**2
+(X_norm[0, :]**2).sum()
+((X_norm[0, :]**2).sum())**(1/2)
+
+from sklearn.preprocessing import OneHotEncoder
+enc = OneHotEncoder(handle_unknown='ignore')
+X = [['Male', 1], ['Female', 3], ['Female', 2]]
+enc.fit(X)
+enc.categories_
+enc.transform([['Female', 1], ['Male', 4]]).toarray()
+X
+enc.transform(X).toarray()
+enc.get_feature_names()
+
+from sklearn.metrics import accuracy_score
+y_pred = [0, 2, 1, 3]
+y_true = [0, 1, 2, 3]
+accuracy_score(y_true, y_pred)
+accuracy_score(y_true, y_pred,normalize=False)
+
+
+import numpy as np
+from sklearn import metrics
+y = np.array([1, 1, 2, 2])
+scores = np.array([0.1, 0.4, 0.35, 0.8])
+fpr, tpr, thresholds = metrics.roc_curve(y, scores, pos_label=2)
+fpr
+tpr
+thresholds
+
+import numpy as np
+from sklearn import metrics
+y = np.array([1, 1, 2, 2])
+pred_prob = np.array([0.1, 0.4, 0.35, 0.8])
+fpr, tpr, thresholds = metrics.roc_curve(y, pred_prob, pos_label=2)
+metrics.auc(fpr, tpr)
+
+
+from sklearn.metrics import classification_report
+y_true = [0, 1, 2, 2, 2]
+y_pred = [0, 0, 2, 2, 1]
+target_names = ['class 0', 'class 1', 'class 2']
+print(classification_report(y_true, y_pred, target_names=target_names))
