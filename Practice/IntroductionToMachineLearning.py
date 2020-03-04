@@ -122,6 +122,28 @@ X = [[np.nan, 2, 3], [4, np.nan, 6], [10, np.nan, 9]]
 imp_mean.get_params()
 imp_mean.transform(X)
 
+from sklearn.impute import MissingIndicator
+X1 = np.array([[np.nan, 1, 3],
+               [4, 0, np.nan],
+               [8, 1, 0]])
+X2 = np.array([[5, 1, np.nan],
+               [np.nan, 2, 3],
+               [2, 4, 0]])
+indicator = MissingIndicator()
+indicator.fit(X1)
+indicator.features_
+X1
+indicator.transform(X1)
+X2
+indicator.transform(X2)
+
+indicator_all = MissingIndicator(features='all')
+indicator_all.fit_transform(X1)
+indicator_all.fit_transform(X2)
+indicator_all.features_
+
+
+
 from sklearn.preprocessing import Binarizer
 X = [[ 1., -1.,  2.],
      [ 2.,  0.,  0.],
@@ -164,6 +186,14 @@ enc.transform([['Female', 1], ['Male', 4]]).toarray()
 X
 enc.transform(X).toarray()
 enc.get_feature_names()
+
+
+from sklearn.metrics import confusion_matrix
+y_true = [1, 1,1,  0,0,0,0,  0,0,0]
+y_pred = [1, 0,0,  0,0,0,0,  1,1,1]
+confusion_matrix(y_true, y_pred, labels=[0, 1])
+confusion_matrix(y_true, y_pred, labels=[1, 0])
+
 
 from sklearn.metrics import accuracy_score
 y_pred = [0, 2, 1, 3]
