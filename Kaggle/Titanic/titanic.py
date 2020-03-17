@@ -68,7 +68,7 @@ X_test_proc = pd.get_dummies(X_test)
 # 因为另外两种得到的是np.array，没有列名，而使用get_dummies得到的仍然是DF
 
 
-# 开始训练模型
+# -----------------开始训练模型----------------------------
 # Logistic
 #预测正确率为 0.74162
 logic = LogisticRegression()
@@ -80,7 +80,7 @@ logic.score(X_proc, y)
 y_test = logic.predict(X_test_proc)
 y_test_df = pd.DataFrame(y_test, index= X_test.index)
 y_test_df.columns = ['Survived']
-y_test_df.to_csv("predict_2.csv")
+y_test_df.to_csv("logis_pred.csv")
 
 # 使用交叉验证的Logistic,
 log_cv = LogisticRegressionCV(Cs=np.linspace(0.5,1.5,5), cv=5, max_iter=1000)
@@ -99,6 +99,20 @@ cross_val_score(rfc, X_proc, y, cv=5)
 cross_val_score(rfc, X_proc, y, cv=5).mean()
 # 预测
 y_test = rfc.predict(X_test_proc)
+y_test_df = pd.DataFrame(y_test, index=X_test.index)
+
+
+# 使用XGBoost
+from  xgboost import XGBClassifier
+# 使用默认参数配置
+xgbc = XGBClassifier()
+xgbc.fit(X_proc,y)
+xgbc.get_booster()
+xgbc.get_params()
+# 使用交叉验证评估一下效果
+cross_val_score(xgbc, X_proc, y, cv=5)
+# 预测
+y_test = xgbc.predict(X_test_proc)
 y_test_df = pd.DataFrame(y_test, index=X_test.index)
 
 
