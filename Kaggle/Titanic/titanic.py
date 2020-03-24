@@ -21,14 +21,27 @@ train.info()
 test.info()
 
 # 将乘客ID设为index，这个变量对于预测没有用
-train.set_index('PassengerId',inplace=True)
+# 但是
+train.set_index('PassengerId', inplace=True)
 test.set_index('PassengerId', inplace=True)
+
+# 查看缺失值个数以及占比
+train.isnull().sum().sort_values(ascending=False)
+(train.isnull().sum()/train.isnull().count()*100).sort_values(ascending=False)
+test.isnull().sum().sort_values(ascending=False)
+(test.isnull().sum()/test.isnull().count()*100).sort_values(ascending=False)
+
+train['Embarked'].value_counts()
+train['Embarked'].mode()[0]
+
 # 选择用于预测的变量
+# 这一步不要做的太早，要检查完缺失值之后再做，并且也不要根据自己的猜测随意删减变量
 # cols = ['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare', 'Cabin']
 selected_features = ['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare']
 X = train[selected_features]
 y = train['Survived']
 X_test = test[selected_features]
+
 
 # 填充缺失值，有两种方式
 # 1. 使用imputer处理会报错，因为含有 非数值的列sex
@@ -66,6 +79,9 @@ X_test_proc = pd.get_dummies(X_test)
 
 # 处理离散特征时，上面三种方式都可以使用，但是我偏向于使用get_dummies，
 # 因为另外两种得到的是np.array，没有列名，而使用get_dummies得到的仍然是DF
+
+
+
 
 
 # -----------------开始训练模型----------------------------
