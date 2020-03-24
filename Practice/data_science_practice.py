@@ -33,3 +33,35 @@ fig = sns.barplot(data=df, x='key', y='value')
 fig.set_xticklabels(fig.get_xticklabels(),rotation=30)
 # plt.bar(df['key'],height=df['value'])
 plt.show()
+
+
+# ---------numpy 随机数----------------
+np.random.rand(2,3)
+
+np.random.randn(2,3)
+
+np.random.choice(5,3)
+np.random.choice([1,3,5,7,9], 3)
+# ------------------------Python绘图---------------------------------
+# 查看可用的图形风格
+plt.style.available
+# 使用图形风格
+plt.style.use("ggplot")
+
+# 查看是否激活绘图
+plt.isinteractive()
+
+# 饼图
+x = [2,3,4,5]
+label = ['a','b','c','d']
+plt.pie(x, labels=label)
+plt.show()
+
+# 条形图
+label = ['b','a','c','d']
+plt.bar(label,x)
+
+
+# --------------seaborn-------------
+x = np.random.randn(2,10)
+sns.scatterplot(x[0,:], x[1,:])
