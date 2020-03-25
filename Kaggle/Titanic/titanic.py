@@ -8,32 +8,61 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
-
+import xgboost as xgb
 
 #查看数据
 # %cd Kaggle/Titanic/
 train = pd.read_csv('train.csv')
 test = pd.read_csv('test.csv')
+# 将乘客ID设为index，这个变量对于预测没有用
+train.set_index('PassengerId', inplace=True)
+test.set_index('PassengerId', inplace=True)
 # describe只会给出数值型变量的统计信息，没有多少用处
 # train.describe()
 # info()可以看出，age, cabin, embarked 含有缺失值
 train.info()
 test.info()
 
-# 将乘客ID设为index，这个变量对于预测没有用
-# 但是
-train.set_index('PassengerId', inplace=True)
-test.set_index('PassengerId', inplace=True)
 
+# ------------------ 第二版 ---------------------
 # 查看缺失值个数以及占比
 train.isnull().sum().sort_values(ascending=False)
+# Cabin       687
+# Age         177
+# Embarked      2  -- 只有训练集里缺失
 (train.isnull().sum()/train.isnull().count()*100).sort_values(ascending=False)
+# Cabin       77.104377
+# Age         19.865320
+# Embarked     0.224467
 test.isnull().sum().sort_values(ascending=False)
+# Cabin       327
+# Age          86
+# Fare          1   -- 只有测试集里缺失
 (test.isnull().sum()/test.isnull().count()*100).sort_values(ascending=False)
+# Cabin       78.229665
+# Age         20.574163
+# Fare         0.239234
+# 可以看出Cabin的缺失值很多，Age的缺失值尚可
 
+# --------处理缺失值--------
+# 对于Age，使用均值填充
+age_fillna_train = train['Age'].mean()
+age_fillna_test = test['Age'].mean()
+train['Age'].fillna(value=age_fillna_train, inplace=True)
+test['Age'].fillna(value=age_fillna_test, inplace=True)
+# 对于 训练集里有缺失的 Embarked，采用众数填充
 train['Embarked'].value_counts()
 train['Embarked'].mode()[0]
+train['Embarked'].fillna(train['Embarked'].mode()[0], inplace=True)
+# 对于 待测试集里有缺失的 Fare ，采用中位数填充
+test['Fare'].fillna(test['Fare'].median(), inplace=True)
+# 对于 Cabin ，由于缺失过于严重，直接丢弃
+train.drop(['Cabin'], axis=1, inplace=True)
+test.drop(['Cabin'], axis=1, inplace=True)
 
+
+
+# ------------ 第一版 -------------
 # 选择用于预测的变量
 # 这一步不要做的太早，要检查完缺失值之后再做，并且也不要根据自己的猜测随意删减变量
 # cols = ['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare', 'Cabin']
@@ -42,9 +71,9 @@ X = train[selected_features]
 y = train['Survived']
 X_test = test[selected_features]
 
-
 # 填充缺失值，有两种方式
-# 1. 使用imputer处理会报错，因为含有 非数值的列sex
+# 1. 使用imputer处理会报错，因为含有 非数值的列sex，
+# imputer会对所有的列进行填充
 # imp_mean = SimpleImputer(strategy='mean')
 # X_imp = imp_mean.fit_transform(X)
 # 2. 更好的方式是使用pandas的缺失值填充方法
@@ -79,10 +108,6 @@ X_test_proc = pd.get_dummies(X_test)
 
 # 处理离散特征时，上面三种方式都可以使用，但是我偏向于使用get_dummies，
 # 因为另外两种得到的是np.array，没有列名，而使用get_dummies得到的仍然是DF
-
-
-
-
 
 # -----------------开始训练模型----------------------------
 # Logistic
@@ -133,8 +158,7 @@ y_test_df = pd.DataFrame(y_test, index=X_test.index)
 
 
 
-# ---------------------------------------
-# TODO kaggle实战里的代码部分
+# ----------------kaggle实战的示例代码-----------------------
 dtype = {'PassengerId': str}
 train_all = pd.read_csv("train.csv", dtype=dtype)
 # 根据列索引来删除某一列
