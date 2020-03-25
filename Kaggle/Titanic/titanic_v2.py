@@ -131,3 +131,5 @@ y_pred = logis_grid.predict(test_dummy)
 y_pred_df = pd.DataFrame(y_pred, index=test_dummy.index)
 y_pred_df.columns = ['Survived']
 y_pred_df.to_csv("logistic_pred.csv")
+# 最终的成绩
+# 0.77033
