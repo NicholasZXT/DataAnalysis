@@ -38,7 +38,6 @@ Street: Type of road access to property
        Pave	Paved
        	
 Alley: Type of alley access to property
-缺失值太多，去除
        Grvl	Gravel
        Pave	Paved
        NA 	No alley access
