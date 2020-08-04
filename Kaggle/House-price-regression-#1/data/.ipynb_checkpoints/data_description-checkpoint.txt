@@ -38,7 +38,6 @@ Street: Type of road access to property
        Pave	Paved
        	
 Alley: Type of alley access to property
-
        Grvl	Gravel
        Pave	Paved
        NA 	No alley access
@@ -350,9 +349,9 @@ CentralAir: Central air conditioning
        N	No
        Y	Yes
 
-电力系统
-Electrical: Electrical system
 
+Electrical: Electrical system
+电力系统
        SBrkr	Standard Circuit Breakers & Romex
        FuseA	Fuse Box over 60 AMP and all Romex wiring (Average)	
        FuseF	60 AMP Fuse Box and mostly Romex wiring (Fair)
