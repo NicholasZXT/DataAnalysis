@@ -3,6 +3,23 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+
+# ------------- numpy 和 pandas 练习 ----------------------
+arr = np.arange(0,6).reshape((2,3))
+df = pd.DataFrame(arr, index=['r1','r2'], columns=['c1','c2','c3'])
+
+arr
+df
+arr.sum(axis=0)
+df.sum(axis=0)
+arr.sum(axis=1)
+df.sum(axis=1)
+
+df
+df.sum(axis=0)
+df.apply(np.sum, axis=0)
+
+
 planets = sns.load_dataset('planets')
 
 df = pd.DataFrame({'key': ['A', 'B', 'C', 'A', 'B', 'C'], 'data': range(6)}, columns=['key', 'data'])
