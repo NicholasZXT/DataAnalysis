@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 def SplitData(df, col, numOfSplit, special_attribute=[]):
     '''
+    根据指定的切分点数量numOfSplit和特征列col对df切分，并返回该特征的切分点
     :param df: 按照col排序后的数据集
     :param col: 待分箱的变量
     :param numOfSplit: 切分的组别数
@@ -11,12 +13,17 @@ def SplitData(df, col, numOfSplit, special_attribute=[]):
     '''
     df2 = df.copy()
     if special_attribute != []:
+        ## 只取那些不包含特殊值的行
         df2 = df.loc[~df[col].isin(special_attribute)]
     N = df2.shape[0]
     n = int(N/numOfSplit)
-    splitPointIndex = [i*n for i in range(1,numOfSplit)]
+    ## 获取df2中col列的值并进行升序排序
     rawValues = sorted(list(df2[col]))
+    ## 计算切分点的index
+    splitPointIndex = [i*n for i in range(1,numOfSplit)]
+    ## 利用切分点index从rawValues中获取切分点
     splitPoint = [rawValues[i] for i in splitPointIndex]
+    ## 下面这个是为了处理重复值出现的情况
     splitPoint = sorted(list(set(splitPoint)))
     return splitPoint
 
@@ -33,6 +40,7 @@ def MaximumBinPcnt(df,col):
 
 def Chi2(df, total_col, bad_col):
     '''
+    用于计算df这组中的卡方值
     :param df: 包含全部样本总计与坏样本总计的数据框
     :param total_col: 全部样本的个数
     :param bad_col: 坏样本的个数
@@ -41,9 +49,10 @@ def Chi2(df, total_col, bad_col):
     df2 = df.copy()
     # 求出df中，总体的坏样本率和好样本率
     badRate = sum(df2[bad_col])*1.0/sum(df2[total_col])
-    # 当全部样本只有好或者坏样本时，卡方值为0
+    # 当全部样本只有好或者坏样本时，卡方值为0——边界值处理
     if badRate in [0,1]:
         return 0
+    ## 计算好样本的个数
     df2['good'] = df2.apply(lambda x: x[total_col] - x[bad_col], axis = 1)
     goodRate = sum(df2['good']) * 1.0 / sum(df2[total_col])
     # 期望坏（好）样本个数＝全部样本个数*平均坏（好）样本占比
@@ -60,22 +69,31 @@ def Chi2(df, total_col, bad_col):
 
 def BinBadRate(df, col, target, grantRateIndicator=0):
     '''
+    用于计算df中根据col分箱之后，target列在每箱中的坏样本率
     :param df: 需要计算好坏比率的数据集
     :param col: 需要计算好坏比率的特征
-    :param target: 好坏标签
+    :param target: 好坏标签，坏样本的target=1
     :param grantRateIndicator: 1返回总体的坏样本率，0不返回
     :return: 每箱的坏样本率，以及总体的坏样本率（当grantRateIndicator＝＝1时）
     '''
+    ## total是每箱中总的样本数
     total = df.groupby([col])[target].count()
     total = pd.DataFrame({'total': total})
+    ## bad是每箱中坏样本的数量（坏样本的target=1）
     bad = df.groupby([col])[target].sum()
     bad = pd.DataFrame({'bad': bad})
+    ## 合并上述得到的两列
     regroup = total.merge(bad, left_index=True, right_index=True, how='left')
     regroup.reset_index(level=0, inplace=True)
-    regroup['bad_rate'] = regroup.apply(lambda x: x.bad * 1.0 / x.total, axis=1)
+    ## 计算每箱的坏样本率
+    regroup['bad_rate'] = regroup.apply(lambda x: x.bad / x.total, axis=1)
+    ## 其实使用下面这句就能直接得到每箱的坏样本率
+    ## df.groupby([col])[target].mean()
+
     dicts = dict(zip(regroup[col],regroup['bad_rate']))
     if grantRateIndicator==0:
         return (dicts, regroup)
+    # 计算总体的坏样本率
     N = sum(regroup['total'])
     B = sum(regroup['bad'])
     overallRate = B * 1.0 / N
@@ -100,13 +118,14 @@ def AssignGroup(x, bin):
 
 def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
     '''
+    根据指定的特征列col和最大分箱个数max_interval对df进行分箱，返回col列的分箱结果
     :param df: 包含目标变量与分箱属性的数据框
     :param col: 需要分箱的属性
     :param target: 目标变量，取值0或1
     :param max_interval: 最大分箱数。如果原始属性的取值个数低于该参数，不执行这段函数
     :param special_attribute: 不参与分箱的属性取值
     :param minBinPcnt：最小箱的占比，默认为0
-    :return: 分箱结果
+    :return: 分箱结果，也就是col特征的切分点
     '''
     colLevels = sorted(list(set(df[col])))
     N_distinct = len(colLevels)
@@ -114,6 +133,7 @@ def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
         print("The number of original levels for {} is less than or equal to max intervals".format(col))
         return colLevels[:-1]
     else:
+        ## 如果有缺失值，只取不含有缺失值的部分
         if len(special_attribute)>=1:
             df1 = df.loc[df[col].isin(special_attribute)]
             df2 = df.loc[~df[col].isin(special_attribute)]
@@ -122,17 +142,25 @@ def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
         N_distinct = len(list(set(df2[col])))
 
         # 步骤一: 通过col对数据集进行分组，求出每组的总样本数与坏样本数
+        ## 初始的分组最多不超过100组，不超过100组时，就按照原有的取值作为初始分组
         if N_distinct > 100:
+            ##  根据指定的特征列col和分组数目划分出col下的切分点
             split_x = SplitData(df2, col, 100)
+            ## 利用划分的切分点将col特征列转换成对于的分箱值
             df2['temp'] = df2[col].map(lambda x: AssignGroup(x, split_x))
+
+            ## 上面两行里使用的SplitData和AssignGroup函数完全可以用sklearn中的preprocessing.KBinsDiscretizer类来进行处理
         else:
+            ## col列的取值个数不超过100时，就使用原本的值作为切分点和分箱
             df2['temp'] = df2[col]
+
         # 总体bad rate将被用来计算expected bad count
         (binBadRate, regroup, overallRate) = BinBadRate(df2, 'temp', target, grantRateIndicator=1)
 
         # 首先，每个单独的属性值将被分为单独的一组
         # 对属性值进行排序，然后两两组别进行合并
         colLevels = sorted(list(set(df2['temp'])))
+        # 每个特征的初始组level，里面的每个元素是一个list
         groupIntervals = [[i] for i in colLevels]
 
         # 步骤二：建立循环，不断合并最优的相邻两个组别，直到：
@@ -145,11 +173,16 @@ def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
             # 每次循环时, 计算合并相邻组别后的卡方值。具有最小卡方值的合并方案，是最优方案
             chisqList = []
             for k in range(len(groupIntervals)-1):
+                # temp_group里是一个list（这里的加法是list的合并）,里面含有合并的grouplevels
                 temp_group = groupIntervals[k] + groupIntervals[k+1]
+                # 过滤出需要合并的组记录
                 df2b = regroup.loc[regroup['temp'].isin(temp_group)]
+                # 计算并存储卡方值
                 chisq = Chi2(df2b, 'total', 'bad')
                 chisqList.append(chisq)
+            ## 找出本轮合并组别的循环中，卡方值最小的两组
             best_comnbined = chisqList.index(min(chisqList))
+            ## 找出合并后卡方值最小的两组
             groupIntervals[best_comnbined] = groupIntervals[best_comnbined] + groupIntervals[best_comnbined+1]
             # 当将最优的相邻的两个变量合并在一起后，需要从原来的列表中将其移除。例如，将[3,4,5] 与[6,7]合并成[3,4,5,6,7]后，需要将[3,4,5] 与[6,7]移除，保留[3,4,5,6,7]
             groupIntervals.remove(groupIntervals[best_comnbined+1])
@@ -159,6 +192,7 @@ def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
         # 检查是否有箱没有好或者坏样本。如果有，需要跟相邻的箱进行合并，直到每箱同时包含好坏样本
         groupedvalues = df2['temp'].apply(lambda x: AssignBin(x, cutOffPoints))
         df2['temp_Bin'] = groupedvalues
+        ## 计算合并后，每箱中的坏样本率
         (binBadRate,regroup) = BinBadRate(df2, 'temp_Bin', target)
         [minBadRate, maxBadRate] = [min(binBadRate.values()),max(binBadRate.values())]
         while minBadRate ==0 or maxBadRate == 1:
@@ -193,7 +227,9 @@ def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
             df2['temp_Bin'] = groupedvalues
             (binBadRate, regroup) = BinBadRate(df2, 'temp_Bin', target)
             [minBadRate, maxBadRate] = [min(binBadRate.values()), max(binBadRate.values())]
+
         # 需要检查分箱后的最小占比
+        ## 当参数 minBinPcnt>0 时，才执行下面的语句
         if minBinPcnt > 0:
             groupedvalues = df2['temp'].apply(lambda x: AssignBin(x, cutOffPoints))
             df2['temp_Bin'] = groupedvalues
@@ -241,6 +277,7 @@ def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
 
 def BadRateEncoding(df, col, target):
     '''
+    对于df中的无序类别特征col进行编码，返回编码结果
     :return: 在数据集df中，用坏样本率给col进行编码。target表示坏样本标签
     '''
     regroup = BinBadRate(df, col, target, grantRateIndicator=0)[1]
@@ -314,9 +351,10 @@ def FeatureMonotone(x):
     index_of_nonmonotone = [i+1 for i in range(len(monotone)) if monotone[i]]
     return {'count_of_nonmonotone':monotone.count(True), 'index_of_nonmonotone':index_of_nonmonotone}
 
-## 判断某变量的坏样本率是否单调
+
 def BadRateMonotone(df, sortByVar, target,special_attribute = []):
     '''
+    判断分箱之后的坏样本率是否单调，单调返回True,否则返回False
     :param df: 包含检验坏样本率的变量，和目标变量
     :param sortByVar: 需要检验坏样本率的变量
     :param target: 目标变量，0、1表示好、坏
@@ -329,6 +367,7 @@ def BadRateMonotone(df, sortByVar, target,special_attribute = []):
     regroup = BinBadRate(df2, sortByVar, target)[1]
     combined = zip(regroup['total'],regroup['bad'])
     badRate = [x[1]*1.0/x[0] for x in combined]
+    ## 获取不满足坏样本率单调性的箱子编号
     badRateNotMonotone = FeatureMonotone(badRate)['count_of_nonmonotone']
     if badRateNotMonotone > 0:
         return False
@@ -484,16 +523,19 @@ def Monotone_Merge(df, target, col):
 def Prob2Score(prob, basePoint, PDO):
     #将概率转化成分数且为正整数
     y = np.log(prob/(1-prob))
-    return int(basePoint+PDO/np.log(2)*(-y))
+    y2 = basePoint+PDO/np.log(2)*(-y)
+    score = y2.astype("int")
+    return score
 
 
 
 ### 计算KS值
-def KS(df, score, target):
+def KS(df, score, target, plot = True):
     '''
     :param df: 包含目标变量与预测值的数据集
     :param score: 得分或者概率
     :param target: 目标变量
+    :return: KS值
     :return: KS值
     '''
     total = df.groupby([score])[target].count()
@@ -501,10 +543,43 @@ def KS(df, score, target):
     all = pd.DataFrame({'total':total, 'bad':bad})
     all['good'] = all['total'] - all['bad']
     all[score] = all.index
-    all = all.sort_values(by=score,ascending=False)
+    all = all.sort_values(by=score)
     all.index = range(len(all))
     all['badCumRate'] = all['bad'].cumsum() / all['bad'].sum()
     all['goodCumRate'] = all['good'].cumsum() / all['good'].sum()
-    KS = all.apply(lambda x: x.badCumRate - x.goodCumRate, axis=1)
-    return max(KS)
+    KS_list = all.apply(lambda x: x.badCumRate - x.goodCumRate, axis=1)
+    KS = max(KS_list)
+    if plot:
+        plt.plot(all[score], all['badCumRate'])
+        plt.plot(all[score], all['goodCumRate'])
+        plt.title('KS ={}%'.format(int(KS*100)))
+    return KS
 
+
+def ROC_AUC(df, score, target, plot = True):
+    df2 = df.copy()
+    s = list(set(df2[score]))
+    s.sort()
+    tpr_list =[]
+    fpr_list = []
+    for k in s:
+        df2['label_temp'] = df[score].map(lambda x : int(x<=k))
+        temp = df2.groupby([target,'label_temp']).size()
+        if temp.shape[0]<4:
+            continue
+        TP,FN,FP,TN = temp[1][1],temp[1][0],temp[0][1],temp[0][0]
+        TPR, FPR = TP/(TP+FN), FP/(FP+TN)
+        tpr_list.append(TPR)
+        fpr_list.append(FPR)
+
+    ROC_df = pd.DataFrame({'tpr':tpr_list, 'fpr':fpr_list})
+    ROC_df = ROC_df.sort_values(by = 'tpr')
+    auc = 0
+    ROC_mat = np.mat(ROC_df)
+    for i in range(1,ROC_mat.shape[0]):
+        auc = auc + (ROC_mat[i,1] + ROC_mat[i-1,1])*(ROC_mat[i,0] - ROC_mat[i-1,0])*0.5
+    if plot:
+        plt.plot(ROC_df['fpr'],ROC_df['tpr'])
+        plt.plot([0,1],[0,1])
+        plt.title("AUC={}%".format(int(auc*100)))
+    return auc
