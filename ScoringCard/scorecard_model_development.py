@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import pandas as pd
 import datetime
 import collections
@@ -15,9 +16,12 @@ from importlib import reload
 from matplotlib import pyplot as plt
 reload(sys)
 sys.setdefaultencoding( "utf-8")
-from scorecard_functions import *
+from .scorecard_functions import  *
 from sklearn.linear_model import LogisticRegressionCV
-# -*- coding: utf-8 -*-
+
+'''
+以 ## 开头的是我添加的注释
+'''
 
 ################################
 ######## UDF: 自定义函数 ########
@@ -54,13 +58,19 @@ def ChangeContent(x):
         y = '_PHONE'
     return y
 
+
 def MissingCategorial(df,x):
     missing_vals = df[x].map(lambda x: int(x!=x))
     return sum(missing_vals)*1.0/df.shape[0]
 
+
 def MissingContinuous(df,x):
+    """
+    用于统计df中x列缺失值占比
+    """
     missing_vals = df[x].map(lambda x: int(np.isnan(x)))
     return sum(missing_vals) * 1.0 / df.shape[0]
+
 
 def MakeupRandom(x, sampledList):
     if x==x:
@@ -70,14 +80,15 @@ def MakeupRandom(x, sampledList):
         return sampledList[randIndex]
 
 
-
 ############################################################
 #Step 0: 数据分析的初始工作, 包括读取数据文件、检查用户Id的一致性等#
 ############################################################
-
-folderOfData = '/Users/Code/Data Collections/bank default/'
+folderOfData = '/Users/danielzhang/Documents/Python-Projects/DataAnalysis/ScoringCard/'
+## data1是登录信息表
 data1 = pd.read_csv(folderOfData+'PPD_LogInfo_3_1_Training_Set.csv', header = 0)
+## data2是主要的信息表
 data2 = pd.read_csv(folderOfData+'PPD_Training_Master_GBK_3_1_Training_Set.csv', header = 0,encoding = 'gbk')
+## data3是信息更新表
 data3 = pd.read_csv(folderOfData+'PPD_Userupdate_Info_3_1_Training_Set.csv', header = 0)
 
 #############################################################################################
@@ -90,16 +101,20 @@ del data2['UserInfo_4']
 del data2['UserInfo_8']
 del data2['UserInfo_20']
 
-### 提取申请日期，计算日期差，查看日期差的分布
+#####------------------ 登录信息表 部分,data1 ------------------------------------
+## 提取申请日期，计算日期差，查看日期差的分布
 data1['logInfo'] = data1['LogInfo3'].map(lambda x: datetime.datetime.strptime(x,'%Y-%m-%d'))
 data1['Listinginfo'] = data1['Listinginfo1'].map(lambda x: datetime.datetime.strptime(x,'%Y-%m-%d'))
+## 这里计算的日期差是 Listinginfo - logInfo，也就是贷款发放日期 - 登录日期
 data1['ListingGap'] = data1[['logInfo','Listinginfo']].apply(lambda x: (x[1]-x[0]).days,axis = 1)
-plt.hist(data1['ListingGap'],bins=200)
-plt.title('Days between login date and listing date')
-ListingGap2 = data1['ListingGap'].map(lambda x: min(x,365))
-plt.hist(ListingGap2,bins=200)
+# 绘图
+# plt.hist(data1['ListingGap'],bins=200)
+# plt.title('Days between login date and listing date')
+# ListingGap2 = data1['ListingGap'].map(lambda x: min(x,365))
+# plt.hist(ListingGap2,bins=200)
 
-timeWindows = TimeWindowSelection(data1, 'ListingGap', range(30,361,30))
+## 下面这个没啥用
+# timeWindows = TimeWindowSelection(data1, 'ListingGap', range(30,361,30))
 
 '''
 使用180天作为最大的时间窗口计算新特征
@@ -108,34 +123,42 @@ timeWindows = TimeWindowSelection(data1, 'ListingGap', range(30,361,30))
 '''
 time_window = [7, 30, 60, 90, 120, 150, 180]
 var_list = ['LogInfo1','LogInfo2']
+## 提取去重后的每个用户ID作为一行记录
 data1GroupbyIdx = pd.DataFrame({'Idx':data1['Idx'].drop_duplicates()})
 
 for tw in time_window:
+    ## 过滤出时间窗口内的记录
     data1['TruncatedLogInfo'] = data1['Listinginfo'].map(lambda x: x + datetime.timedelta(-tw))
     temp = data1.loc[data1['logInfo'] >= data1['TruncatedLogInfo']]
     for var in var_list:
         #count the frequences of LogInfo1 and LogInfo2
+        ## 按照Idx分组，统计var的count——统计每个Idx的行为数，之后转换为dict,每一列是字典中的一个key
         count_stats = temp.groupby(['Idx'])[var].count().to_dict()
         data1GroupbyIdx[str(var)+'_'+str(tw)+'_count'] = data1GroupbyIdx['Idx'].map(lambda x: count_stats.get(x,0))
 
         # count the distinct value of LogInfo1 and LogInfo2
+        ## 获取IDx和 var的去重记录
         Idx_UserupdateInfo1 = temp[['Idx', var]].drop_duplicates()
         uniq_stats = Idx_UserupdateInfo1.groupby(['Idx'])[var].count().to_dict()
         data1GroupbyIdx[str(var) + '_' + str(tw) + '_unique'] = data1GroupbyIdx['Idx'].map(lambda x: uniq_stats.get(x,0))
 
         # calculate the average count of each value in LogInfo1 and LogInfo2
+        ## 也就是 count/unique
         data1GroupbyIdx[str(var) + '_' + str(tw) + '_avg_count'] = data1GroupbyIdx[[str(var)+'_'+str(tw)+'_count',str(var) + '_' + str(tw) + '_unique']].\
             apply(lambda x: DeivdedByZero(x[0],x[1]), axis=1)
 
 
+#####------------------ 信息更新表 部分，data3 ------------------------------------
 data3['ListingInfo'] = data3['ListingInfo1'].map(lambda x: datetime.datetime.strptime(x,'%Y/%m/%d'))
 data3['UserupdateInfo'] = data3['UserupdateInfo2'].map(lambda x: datetime.datetime.strptime(x,'%Y/%m/%d'))
-data3['ListingGap'] = data3[['UserupdateInfo','ListingInfo']].apply(lambda x: (x[1]-x[0]).days,axis = 1)
-collections.Counter(data3['ListingGap'])
-hist_ListingGap = np.histogram(data3['ListingGap'])
-hist_ListingGap = pd.DataFrame({'Freq':hist_ListingGap[0],'gap':hist_ListingGap[1][1:]})
-hist_ListingGap['CumFreq'] = hist_ListingGap['Freq'].cumsum()
-hist_ListingGap['CumPercent'] = hist_ListingGap['CumFreq'].map(lambda x: x*1.0/hist_ListingGap.iloc[-1]['CumFreq'])
+## 这里的差值是 ListingInfo - UserupdateInfo
+data3['ListingGap'] = data3[['UserupdateInfo', 'ListingInfo']].apply(lambda x: (x[1]-x[0]).days, axis=1)
+## 绘图
+# collections.Counter(data3['ListingGap'])
+# hist_ListingGap = np.histogram(data3['ListingGap'])
+# hist_ListingGap = pd.DataFrame({'Freq':hist_ListingGap[0],'gap':hist_ListingGap[1][1:]})
+# hist_ListingGap['CumFreq'] = hist_ListingGap['Freq'].cumsum()
+# hist_ListingGap['CumPercent'] = hist_ListingGap['CumFreq'].map(lambda x: x*1.0/hist_ListingGap.iloc[-1]['CumFreq'])
 
 '''
 对 QQ和qQ, Idnumber和idNumber,MOBILEPHONE和PHONE 进行统一
@@ -166,15 +189,20 @@ for tw in time_window:
         apply(lambda x: x[0] * 1.0 / x[1], axis=1)
 
     #whether the applicant changed items like IDNUMBER,HASBUYCAR, MARRIAGESTATUSID, PHONE
+    ## 计算IDNUMBER,HASBUYCAR, MARRIAGESTATUSID, PHONE这四类更新信息行为的特征数
+    ## 将每个信息变成list里的一个元素
     Idx_UserupdateInfo1['UserupdateInfo1'] = Idx_UserupdateInfo1['UserupdateInfo1'].map(lambda x: [x])
+    ## 这里的sum会将上述list的元素以list的方式连接起来，不转成list的话，会当做字符串拼接起来，后续就无法区分了
     Idx_UserupdateInfo1_V2 = Idx_UserupdateInfo1.groupby(['Idx'])['UserupdateInfo1'].sum()
     for item in ['_IDNUMBER','_HASBUYCAR','_MARRIAGESTATUSID','_PHONE']:
+
         item_dict = Idx_UserupdateInfo1_V2.map(lambda x: int(item in x)).to_dict()
         data3GroupbyIdx['UserupdateInfo_' + str(tw) + str(item)] = data3GroupbyIdx['Idx'].map(lambda x: item_dict.get(x, x))
 
 # Combine the above features with raw features in PPD_Training_Master_GBK_3_1_Training_Set
+## 将上述登录表和更新表里得到的时间切片特征合并到基础信息表里
 allData = pd.concat([data2.set_index('Idx'), data3GroupbyIdx.set_index('Idx'), data1GroupbyIdx.set_index('Idx')],axis= 1)
-allData.to_csv(folderOfData+'allData_0.csv',encoding = 'gbk')
+allData.to_csv(folderOfData+'allData_0.csv', encoding='gbk')
 
 
 
@@ -189,6 +217,7 @@ if 'Idx' in allFeatures:
     allFeatures.remove('Idx')
 allFeatures.remove('ListingInfo')
 
+## 下面这个没有必要
 #检查是否有常数型变量，并且检查是类别型还是数值型变量
 numerical_var = []
 for col in allFeatures:
@@ -197,6 +226,9 @@ for col in allFeatures:
         del allData[col]
         allFeatures.remove(col)
     else:
+        #uniq_vals = list(set(allData[col]))
+        #if np.nan in uniq_vals:
+            #uniq_vals.remove(np.nan)
         uniq_valid_vals = [i for i in allData[col] if i == i]
         uniq_valid_vals = list(set(uniq_valid_vals))
         if len(uniq_valid_vals) >= 10 and isinstance(uniq_valid_vals[0], numbers.Real):
@@ -207,7 +239,7 @@ categorical_var = [i for i in allFeatures if i not in numerical_var]
 
 #检查变量的最多值的占比情况,以及每个变量中占比最大的值
 records_count = allData.shape[0]
-col_most_values,col_large_value = {},{}
+col_most_values, col_large_value = {}, {}
 for col in allFeatures:
     value_count = allData[col].groupby(allData[col]).count()
     col_most_values[col] = max(value_count)/records_count
@@ -218,8 +250,9 @@ col_most_values_df.columns = ['max percent']
 col_most_values_df = col_most_values_df.sort_values(by = 'max percent', ascending = False)
 pcnt = list(col_most_values_df[:500]['max percent'])
 vars = list(col_most_values_df[:500].index)
-plt.bar(range(len(pcnt)), height = pcnt)
+plt.bar(range(len(pcnt)), height=pcnt)
 plt.title('Largest Percentage of Single Value in Each Variable')
+plt.show()
 
 #计算多数值占比超过90%的字段中，少数值的坏样本率是否会显著高于多数值
 large_percent_cols = list(col_most_values_df[col_most_values_df['max percent']>=0.9].index)
@@ -237,7 +270,8 @@ bad_rate_diff_sorted = sorted(bad_rate_diff.items(),key=lambda x: x[1], reverse=
 bad_rate_diff_sorted_values = [x[1] for x in bad_rate_diff_sorted]
 plt.bar(x = range(len(bad_rate_diff_sorted_values)), height = bad_rate_diff_sorted_values)
 
-#由于所有的少数值的坏样本率并没有显著高于多数值，意味着这些变量可以直接剔除
+#由于所有的少数值的坏样本率并没有显著高于多数值，意味着这些变量可以  直接剔除
+## 这里做的这一步有点意思
 for col in large_percent_cols:
     if col in numerical_var:
         numerical_var.remove(col)
@@ -256,30 +290,29 @@ for col in categorical_var:
         categorical_var.remove(col)
         del allData[col]
     if 0 < missingRate < missing_pcnt_threshould_1:
-        uniq_valid_vals = [i for i in allData[col] if i == i]
-        uniq_valid_vals = list(set(uniq_valid_vals))
-        if isinstance(uniq_valid_vals[0], numbers.Real):
-            missing_position = allData.loc[allData[col] != allData[col]][col].index
-            not_missing_sample = [-1]*len(missing_position)
-            allData.loc[missing_position, col] = not_missing_sample
-        else:
-            # In this way we convert NaN to NAN, which is a string instead of np.nan
-            allData[col] = allData[col].map(lambda x: str(x).upper())
+        # In this way we convert NaN to NAN, which is a string instead of np.nan
+        ## 将NaN表示的缺失值转换成字符的NAN,用于表示特殊状态
+        allData[col] = allData[col].map(lambda x: str(x).upper())
 
 allData_bk = allData.copy()
+
 '''
-检查数值型变量
+检查数值型变量,如果缺失超过80%, 就删除，
 '''
 missing_pcnt_threshould_2 = 0.8
 deleted_var = []
 for col in numerical_var:
+    ## 先计算col列的缺失值占比
     missingRate = MissingContinuous(allData, col)
     print('{0} has missing rate as {1}'.format(col, missingRate))
     if missingRate > missing_pcnt_threshould_2:
+    ## 缺失值占比在0.8以上的 特征col 直接删除
         deleted_var.append(col)
         print('we delete variable {} because of its high missing rate'.format(col))
     else:
         if missingRate > 0:
+        # 缺失值占比在0.8以下的，进行抽样补充
+            ## 对于缺失值在0.8以下的数值变量，从未缺失的值里随机抽样进行填充
             not_missing = allData.loc[allData[col] == allData[col]][col]
             #makeuped = allData[col].map(lambda x: MakeupRandom(x, list(not_missing)))
             missing_position = allData.loc[allData[col] != allData[col]][col].index
@@ -297,8 +330,6 @@ if deleted_var != []:
 
 
 allData.to_csv(folderOfData+'allData_1.csv', header=True,encoding='gbk', columns = allData.columns, index=False)
-
-allData = pd.read_csv(folderOfData+'allData_1.csv', header=0,encoding='gbk')
 
 
 
@@ -350,6 +381,7 @@ var_IV = {}  #save the IV values for binned features       #将IV值保留和WOE
 var_WOE = {}
 for col in categorical_var:
     print('we are processing {}'.format(col))
+    ## 只有在类别型变量取值个数>5时才进行合并分箱操作
     if len(set(trainData[col]))>5:
         print('{} is encoded with bad rate'.format(col))
         col0 = str(col)+'_encoding'
@@ -365,8 +397,8 @@ for col in categorical_var:
         encoded_features[col] = [col0, br_encoding]
 
         #(4), 删除原始值
-
         deleted_features.append(col)
+
     else:
         bad_bin = trainData.groupby([col])['target'].sum()
         #对于类别数少于5个，但是出现0坏样本的特征需要做处理
@@ -401,8 +433,9 @@ for col in categorical_var:
 '''
 对于连续型变量，处理方式如下：
 1，利用卡方分箱法将变量分成5个箱
-2，检查坏样本率的单带性，如果发现单调性不满足，就进行合并，直到满足单调性
+2，检查坏样本率的单调性，如果发现单调性不满足，就进行合并，直到满足单调性
 '''
+## 用于记录每个特征col下分箱的切分点列表
 var_cutoff = {}
 for col in numerical_var:
     print("{} is in processing".format(col))
@@ -414,14 +447,19 @@ for col in numerical_var:
         special_attribute = [-1]
     else:
         special_attribute = []
+    ## 返回的是trainData在col列进行分箱之后的切分点列表
     cutOffPoints = ChiMerge(trainData, col, 'target',special_attribute=special_attribute)
     var_cutoff[col] = cutOffPoints
+    ## 根据特征col得到的切分点进行对trainData进行分箱，得到分箱后的新特征col1
     trainData[col1] = trainData[col].map(lambda x: AssignBin(x, cutOffPoints,special_attribute=special_attribute))
 
     #(2), check whether the bad rate is monotone
+    ## 检查分箱之后，坏样本率是否是单调的
     BRM = BadRateMonotone(trainData, col1, 'target',special_attribute=special_attribute)
     if not BRM:
+    ## 如果分箱之后坏样本率 不是单调的，则执行下面的合并代码
         if special_attribute == []:
+            ## 进行单调合并，获取合并后的切分点
             bin_merged = Monotone_Merge(trainData, 'target', col1)
             removed_index = []
             for bin in bin_merged:
@@ -431,7 +469,9 @@ for col in numerical_var:
             removed_point = [cutOffPoints[k] for k in removed_index]
             for p in removed_point:
                 cutOffPoints.remove(p)
+            ## 重新记录特征col合并后的切分点
             var_cutoff[col] = cutOffPoints
+            ## 利用col特征新的切分点进行分箱
             trainData[col1] = trainData[col].map(lambda x: AssignBin(x, cutOffPoints, special_attribute=special_attribute))
         else:
             cutOffPoints2 = [i for i in cutOffPoints if i not in special_attribute]
@@ -458,6 +498,7 @@ for col in numerical_var:
         print('we delete {} because the maximum bin occupies more than 90%'.format(col))
         continue
 
+    ## 计算特征col分箱之后的WOE和IV
     WOE_IV = CalcWOE(trainData, col1, 'target')
     var_IV[col] = WOE_IV['IV']
     var_WOE[col] = WOE_IV['WOE']
@@ -483,11 +524,27 @@ with open(folderOfData+'var_cutoff.pkl',"wb") as f:
 with open(folderOfData+'merged_features.pkl',"wb") as f:
     f.write(pickle.dumps(merged_features))
 
-#########################################################
-# Step 4: Select variables with IV > 0.02 and assign WOE#
-#########################################################
+########################################
+# Step 4: WOE编码后的单变量分析与多变量分析#
+########################################
 trainData = pd.read_csv(folderOfData+'allData_2.csv', header=0, encoding='gbk')
 
+
+with open(folderOfData+'var_WOE.pkl',"rb") as f:
+    var_WOE = pickle.load(f)
+
+with open(folderOfData+'var_IV.pkl',"rb") as f:
+    var_IV = pickle.load(f)
+
+
+with open(folderOfData+'var_cutoff.pkl',"rb") as f:
+    var_cutoff = pickle.load(f)
+
+
+with open(folderOfData+'merged_features.pkl',"rb") as f:
+    merged_features = pickle.load(f)
+
+#将一些看起来像数值变量实际上是类别变量的字段转换成字符
 num2str = ['SocialNetwork_13','SocialNetwork_12','UserInfo_6','UserInfo_5','UserInfo_10','UserInfo_17']
 for col in num2str:
     trainData[col] = trainData[col].map(lambda x: str(x))
@@ -510,9 +567,7 @@ trainData.to_csv(folderOfData+'allData_3.csv', header=True,encoding='gbk', colum
 
 
 
-
-
-### (i) select the features with IV above the thresould
+### (i) 选择IV高于阈值的变量
 trainData = pd.read_csv(folderOfData+'allData_3.csv', header=0,encoding='gbk')
 all_IV = list(var_IV.values())
 all_IV = sorted(all_IV, reverse=True)
@@ -522,7 +577,7 @@ varByIV = [k for k, v in var_IV.items() if v > iv_threshould]
 
 
 
-### (ii) check the collinearity of any pair of the features with WOE after (i)
+### (ii) 检查WOE编码后的变量的两两线性相关性
 
 var_IV_selected = {k:var_IV[k] for k in varByIV}
 var_IV_sorted = sorted(var_IV_selected.items(), key=lambda d:d[1], reverse = True)
@@ -546,7 +601,7 @@ for i in range(len(var_IV_sorted)-1):
 
 var_IV_sortet_2 = [i for i in var_IV_sorted if i not in removed_var]
 
-### (iii) check the multi-colinearity according to VIF > 10
+### (iii）检查是否有变量与其他所有变量的VIF > 10
 for i in range(len(var_IV_sortet_2)):
     x0 = trainData[var_IV_sortet_2[i]+'_WOE']
     x0 = np.array(x0)
@@ -563,6 +618,74 @@ for i in range(len(var_IV_sortet_2)):
 
 
 
+#########################
+# Step 5: 应用逻辑回归模型#
+#########################
+multi_analysis = [i+'_WOE' for i in var_IV_sortet_2]
+y = trainData['target']
+X = trainData[multi_analysis].copy()
+X['intercept'] = [1]*X.shape[0]
+
+
+LR = sm.Logit(y, X).fit()
+summary = LR.summary2()
+pvals = LR.pvalues.to_dict()
+params = LR.params.to_dict()
+
+#发现有变量不显著，因此需要单独检验显著性
+varLargeP = {k: v for k,v in pvals.items() if v >= 0.1}
+varLargeP = sorted(varLargeP.items(), key=lambda d:d[1], reverse = True)
+varLargeP = [i[0] for i in varLargeP]
+p_value_list = {}
+for var in varLargeP:
+    X_temp = trainData[var].copy().to_frame()
+    X_temp['intercept'] = [1] * X_temp.shape[0]
+    LR = sm.Logit(y, X_temp).fit()
+    p_value_list[var] = LR.pvalues[var]
+for k,v in p_value_list.items():
+    print("{0} has p-value of {1} in univariate regression".format(k,v))
+
+
+#发现有变量的系数为正，因此需要单独检验正确性
+varPositive = [k for k,v in params.items() if v >= 0]
+coef_list = {}
+for var in varPositive:
+    X_temp = trainData[var].copy().to_frame()
+    X_temp['intercept'] = [1] * X_temp.shape[0]
+    LR = sm.Logit(y, X_temp).fit()
+    coef_list[var] = LR.params[var]
+for k,v in coef_list.items():
+    print("{0} has coefficient of {1} in univariate regression".format(k,v))
+
+
+selected_var = [multi_analysis[0]]
+for var in multi_analysis[1:]:
+    try_vars = selected_var+[var]
+    X_temp = trainData[try_vars].copy()
+    X_temp['intercept'] = [1] * X_temp.shape[0]
+    LR = sm.Logit(y, X_temp).fit()
+    #summary = LR.summary2()
+    pvals, params = LR.pvalues, LR.params
+    del params['intercept']
+    if max(pvals)<0.1 and max(params)<0:
+        selected_var.append(var)
+
+LR.summary2()
+
+y_pred = LR.predict(X_temp)
+roc_auc_score(trainData['target'], y_pred)
 
 
 
+#########################
+# Step 6: 尺度化与性能检验#
+#########################
+scores = Prob2Score(y_pred, 200, 100)
+plt.hist(score,bins=100)
+
+scorecard = pd.DataFrame({'y_pred':y_pred, 'y_real':list(trainData['target']),'score':scores})
+KS(scorecard,'score','y_real')
+ROC_AUC(df, score, target)
+
+# 也可用sklearn带的函数
+roc_auc_score(trainData['target'], y_pred)

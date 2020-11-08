@@ -109,22 +109,28 @@ timeWindows = TimeWindowSelection(data1, 'ListingGap', range(30,361,30))
 '''
 time_window = [7, 30, 60, 90, 120, 150, 180]
 var_list = ['LogInfo1','LogInfo2']
+# 提取去重后的每个用户ID作为一行记录
 data1GroupbyIdx = pd.DataFrame({'Idx':data1['Idx'].drop_duplicates()})
 
 for tw in time_window:
+    # 过滤出时间窗口内的记录
     data1['TruncatedLogInfo'] = data1['Listinginfo'].map(lambda x: x + datetime.timedelta(-tw))
     temp = data1.loc[data1['logInfo'] >= data1['TruncatedLogInfo']]
     for var in var_list:
         #count the frequences of LogInfo1 and LogInfo2
+        # 统计count之后，转换为dict,每一列是字典中的一个key
         count_stats = temp.groupby(['Idx'])[var].count().to_dict()
+        # 
         data1GroupbyIdx[str(var)+'_'+str(tw)+'_count'] = data1GroupbyIdx['Idx'].map(lambda x: count_stats.get(x,0))
 
         # count the distinct value of LogInfo1 and LogInfo2
+        # 获取IDx和 var的去重记录
         Idx_UserupdateInfo1 = temp[['Idx', var]].drop_duplicates()
         uniq_stats = Idx_UserupdateInfo1.groupby(['Idx'])[var].count().to_dict()
         data1GroupbyIdx[str(var) + '_' + str(tw) + '_unique'] = data1GroupbyIdx['Idx'].map(lambda x: uniq_stats.get(x,0))
 
         # calculate the average count of each value in LogInfo1 and LogInfo2
+        # 也就是 count/unique 
         data1GroupbyIdx[str(var) + '_' + str(tw) + '_avg_count'] = data1GroupbyIdx[[str(var)+'_'+str(tw)+'_count',str(var) + '_' + str(tw) + '_unique']].\
             apply(lambda x: DeivdedByZero(x[0],x[1]), axis=1)
 
