@@ -16,8 +16,10 @@ from importlib import reload
 from matplotlib import pyplot as plt
 reload(sys)
 sys.setdefaultencoding( "utf-8")
-from .scorecard_functions import  *
 from sklearn.linear_model import LogisticRegressionCV
+
+## 从另外一个文件里引入所需要的函数
+from .scorecard_functions import  *
 
 '''
 以 ## 开头的是我添加的注释
