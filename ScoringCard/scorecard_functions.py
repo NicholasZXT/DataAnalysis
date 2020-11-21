@@ -42,25 +42,34 @@ def Chi2(df, total_col, bad_col):
     '''
     用于计算df这组中的卡方值
     :param df: 包含全部样本总计与坏样本总计的数据框
-    :param total_col: 全部样本的个数
-    :param bad_col: 坏样本的个数
+    :param total_col: 全部样本的个数的列名
+    :param bad_col: 坏样本的个数的列名
     :return: 卡方值
+    传入的df如下所示：
+      temp  total  bad  bad_rate
+    0    1      4    1      0.25
+    1    2      4    3      0.75
+    2    3      2    1      0.50
     '''
     df2 = df.copy()
-    # 求出df中，总体的坏样本率和好样本率
+    ## 求出df中，总体的坏样本率
     badRate = sum(df2[bad_col])*1.0/sum(df2[total_col])
     # 当全部样本只有好或者坏样本时，卡方值为0——边界值处理
     if badRate in [0,1]:
         return 0
-    ## 计算好样本的个数
+    ## 计算每组中好样本的个数
     df2['good'] = df2.apply(lambda x: x[total_col] - x[bad_col], axis = 1)
+    ## 然后求出df中，总体的好样本率
     goodRate = sum(df2['good']) * 1.0 / sum(df2[total_col])
     # 期望坏（好）样本个数＝全部样本个数*平均坏（好）样本占比
     df2['badExpected'] = df[total_col].apply(lambda x: x*badRate)
     df2['goodExpected'] = df[total_col].apply(lambda x: x * goodRate)
+    ## 上面两局可以直接写成下面这样：
+    #df2['badExpected'] = df[total_col] * badRate
+    #df2['goodExpected'] = df[total_col] * goodRate
     badCombined = zip(df2['badExpected'], df2[bad_col])
     goodCombined = zip(df2['goodExpected'], df2['good'])
-    badChi = [(i[0]-i[1])**2/i[0] for i in badCombined]
+    badChi = [(i[0]-i[1]) ** 2 / i[0] for i in badCombined]
     goodChi = [(i[0] - i[1]) ** 2 / i[0] for i in goodCombined]
     chi2 = sum(badChi) + sum(goodChi)
     return chi2
@@ -87,6 +96,13 @@ def BinBadRate(df, col, target, grantRateIndicator=0):
     regroup.reset_index(level=0, inplace=True)
     ## 计算每箱的坏样本率
     regroup['bad_rate'] = regroup.apply(lambda x: x.bad / x.total, axis=1)
+    ## regroup是如下的DF
+    '''
+       col  total  bad  bad_rate
+    0    1      4    1      0.25
+    1    2      4    3      0.75
+    2    3      2    1      0.50
+    '''
     ## 其实使用下面这句就能直接得到每箱的坏样本率
     ## df.groupby([col])[target].mean()
 
@@ -116,6 +132,7 @@ def AssignGroup(x, bin):
                 return bin[i+1]
 
 
+## KEY——卡方分箱的核心函数
 def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
     '''
     根据指定的特征列col和最大分箱个数max_interval对df进行分箱，返回col列的分箱结果
@@ -127,13 +144,17 @@ def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
     :param minBinPcnt：最小箱的占比，默认为0
     :return: 分箱结果，也就是col特征的切分点
     '''
+    ## 统计特征col的不同取值并排序
     colLevels = sorted(list(set(df[col])))
     N_distinct = len(colLevels)
-    if N_distinct <= max_interval:  #如果原始属性的取值个数低于max_interval，不执行这段函数
+    if N_distinct <= max_interval:
+    # 如果原始属性的取值个数低于max_interval，不执行这段函数
+    ## 原始属性的取值个数低于max_interval时，直接使用原有的取值作为分箱分界点即可，不用执行这之后的合并分箱操作
         print("The number of original levels for {} is less than or equal to max intervals".format(col))
+        ## 只返回 collevels中除最后一个元素的部分，因为最后一个元素并不用来作分箱的分界点
         return colLevels[:-1]
     else:
-        ## 如果有缺失值，只取不含有缺失值的部分
+        ## 如果有缺失值，只取不含有缺失值的记录
         if len(special_attribute)>=1:
             df1 = df.loc[df[col].isin(special_attribute)]
             df2 = df.loc[~df[col].isin(special_attribute)]
@@ -142,42 +163,53 @@ def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
         N_distinct = len(list(set(df2[col])))
 
         # 步骤一: 通过col对数据集进行分组，求出每组的总样本数与坏样本数
-        ## 初始的分组最多不超过100组，不超过100组时，就按照原有的取值作为初始分组
+        ## 初始的分组最多不超过100组，超过100组时，均匀划分出100个切分点
+        ## SplitData这个分箱函数只需要在这里调用一次，后续就都是合并分箱的工作
         if N_distinct > 100:
             ##  根据指定的特征列col和分组数目划分出col下的切分点
             split_x = SplitData(df2, col, 100)
-            ## 利用划分的切分点将col特征列转换成对于的分箱值
+            ## 利用划分的切分点将col特征列转换成对应的分箱编号，分箱编号使用 temp 这一列存储
             df2['temp'] = df2[col].map(lambda x: AssignGroup(x, split_x))
-
             ## 上面两行里使用的SplitData和AssignGroup函数完全可以用sklearn中的preprocessing.KBinsDiscretizer类来进行处理
         else:
             ## col列的取值个数不超过100时，就使用原本的值作为切分点和分箱
             df2['temp'] = df2[col]
-
         # 总体bad rate将被用来计算expected bad count
+        ## 返回的是每箱的坏样本率binBdaRate，总体坏样本率overallRate
         (binBadRate, regroup, overallRate) = BinBadRate(df2, 'temp', target, grantRateIndicator=1)
+        ## binBdaRate是一个字典，其中的每一个元素是形如(col, bad_rate)的元组，col是分箱编号
+        ## regroup 是具体的分箱情况，是如下的DF:
+        '''
+          temp  total  bad  bad_rate
+        0    1      4    1      0.25
+        1    2      4    3      0.75
+        2    3      2    1      0.50
+        '''
+        ## 上面得到的是初始的分箱情况，接下来就是逐步合并分箱的操作了
 
         # 首先，每个单独的属性值将被分为单独的一组
-        # 对属性值进行排序，然后两两组别进行合并
+        ## 对用于分箱的属性值进行排序，然后相邻两组进行合并
         colLevels = sorted(list(set(df2['temp'])))
         # 每个特征的初始组level，里面的每个元素是一个list
         groupIntervals = [[i] for i in colLevels]
-
         # 步骤二：建立循环，不断合并最优的相邻两个组别，直到：
         # 1，最终分裂出来的分箱数<＝预设的最大分箱数
         # 2，每箱的占比不低于预设值（可选）
         # 3，每箱同时包含好坏样本
         # 如果有特殊属性，那么最终分裂出来的分箱数＝预设的最大分箱数－特殊属性的个数
         split_intervals = max_interval - len(special_attribute)
-        while (len(groupIntervals) > split_intervals):  # 终止条件: 当前分箱数＝预设的分箱数
+        while (len(groupIntervals) > split_intervals):  
+        # 终止条件: 当前分箱数＝预设的分箱数
             # 每次循环时, 计算合并相邻组别后的卡方值。具有最小卡方值的合并方案，是最优方案
             chisqList = []
             for k in range(len(groupIntervals)-1):
-                # temp_group里是一个list（这里的加法是list的合并）,里面含有合并的grouplevels
+                ## temp_group里是一个list（这里的加法是list的合并）,list里的元素是分组的标号
                 temp_group = groupIntervals[k] + groupIntervals[k+1]
                 # 过滤出需要合并的组记录
+                ## 过滤中temp这一列的组标志在temp_group中的记录
                 df2b = regroup.loc[regroup['temp'].isin(temp_group)]
                 # 计算并存储卡方值
+                ## 这里计算的是 合并后的df2b 这整个组的卡方值
                 chisq = Chi2(df2b, 'total', 'bad')
                 chisqList.append(chisq)
             ## 找出本轮合并组别的循环中，卡方值最小的两组
@@ -186,15 +218,20 @@ def ChiMerge(df, col, target, max_interval=5,special_attribute=[],minBinPcnt=0):
             groupIntervals[best_comnbined] = groupIntervals[best_comnbined] + groupIntervals[best_comnbined+1]
             # 当将最优的相邻的两个变量合并在一起后，需要从原来的列表中将其移除。例如，将[3,4,5] 与[6,7]合并成[3,4,5,6,7]后，需要将[3,4,5] 与[6,7]移除，保留[3,4,5,6,7]
             groupIntervals.remove(groupIntervals[best_comnbined+1])
+        ## 这里获得的是最佳合并分箱的列表表示，比如初始分箱表示是[ [1], [2], [3], [4], [5] ]
+        ## 得到的最佳合并分箱表示为 [ [1,2], [3,4], [5] ]
         groupIntervals = [sorted(i) for i in groupIntervals]
+        ## 根据最佳合并分箱获得新的分割点
         cutOffPoints = [max(i) for i in groupIntervals[:-1]]
 
         # 检查是否有箱没有好或者坏样本。如果有，需要跟相邻的箱进行合并，直到每箱同时包含好坏样本
+        ## 根据上一步合并分箱后得到的新分割点，在temp列上得到的新的分箱编号
         groupedvalues = df2['temp'].apply(lambda x: AssignBin(x, cutOffPoints))
         df2['temp_Bin'] = groupedvalues
         ## 计算合并后，每箱中的坏样本率
         (binBadRate,regroup) = BinBadRate(df2, 'temp_Bin', target)
         [minBadRate, maxBadRate] = [min(binBadRate.values()),max(binBadRate.values())]
+        ## while的循环里，每次只处理一个箱子
         while minBadRate ==0 or maxBadRate == 1:
             # 找出全部为好／坏样本的箱
             indexForBad01 = regroup[regroup['bad_rate'].isin([0,1])].temp_Bin.tolist()
@@ -337,6 +374,7 @@ def CalcWOE(df, col, target):
     for k, v in WOE_dict.items():
         WOE_dict[k] = v['WOE']
     IV = regroup.apply(lambda x: (x.good_pcnt-x.bad_pcnt)*np.log(x.good_pcnt*1.0/x.bad_pcnt),axis = 1)
+    ## 这里是返回总的IV值，总的IV值才是对应于特征col的
     IV = sum(IV)
     return {"WOE": WOE_dict, 'IV':IV}
 
@@ -416,6 +454,7 @@ def Monotone_Merge(df, target, col):
     合并只能在相邻的箱中进行。
     迭代地寻找最优合并方案。每一步迭代时，都尝试将所有非单调的箱进行合并，每一次尝试的合并都是跟前后箱进行合并再做比较
     '''
+    ## 下面这两个定义在函数Monotone_Merge里的函数这一操作不太好
     def MergeMatrix(m, i,j,k):
         '''
         :param m: 需要合并行的矩阵
@@ -481,22 +520,30 @@ def Monotone_Merge(df, target, col):
                 bad_by_bin = bad_by_bin2b
                 not_monotone_count = not_monotone_count2b
                 balance = balance_b
-        return {'bins_list': bins_list, 'bad_by_bin': bad_by_bin, 'not_monotone_count': not_monotone_count,
-                'balance': balance}
+        return {'bins_list': bins_list, 'bad_by_bin': bad_by_bin, 'not_monotone_count': not_monotone_count, 'balance': balance}
 
 
     N = df.shape[0]
+    ## badrate_bin是dict，存储每箱的坏样本率，bad_by_bin是一个df，存储了每箱的好坏样本分布
+    '''
+       col  total  bad  bad_rate
+    0    1      4    1      0.25
+    1    2      4    3      0.75
+    2    3      2    1      0.50
+    '''
     [badrate_bin, bad_by_bin] = BinBadRate(df, col, target)
     bins = list(bad_by_bin[col])
     bins_list = [[i] for i in bins]
     badRate = sorted(badrate_bin.items(), key=lambda x: x[0])
     badRate = [i[1] for i in badRate]
+    ## 返回不满足单调性的元素个数和具体的位置
     not_monotone_count, not_monotone_position = FeatureMonotone(badRate)['count_of_nonmonotone'], FeatureMonotone(badRate)['index_of_nonmonotone']
     #迭代地寻找最优合并方案，终止条件是:当前的坏样本率已经单调，或者当前只有2箱
     while (not_monotone_count > 0 and len(bins_list)>2):
         #当非单调的箱的个数超过1个时，每一次迭代中都尝试每一个箱的最优合并方案
         all_possible_merging = []
         for i in not_monotone_position:
+        ## 对于每个不单调的箱，都尝试向前或者向后合并，从中选一个较好的合并方式
             merge_adjacent_rows = Merge_adjacent_Rows(i, np.mat(bad_by_bin), bins_list, not_monotone_count)
             all_possible_merging.append(merge_adjacent_rows)
         balance_list = [i['balance'] for i in all_possible_merging]
@@ -505,18 +552,21 @@ def Monotone_Merge(df, target, col):
         if min(not_monotone_count_new) >= not_monotone_count:
             best_merging_position = balance_list.index(min(balance_list))
         #如果有多个合并方案都能减轻当前的非单调性，也选择更加均匀的合并方案
+        ## 这里有问题，如果有多个合并方案都能减轻当前的非单调性时，首先应当先考虑能够最大限度减少非单调箱子个数的方案，其次才是考虑均匀性！！！！！！！
         else:
+            ## 找出能减少非单调箱子个数的合并方案的index
             better_merging_index = [i for i in range(len(not_monotone_count_new)) if not_monotone_count_new[i] < not_monotone_count]
+            ## 获得对应的balance列表
             better_balance = [balance_list[i] for i in better_merging_index]
+            ## 获取这些方案中balance最小的index
             best_balance_index = better_balance.index(min(better_balance))
             best_merging_position = better_merging_index[best_balance_index]
+
         bins_list = all_possible_merging[best_merging_position]['bins_list']
         bad_by_bin = all_possible_merging[best_merging_position]['bad_by_bin']
         not_monotone_count = all_possible_merging[best_merging_position]['not_monotone_count']
         not_monotone_position = FeatureMonotone(bad_by_bin[:, 3])['index_of_nonmonotone']
     return bins_list
-
-
 
 
 

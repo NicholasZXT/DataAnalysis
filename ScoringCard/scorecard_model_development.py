@@ -384,6 +384,7 @@ var_WOE = {}
 for col in categorical_var:
     print('we are processing {}'.format(col))
     ## 只有在类别型变量取值个数>5时才进行合并分箱操作
+    ## 但是要注意，实际的合并分箱操作并不是在这里进行的，而是转换成数值型变量之后，在下面数值型变量中进行的合并分箱操作
     if len(set(trainData[col]))>5:
         print('{} is encoded with bad rate'.format(col))
         col0 = str(col)+'_encoding'
@@ -393,6 +394,7 @@ for col in categorical_var:
         trainData[col0], br_encoding = encoding_result['encoding'],encoding_result['bad_rate']
 
         #(2), 将（1）中的编码后的变量也加入数值型变量列表中，为后面的卡方分箱做准备
+        ## 这里相当于，使用坏样本率进行编码后，转成了数值型变量，然后在下面的数值型变量中进行处理
         numerical_var.append(col0)
 
         #(3), 保存编码结果
@@ -404,6 +406,7 @@ for col in categorical_var:
     else:
         bad_bin = trainData.groupby([col])['target'].sum()
         #对于类别数少于5个，但是出现0坏样本的特征需要做处理
+        ## 我觉得这一步也可以放到下面的数值型变量中去做，不需要写一个else进行单独的处理
         if min(bad_bin) == 0:
             print('{} has 0 bad sample!'.format(col))
             col1 = str(col) + '_mergeByBadRate'
@@ -449,7 +452,8 @@ for col in numerical_var:
         special_attribute = [-1]
     else:
         special_attribute = []
-    ## 返回的是trainData在col列进行分箱之后的切分点列表
+    ## 卡方分箱最重要的函数
+    ## 返回的是trainData的col列进行分箱之后的切分点列表
     cutOffPoints = ChiMerge(trainData, col, 'target',special_attribute=special_attribute)
     var_cutoff[col] = cutOffPoints
     ## 根据特征col得到的切分点进行对trainData进行分箱，得到分箱后的新特征col1
