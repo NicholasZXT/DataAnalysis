@@ -510,11 +510,8 @@ for col in numerical_var:
     var_WOE[col] = WOE_IV['WOE']
     #del trainData[col]
 
-
-
+## 这一步并没有对trainData里的特征做转换，而是将每个特征计算出来的分箱分界点列表，相应的WOE值和IV值保存了下来
 trainData.to_csv(folderOfData+'allData_2.csv', header=True,encoding='gbk', columns = trainData.columns, index=False)
-
-
 
 with open(folderOfData+'var_WOE.pkl',"wb") as f:
     f.write(pickle.dumps(var_WOE))
@@ -564,7 +561,9 @@ for col in var_WOE.keys():
         special_attribute = []
         if - 1 in cutOffPoints:
             special_attribute = [-1]
+        ## 这里才使用上一步得到的分箱边界值进行分箱，得到分箱编号
         binValue = trainData[col].map(lambda x: AssignBin(x, cutOffPoints,special_attribute=special_attribute))
+        ## 将分箱编号转换成对应的WOE编码
         trainData[col2] = binValue.map(lambda x: var_WOE[col][x])
     else:
         trainData[col2] = trainData[col].map(lambda x: var_WOE[col][x])
