@@ -7,3 +7,4 @@
 !/ScoringCard/all_data_woe.csv
 ScoringCard/all_data_woe.csv
 /Practice/TensorFlow-Saved-Models/*
+/Practice/TensorBoard-Logs/*
