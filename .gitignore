@@ -2,6 +2,7 @@
 .ipynb_checkpoints/
 # 忽略任何目录下的 _pychache_文件夹
 _pycache_/
+/Practice/_pycache_/
 /.idea
 
 /Kaggle/Titanic/predict.csv
