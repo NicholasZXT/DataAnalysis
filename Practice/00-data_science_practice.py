@@ -34,22 +34,13 @@ df = pd.DataFrame({'key': ['A', 'B', 'C', 'A', 'B', 'C'], 'data1': range(6), 'da
                   columns=['key', 'data1', 'data2'])
 df.groupby("key").aggregate(['min', np.median, 'max'])
 
-titanic = sns.load_dataset('titanic')
-titanic.groupby(['sex', 'class'])['survived'].aggregate('mean')
-titanic.groupby(['sex', 'class'])['survived'].aggregate('mean').unstack()
-titanic.pivot_table(index='sex', columns='class', values='survived')
 
-titanic.pivot
+# ----------------numpy ravel-------------------------------------\
+arr = np.arange(0,6).reshape((2,3))
+a1 = arr.ravel()
+a2 = arr.ravel("F")
 
-fmri = sns.load_dataset('fmri')
 
-# ---测试seaborn绘图
-plt.style.use("ggplot")
-df = pd.DataFrame({'key': ['2019-12-12', '2019-12-13', '2019-12-14', '2019-12-15'], 'value': [2, 3, 4, 5]})
-fig = sns.barplot(data=df, x='key', y='value')
-fig.set_xticklabels(fig.get_xticklabels(),rotation=30)
-# plt.bar(df['key'],height=df['value'])
-plt.show()
 
 
 # ---------numpy 随机数----------------
@@ -59,7 +50,9 @@ np.random.randn(2,3)
 
 np.random.choice(5,3)
 np.random.choice([1,3,5,7,9], 3)
-# ------------------------Python绘图---------------------------------
+
+
+# ------------------------matplotlib绘图---------------------------------
 # 查看可用的图形风格
 plt.style.available
 # 使用图形风格
@@ -79,6 +72,22 @@ label = ['b','a','c','d']
 plt.bar(label,x)
 
 
-# --------------seaborn-------------
-x = np.random.randn(2,10)
-sns.scatterplot(x[0,:], x[1,:])
+# ----------------------------seaborn绘图------------------------------------
+plt.style.use("ggplot")
+
+titanic = sns.load_dataset('titanic')
+fmri = sns.load_dataset('fmri')
+
+
+titanic.groupby(['sex', 'class'])['survived'].aggregate('mean')
+titanic.groupby(['sex', 'class'])['survived'].aggregate('mean').unstack()
+titanic.pivot_table(index='sex', columns='class', values='survived')
+
+titanic.pivot
+
+
+df = pd.DataFrame({'key': ['2019-12-12', '2019-12-13', '2019-12-14', '2019-12-15'], 'value': [2, 3, 4, 5]})
+fig = sns.barplot(data=df, x='key', y='value')
+fig.set_xticklabels(fig.get_xticklabels(),rotation=30)
+# plt.bar(df['key'],height=df['value'])
+plt.show()
