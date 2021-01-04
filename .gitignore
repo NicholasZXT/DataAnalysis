@@ -2,6 +2,9 @@
 .ipynb_checkpoints/
 # 忽略任何目录下的 _pychache_文件夹
 __pycache__/
+# 忽略任何目录下的 dataset 文件夹
+dataset/
+
 /.idea
 
 /Kaggle/Titanic/predict.csv
@@ -16,3 +19,5 @@ __pycache__/
 
 /ScoringCard/all_data_woe.csv
 /datasets/Digit-Recognizor.csv
+/datasets/PTB-simple-examples/
+/datasets/Python-Data-Mining-Dataset/
