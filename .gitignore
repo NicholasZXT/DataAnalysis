@@ -18,6 +18,4 @@ dataset/
 /Practice/datasets/PTB-simple-examples/
 
 /ScoringCard/all_data_woe.csv
-/datasets/Digit-Recognizor.csv
-/datasets/PTB-simple-examples/
-/datasets/Python-Data-Mining-Dataset/
+/datasets/*
