@@ -91,3 +91,6 @@ fig = sns.barplot(data=df, x='key', y='value')
 fig.set_xticklabels(fig.get_xticklabels(),rotation=30)
 # plt.bar(df['key'],height=df['value'])
 plt.show()
+
+
+# --------------sklearn---------------
