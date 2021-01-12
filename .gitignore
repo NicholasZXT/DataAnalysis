@@ -19,3 +19,5 @@ dataset/
 
 /ScoringCard/all_data_woe.csv
 /datasets/*
+/BERT/bert-pre-trained-models/
+/BERT/output/
