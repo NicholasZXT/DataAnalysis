@@ -97,6 +97,28 @@ plt.show()
 
 import sys
 
+from sklearn.impute import SimpleImputer
+df = pd.DataFrame({'a':[1,2,2,np.nan], 'b':['A','A',None, 'B']})
+
+df.fillna(0)
+df.fillna(method='ffill')
+df.fillna(method='backfill')
+
+imp = SimpleImputer(strategy='mean')
+imp.fit(df)
+imp = SimpleImputer(strategy='most_frequent')
+imp.fit(df)
+imp = SimpleImputer(strategy='constant', fill_value='FILL')
+imp.fit(df)
+imp.transform(df)
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     args = sys.argv
     print("name:", args[0])
