@@ -30,14 +30,14 @@ https://tianchi.aliyun.com/competition/entrance/531830/information
 |        term        |                       贷款期限（year）                       | int，只有3和5两种取值，                               | 有序型     |              |
 |    interestRate    |                           贷款利率                           | float，取值较多，                                     | 实数型     |              |
 |    installment     |                         分期付款金额                         | float，取值较多                                       | 实数型     |              |
-|       grade        |                           贷款等级                           | str，取值A,B,C,D,E,F,G,                               | 有序型     |              |
-|      subGrade      |                        贷款等级之子级                        | str，对应于上述等级，细分为A1,A2,A3,A4,A5             | 有序型     |              |
+|       grade        |                           贷款等级                           | str，取值A,B,C,D,E,F,G,                               | 有序型     | 序号编码     |
+|      subGrade      |                        贷款等级之子级                        | str，对应于上述等级，细分为A1,A2,A3,A4,A5             | 有序型     | 序号编码     |
 |  employmentTitle   |                           就业职称                           | float，取值较多，这个特征有点奇怪，按理应该是离散型的 | ？？       |              |
-|  employmentLength  |                        就业年限（年）                        | str，取值为 <1 year，1 year 至 9 years，10+ years     | 有序型     |              |
+|  employmentLength  |                        就业年限（年）                        | str，取值为 <1 year，1 year 至 9 years，10+ years     | 有序型     | 序号编码     |
 |   homeOwnership    |              借款人在登记时提供的房屋所有权状况              | int，取值从 0 到 5，这个应当是序数型或者离散型        | 有序型     |              |
 |    annualIncome    |                            年收入                            | float，取值很多                                       | 实数型     |              |
 | verificationStatus |                           验证状态                           | int，取值 0 到 2                                      | 离散型     |              |
-|     issueDate      |                        贷款发放的月份                        | str，形如2017-01-01的日期，不应当单独使用             | 区间型     |              |
+|     issueDate      |                        贷款发放的月份                        | str，形如2017-01-01的日期，不应当单独使用             | 日期型     |              |
 |      purpose       |               借款人在贷款申请时的贷款用途类别               | int，从 0 到 13                                       | 离散型     |              |
 |      postCode      |         借款人在贷款申请中提供的邮政编码的前3位数字          | int，取值较多，但是应当是离散型                       | ？？       |              |
 |     regionCode     |                           地区编码                           | int，取值较多，应当是离散型                           | 离散型     |              |
@@ -53,7 +53,7 @@ https://tianchi.aliyun.com/competition/entrance/531830/information
 |      totalAcc      |              借款人信用档案中当前的信用额度总数              | int，                                                 | 实数型     |              |
 | initialListStatus  |                      贷款的初始列表状态                      | int，取值 0 和 1                                      | 离散型     |              |
 |  applicationType   |       表明贷款是个人申请还是与两个共同借款人的联合申请       | int，取值 0 和 1                                      | 离散型     |              |
-| earliesCreditLine  |              借款人最早报告的信用额度开立的月份              | str，Aug-2001之类的格式                               | 区间型     |              |
+| earliesCreditLine  |              借款人最早报告的信用额度开立的月份              | str，Aug-2001之类的格式                               | 日期型     |              |
 |       title        |                     借款人提供的贷款名称                     | int，取值非常多，应当是离散型                         | ？？       |              |
 |     policyCode     |      公开可用的策略_代码=1新产品不公开可用的策略_代码=2      | int，理论取值 1或2，实际只有1                         | 离散型     |              |
 |   n系列匿名特征    |        匿名特征n0-n14，为一些贷款人行为计数特征的处理        | int，取值不多                                         | **计数型** |              |
