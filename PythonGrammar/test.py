@@ -46,6 +46,31 @@ config.get(section='bitbucket.org', option='nothing', fallback='not exist')
 
 
 
+# ------------------数据库操作----------------
+# pymysql
+import pymysql
+connection = pymysql.connect(host='localhost', user='root', password='mysql2020', port=3306, database='crashcourse')
+cursor = connection.cursor()
+query = "select * from products"
+cursor.execute(query=query)
+row_1 = cursor.fetchone()
+all_rows = cursor.fetchall()
+cursor.close()
+connection.close()
+
+# MySQL-Client
+import MySQLdb
+connection = MySQLdb.connect(host='localhost', user='root', passwd='mysql2020', port=3306, db='crashcourse')
+cursor = connection.cursor()
+query = "select * from products"
+cursor.execute(query=query)
+row_1 = cursor.fetchone()
+all_rows = cursor.fetchall()
+cursor.close()
+connection.close()
+
+
+
 if __name__ == "__main__":
     args = sys.argv
     print("name:", args[0])
