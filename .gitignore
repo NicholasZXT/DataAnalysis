@@ -12,10 +12,10 @@ dataset/
 /Kaggle/IMDB/aclImdb/
 /Kaggle/Titanic/logistic_pred.csv
 
-/Practice/LianjiaHousePrice.xlsx
-/Practice/TensorFlow-Saved-Models/*
-/Practice/TensorBoard-Logs/*
-/Practice/datasets/PTB-simple-examples/
+/ML-Action/LianjiaHousePrice.xlsx
+/ML-Action/TensorFlow-Saved-Models/*
+/ML-Action/TensorBoard-Logs/*
+/ML-Action/datasets/PTB-simple-examples/
 
 /ScoringCard/all_data_woe.csv
 /datasets/*
