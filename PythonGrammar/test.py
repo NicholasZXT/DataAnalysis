@@ -70,6 +70,40 @@ cursor.close()
 connection.close()
 
 
+d = {
+'a' : [1, 2, 3],
+'b' : [4, 5]
+}
+
+from collections import  defaultdict
+
+d = defaultdict(lambda :{'args':1, 'keargs': {}})
+
+d['a']
+
+
+d = {'a':1, 'b':2, 'c':3}
+
+a, b, c = d['a'], d['b'], d['c']
+
+
+s = set(['a', 'b'])
+
+
+from datetime import datetime, timedelta
+
+t1 = datetime.strptime('2021-01-28 10:11:21', '%Y-%m-%d %H:%M:%S')
+t2 = datetime.strptime('2021-01-29 08:00:11', '%Y-%m-%d %H:%M:%S')
+t3 = datetime.strptime('2021', '%Y')
+
+t1.hour
+t2.hour
+
+t4 = t2 - t1
+t4.days
+t4.seconds
+t4.max
+
 
 if __name__ == "__main__":
     args = sys.argv
