@@ -4,20 +4,21 @@ import numpy as np
 # cd 'Machine-Learning-in-Action/Ch05-LogisticRegression/'
 # cd .\Machine-Learning-in-Action\Ch05-LogisticRegression\
 
-dataSet = np.loadtxt("testSet.txt")
-X = dataSet[:, :2]
-# y切片出来之后是一个一维的array，还需要转成二维的array
-y = dataSet[:, -1].reshape((-1, 1))
-
 
 def sigmoid(x):
     return 1.0/(1 + np.exp(-x))
 
 
 def gradientAscent(X, y):
+    """
+    梯度下降法，使用全量数据更新梯度
+    @param X: 样本阵
+    @param y: 类标签，取值{0,1}
+    @return:
+    """
     # 数据矩阵需要增加一列全为1，表示截距
-    intercep = np.ones((X.shape[0],1))
-    X = np.hstack((intercep,X))
+    intercep = np.ones((X.shape[0], 1))
+    X = np.hstack((intercep, X))
     # 需要将X和y转换为矩阵，以便直接使用矩阵的乘法
     X = np.mat(X)
     y = np.mat(y)
@@ -25,22 +26,26 @@ def gradientAscent(X, y):
     alpha = 0.001
     # 最多迭代的次数，这里是写死的
     maxCycles = 500
+    # n 是样本数，m 是特征数
     n, m = X.shape
     # 初始化权重
     w = np.ones((m, 1))
     # 开始迭代
     for k in range(maxCycles):
+        # 这里的 X 为 n*m, W 是 m*1， X 是样本阵（没有转置）
+        # 得到的 h 为 n*1 列向量
         h = sigmoid(X * w)
         error = y - h
+        # 下面这个公式就是 LR 的梯度下降法的 权重更新公式的矩阵版
         w = w + alpha * X.transpose() * error
     return w
 
 
 def gradientAscentCrossEntropy(X, y):
     """
-    这个是用交叉熵损失函数表示
+    类标签为 {-1,1}下，使用的是标准的交叉熵损失函数
     :param X:
-    :param y: 这里要求 y 使用{1,-1}来表示类标签，而不是{1,0}
+    :param y: 这里要求 y 使用{1,-1}来表示类标签，而不是{1,0}，
     :return:
     """
     # 数据矩阵X需要增加一列全为1，表示截距
@@ -65,11 +70,6 @@ def gradientAscentCrossEntropy(X, y):
         h = sigmoid(-y*X*w)
         w = w + alpha*X.transpose()*y*h
     return w
-
-
-# 可以看出，这两个结果是一样的
-w1 = gradientAscent(X, y)
-# w2 = gradientAscentCrossEntropy(X, y)
 
 
 def stochasticGradientAscent(X, y):
@@ -132,5 +132,30 @@ def stochasticGradientAscentImproved(X, y, numIter=150):
     return w
 
 
-w3 = stochasticGradientAscent(X, y)
-w4 = stochasticGradientAscentImproved(X, y, 200)
+def gradientAscentParallel(X, y):
+    """
+    LR梯度下降法的并行实现
+    @param X:
+    @param y: 类标签{0,1}
+    @return:参数向量 w
+    """
+    # TODO 这个在本机上不太好实现，涉及的问题有：1.多线程似乎不太合适，需要使用多进程；2. 多进程的话，涉及到进程间通信
+    pass
+
+
+if __name__ == "__main__":
+    # 加载数据集
+    # % cd Machine-Learning-in-Action\Ch05-LogisticRegression
+    dataset = np.loadtxt("testSet.txt")
+    X = dataset[:, :2]
+    # y切片出来之后是一个一维的array，还需要转成二维的array
+    y = dataset[:, -1].reshape((-1, 1))
+
+    # 对比 类标签为{0,1}和{-1,1}下，两种梯度下降方式的结果
+    # 可以看出，这两个结果是一样的
+    w1 = gradientAscent(X, y)
+    w2 = gradientAscentCrossEntropy(X, y)
+
+    # 对比随机梯度下降的结果
+    w3 = stochasticGradientAscent(X, y)
+    w4 = stochasticGradientAscentImproved(X, y, 200)
