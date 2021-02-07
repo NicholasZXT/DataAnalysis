@@ -71,9 +71,9 @@ result_json_list = jsonpath.jsonpath(r_dict, "$.content.positionResult.result")[
 df = pd.DataFrame(result_json_list)
 
 #TODO ------ 练习使用Selenium爬取拉勾网 ---------
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.wait import WebDriverWait
+from html_parse import webdriver
+from html_parse.webdriver.common.keys import Keys
+from html_parse.webdriver.support.wait import WebDriverWait
 # 开启浏览器
 browser = webdriver.Chrome(executable_path='/usr/local/chromedriver/chromedriver')
 # 打开网页
