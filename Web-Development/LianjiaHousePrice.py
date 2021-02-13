@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import requests
 import time
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import NoSuchElementException
+from html_parse import webdriver
+from html_parse.webdriver.common.keys import Keys
+from html_parse.common.exceptions import NoSuchElementException
 
 # 链家房价爬虫
 class LianjiaCrawer():
