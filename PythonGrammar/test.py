@@ -105,9 +105,17 @@ t4.seconds
 t4.max
 
 
+import getopt
+
+
 if __name__ == "__main__":
     args = sys.argv
     print("name:", args[0])
     print(args)
 
-    t = os.environ.get("es", "localhost:19200")
+    # t = os.environ.get("es", "localhost:19200")
+
+    # 测试getopt函数
+    opts, pargs = getopt.getopt(sys.argv[1:], "n:m:", ['param1=', 'param2='])
+    print("opts: ", opts)
+    print("pargs: ", pargs)
