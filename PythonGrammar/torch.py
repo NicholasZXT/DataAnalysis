@@ -60,3 +60,48 @@ kernel.shape
 res_2 = nn.functional.conv2d(input=imgs_tensor, weight=kernel, bias=None, stride=1, padding=0)
 # 得到的结果为 2 x 2 x3x3, 2张 2通道的 3x3图片
 res_2.shape
+
+
+# ----------池化层------------
+# 池化窗口大小为 2x2， 步长=2
+pool = nn.MaxPool2d(kernel_size=(2, 2), stride=2, padding=0)
+# 原始的shape
+imgs_tensor.shape
+res_3 = pool(imgs_tensor)
+res_3.shape
+
+### --------------------RNN练习---------------------
+#RNN处理的是序列数据，所以输入数据的维度中，多了一个sequence维度（或者叫time_step），
+# 所以输入的数据shape是 (batch_size, seq_length, in_features)
+# 以文本处理为例，一般将一个句子看做一个sequence，而句子中的每个单词都用一个词向量来表示，那么一个句子就是一个矩阵 v x s
+# v 是 词向量的长度，所有单词都是一样的， s 是这个句子的长度——也就是单词的数量
+# 但是文本中，不是所有的句子长度 s 都是一样的，需要做进一步的处理——选择最大的句子长度（或者平均长度）为准，所有的句子都规范化成这个长度
+# 超过的部分截断，不足的部分单词补0——这个补充的单词0也对应于一个词向量，这样就得到了形状规范的一个 sequence 样本
+# 每个 sequence 对于RNN 来说是一个样本，每次训练使用多个，也就是 batch_size。
+
+# 在设置一层RNN的时候，需要配置的参数有如下几个：in_features——对应于输入层的节点数，hidden_units——隐藏层节点数，也就是状态向量的长度，
+# 最重要的是sequence的长度，代表序列的长度.
+
+# 单层、单向 RNN，输入特征数为5，序列长度=4，隐藏层状态向量长度=3，batch_size=2
+in_features = 5
+seq_length = 4
+hidden_size = 3
+rnn = nn.RNN(input_size=in_features, hidden_size=hidden_size, num_layers=1, nonlinearity='relu', bias=False,
+             batch_first=True, bidirectional=False)
+
+# 输入的数据shape应当为 batch_size * seq_length * in_features
+batch_size = 2
+rnn_data = torch.randn(batch_size, seq_length, in_features)
+rnn_data.shape
+res_4 = rnn(rnn_data)
+# 得到的结果是一个长度=2 的tuple，第一个元素是输出，第二个元素是隐藏层的状态
+# 输出层的shape=(2, 4, 3)，表示 2 个样本，序列长度=4, 输出层也就是隐藏层节点数
+res_4[0].shape
+res_4[0]
+# 隐藏层shape=(1, 2, 3)，1表示只有 1层*单向，2表示批次，3是每个状态向量的长度
+# 这个 2 有待研究
+res_4[1].shape
+res_4[1]
+
+
+##----------MNIST----------
