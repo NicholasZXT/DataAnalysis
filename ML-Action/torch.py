@@ -53,7 +53,7 @@ res.shape
 
 # 卷积函数，可以自定义卷积核
 # 自定义的卷积核，包含2个过滤器，分别为 [[1,0], [1,0]], [[0,1],[0,1]]，三个通道都是一样的
-kernel = torch.tensor(np.array([1,1,0,0]*3 + [0,0,1,1]*3, dtype=np.float32).reshape((2, 3, 2,2), order='F'))
+kernel = torch.tensor(np.array([1, 1, 0, 0] * 3 + [0, 0, 1, 1] * 3, dtype=np.float32).reshape((2, 3, 2, 2), order='F'))
 # 卷积核shape 为 2x3 x 2x2，2对应于输出的 channel——也就是两个过滤器,3对应于输入的channel,2x2是卷积的长宽
 kernel.shape
 
