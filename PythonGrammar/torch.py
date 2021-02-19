@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import torch
-from torch import nn
+from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms as T
 
@@ -104,4 +105,109 @@ res_4[1].shape
 res_4[1]
 
 
-##----------MNIST----------
+##--------RNN拟合sin函数-----------
+TRAINING_EXAMPLES = 10000
+TESTING_EXAMPLES = 1000
+SAMPLE_INTERVAL = 0.01*np.pi
+TIME_STEPS = 10  # 序列的长度
+
+# 构造数据集
+# 需要注意的是，RNN输入数据的shape=(batch_size, time_steps, input_size)，特别要注意 time_steps 这个维度.
+def generate_data(seq):
+    """
+    从序列seq中进行采样，用 [第i项: TIME_STEPS-1项]作为输入值X， 第 i+TIMES_STEPS 项作为Y值
+    """
+    X = []
+    Y = []
+    # 序列的第i项和后面的TIME_STEPS-1项合在一起作为输入；第i + TIME_STEPS项作为输出。
+    # 即用sin函数前面的TIME_STEPS个点的信息，预测第i + TIME_STEPS个点的函数值。
+    # 样本数为 序列长度 - TIME_STEPS
+    for i in range(len(seq)-TIME_STEPS):
+        # X.append([seq[i: (i+TIME_STEPS)]])
+        # Y.append([seq[i+TIME_STEPS]])
+        X.append(seq[i: (i+TIME_STEPS)])
+        Y.append(seq[i+TIME_STEPS])
+    return np.array(X, dtype=np.float32), np.array(Y, dtype=np.float32)
+
+# 确定测试数据起点，这之前都是训练数据集，训练数据集的取值区间是 [0, test_start]，这中间取 TRAINING_EXAMPLES + TIME_STEPS 个点，
+test_start = (TRAINING_EXAMPLES + TIME_STEPS) * SAMPLE_INTERVAL
+# 确定测试数据集的终点，测试数据集的取值区间是 [test_start, test_end]， 这中间取 TESTING_EXAMPLES + TIME_STEPS 个点
+test_end = test_start + (TESTING_EXAMPLES + TIME_STEPS) * SAMPLE_INTERVAL
+
+sin_x_train = np.linspace(0, test_start, TRAINING_EXAMPLES + TIME_STEPS, dtype=np.float32)
+sin_y_train = np.sin(sin_x_train)
+sin_x_test = np.linspace(test_start, test_end, TESTING_EXAMPLES + TIME_STEPS, dtype=np.float32)
+sin_y_test = np.sin(sin_x_test)
+
+# 注意，这里是要用sin值序列的 第i项: TIME_STEPS-1 项 预测 第 i+TIMES_STEPS 项，所以只需要 seq_train_y值，不需要横坐标的值
+train_X, train_y = generate_data(sin_y_train)
+test_X, test_y = generate_data(sin_y_test)
+
+train_X = train_X.reshape(TRAINING_EXAMPLES, TIME_STEPS, 1)
+train_y = train_y.reshape(TRAINING_EXAMPLES, 1)
+test_X = test_X.reshape(TESTING_EXAMPLES, TIME_STEPS, 1)
+test_y = test_y.reshape(TESTING_EXAMPLES, 1)
+
+train_X = torch.tensor(train_X)
+train_y = torch.tensor(train_y)
+test_X = torch.tensor(test_X)
+test_y = torch.tensor(test_y)
+
+# 一共10000个样本，每个训练样本是一个长度(time_step)=10的 sequence，sequence中每个位置的值是一个长度=1的向量（也就是标量）
+train_X.shape
+train_y.shape
+test_X.shape
+test_y.shape
+
+# input_size=1，隐藏层是长度=5的向量
+rnn = nn.RNN(input_size=1, hidden_size=5, num_layers=1, nonlinearity='relu', bias=False,
+             batch_first=True, bidirectional=False)
+
+res = rnn(train_X)
+# 输出层
+res[0].shape
+# 隐藏层（状态层）
+res[1].shape
+
+
+class RnnSin(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.rnn = nn.RNN(input_size=1, hidden_size=5, num_layers=1, nonlinearity='relu', bias=False,
+                          batch_first=True, bidirectional=False)
+        self.flatten = nn.Flatten()
+        self.linear = nn.Linear(in_features=50, out_features=1, bias=True)
+
+    def forward(self, X):
+        rnn_out = self.rnn(X)
+        rnn_out_flat = self.flatten(rnn_out[0])
+        out = self.linear(rnn_out_flat)
+        return out
+
+# 初始化模型
+sin_rnn = RnnSin()
+# 定义损失函数
+mse = nn.MSELoss()
+# 定义优化器
+optimizer = optim.SGD(params=sin_rnn.parameters(), lr=0.1)
+
+for epoch in range(1, 31):
+    # 获取预测值
+    sin_pred = sin_rnn(train_X)
+    # sin_pred.shape
+    # 清空梯度
+    optimizer.zero_grad()
+    # 计算损失函数
+    loss = mse(sin_pred, train_y)
+    # 计算梯度
+    loss.backward()
+    # 使用优化器更新参数
+    optimizer.step()
+    # 新的MSE损失
+    sin_pred_new = sin_rnn(train_X)
+    train_loss = mse(sin_pred_new, train_y)
+    pred_y = sin_rnn(test_X)
+    test_loss = mse(pred_y, test_y)
+    # print(loss)
+    print("epoch {} ---- training MSE-Loss  is：{:.4f}".format(epoch, train_loss))
+    print("epoch {} ---- testing MSE-Loss  is：{:.4f}".format(epoch, test_loss))
