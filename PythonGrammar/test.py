@@ -2,6 +2,8 @@ import sys
 import os
 from elasticsearch import Elasticsearch
 import configparser
+import numpy as np
+import pandas as pd
 
 
 es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
@@ -104,6 +106,19 @@ t4.days
 t4.seconds
 t4.max
 
+df = pd.DataFrame({'col1':list("aabbc"), 'col2':list("AABBC"), 'col3':[1,2,3,4,5]})
+df.groupby(['col1','col2'], as_index=False).apply(lambda x: x.iloc[0,0])
+
+df.groupby(['col1','col2'], as_index=False).apply(lambda x: x.sort_values(['col3'], ascending=False).nlargest(1, 'col3'))
+
+
+df[['col1', 'col2']].set_index('col1')['col2'].to_dict()
+
+df['col4'] = df.apply(lambda x: list("abc"), axis=1)
+
+for (k,v) in df.groupby(['col1','col2'], as_index=False):
+    print(k)
+    print(v)
 
 import getopt
 
