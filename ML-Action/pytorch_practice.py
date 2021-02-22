@@ -71,6 +71,8 @@ imgs_tensor.shape
 res_3 = pool(imgs_tensor)
 res_3.shape
 
+
+
 ### --------------------RNN练习---------------------
 #RNN处理的是序列数据，所以输入数据的维度中，多了一个sequence维度（或者叫time_step），
 # 所以输入的数据shape是 (batch_size, seq_length, in_features)
@@ -209,5 +211,5 @@ for epoch in range(1, 31):
     pred_y = sin_rnn(test_X)
     test_loss = mse(pred_y, test_y)
     # print(loss)
-    print("epoch {} ---- training MSE-Loss  is：{:.4f}".format(epoch, train_loss))
-    print("epoch {} ---- testing MSE-Loss  is：{:.4f}".format(epoch, test_loss))
+    print("epoch {:2} ---- training MSE-Loss  is：{:.4f}".format(epoch, train_loss))
+    print("epoch {:2} ---- testing  MSE-Loss  is：{:.4f}".format(epoch, test_loss))
