@@ -235,13 +235,18 @@ class ImdbDataset(Dataset):
             label = label[:part]
         text = [doc.decode("utf-8").replace("<br />", " ") for doc in text_list]
         sentence_vec = [self.sentence2vector(self.__nlp(doc)) for doc in text]
-        # 上面得到的 sentence_vec 中，每个句子的长度都不一样，需要选择最短的句子做截断处理
-        seq_length = min([sentence.shape[0] for sentence in sentence_vec])
-        sentence_vec_trunc = [sentence[:seq_length, :] for sentence in sentence_vec]
+        # 上面得到的 sentence_vec 中，每个句子的长度都不一样，需要选择最短的句子做截断处理-----这个处理的不好
+        # seq_length = min([sentence.shape[0] for sentence in sentence_vec])
+        # sentence_vec_trunc = [sentence[:seq_length, :] for sentence in sentence_vec]
         # doc_len = [sentence.shape for sentence in sentence_vec_trunc]
         # print("seq_length", seq_length)
         # print("doc_len", doc_len)
-        doc_vector = np.array(sentence_vec_trunc)
+        # doc_vector = np.array(sentence_vec_truc)
+
+        # 选择句子的平均长度，不足的进行padding
+        seq_length = int(np.mean(([sentence.shape[0] for sentence in sentence_vec])))
+        sentence_vec_pad = [self.sentence_vector_padding(sentence, seq_length) for sentence in sentence_vec]
+        doc_vector = np.array(sentence_vec_pad)
         return doc_vector, label
 
     def sentence2vector(self, doc):
@@ -261,6 +266,17 @@ class ImdbDataset(Dataset):
         result = doc_matrix[index_list, :]
         # print(result.shape)
         return result
+
+    def sentence_vector_padding(self, sen_vec, seq_length):
+        """
+        对每个句子对应的词向量矩阵进行填充，保证句子长度一样
+        """
+        if sen_vec.shape[0] >= seq_length:
+            return sen_vec[:seq_length, :]
+        else:
+            pad_len = int(seq_length-sen_vec.shape[0])
+            sen_vec_pad = np.pad(array=sen_vec, pad_width=((0,pad_len),(0,0)), mode='constant', constant_values=0)
+            return sen_vec_pad
 
     def __len__(self):
         return self.doc_vector.shape[0]
