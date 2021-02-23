@@ -55,6 +55,9 @@ label_train.shape
 text_train[0].__class__  #其中的字符串是bytes类型
 text_train[0]
 label_train[0]
+
+set(label_train)
+
 t = text_train[0]
 t = b"1"
 
