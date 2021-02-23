@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
+from torch.utils.data.dataset import Dataset
 from torchvision import datasets, transforms as T
 
 # 用于将tensor压平的匿名函数
@@ -213,3 +214,130 @@ for epoch in range(1, 31):
     # print(loss)
     print("epoch {:2} ---- training MSE-Loss  is：{:.4f}".format(epoch, train_loss))
     print("epoch {:2} ---- testing  MSE-Loss  is：{:.4f}".format(epoch, test_loss))
+
+
+# ------------------IMDB数据集的加载---------------------
+from sklearn.datasets import load_files
+import spacy
+
+class ImdbDataset(Dataset):
+    def __init__(self, filepath, part=None):
+        super(ImdbDataset, self).__init__()
+        self.filepath = filepath
+        self.__nlp = spacy.load("en_core_web_sm")
+        self.doc_vector, self.label = self.transform(filepath, part)
+
+    def transform(self, filepath, part):
+        text_data = load_files(filepath)
+        text_list, label = text_data.data, text_data.target
+        if part is not None:
+            text_list = text_list[:part]
+            label = label[:part]
+        text = [doc.decode("utf-8").replace("<br />", " ") for doc in text_list]
+        sentence_vec = [self.sentence2vector(self.__nlp(doc)) for doc in text]
+        # 上面得到的 sentence_vec 中，每个句子的长度都不一样，需要选择最短的句子做截断处理
+        seq_length = min([sentence.shape[0] for sentence in sentence_vec])
+        sentence_vec_trunc = [sentence[:seq_length, :] for sentence in sentence_vec]
+        # doc_len = [sentence.shape for sentence in sentence_vec_trunc]
+        # print("seq_length", seq_length)
+        # print("doc_len", doc_len)
+        doc_vector = np.array(sentence_vec_trunc)
+        return doc_vector, label
+
+    def sentence2vector(self, doc):
+        """
+        用于从 sentence 中过滤出有用的word
+        @param sentence: spacy的doc对象，封装了一个句子
+        @return: 句子中有效单词所组成的 词向量矩阵,
+        """
+        doc_matrix = doc.tensor
+        # 接下来要从上面剔除掉 标点符号 等无效部分的词向量
+        index_list = []
+        for token in doc:
+            if token.is_stop or token.is_punct or token.is_currency:
+                continue
+            else:
+                index_list.append(token.i)
+        result = doc_matrix[index_list, :]
+        # print(result.shape)
+        return result
+
+    def __len__(self):
+        return self.doc_vector.shape[0]
+
+    def __getitem__(self, item):
+        return self.doc_vector[item, :, :], self.label[item]
+
+
+imdb_train = ImdbDataset(filepath='./datasets/aclImdb/train/', part=20)
+imdb_test = ImdbDataset(filepath='./datasets/aclImdb/test/', part=10)
+
+doc_vector = imdb_train.doc_vector
+doc_vector.shape
+doc_label = imdb_train.label
+doc_label.shape
+
+
+# 构建数据加载器
+batch_size = 5
+imdb_train_loader = DataLoader(dataset=imdb_train, batch_size=batch_size)
+imdb_test_loader = DataLoader(dataset=imdb_test, batch_size=batch_size)
+iter_batch = iter(imdb_train_loader)
+X, y = next(iter_batch)
+X.__class__
+X.shape
+y.__class__
+y.shape
+
+lstm_layer = nn.LSTM(input_size=96, hidden_size=48, num_layers=1, batch_first=True, bidirectional=False)
+res = lstm_layer(X)
+
+X.shape
+# 输出
+res[0].shape
+res[1].__class__
+# 隐藏层状态
+res[1][0].shape
+# 隐藏层的cell状态
+res[1][1].shape
+
+
+
+# -------------使用LSTM来进行IMDB的文本分类------------------
+class ImdbLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, seq_length, num_layers):
+        super().__init__()
+        self.lstm_layer = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers)
+        self.flatten = nn.Flatten()
+        self.linear = nn.Linear(in_features=seq_length*hidden_size, out_features=2, bias=True)
+
+    def forward(self, X):
+        lstm_out = self.lstm_layer(X)
+        lstm_flatten = self.flatten(lstm_out[0])
+        y_pred = self.linear(lstm_flatten)
+        return y_pred
+
+
+# 初始化模型
+lstm_rnn = ImdbLSTM(input_size=96, hidden_size=48, seq_length=20, num_layers=1)
+# 定义损失函数
+crossEnt = nn.CrossEntropyLoss()
+# 定义优化器
+optimizer = optim.SGD(params=lstm_rnn.parameters(), lr=0.1)
+# 测试
+# out = lstm_rnn(X)
+# loss = crossEnt(out, y.long())
+
+# 开始迭代训练
+for epoch in range(1,5):
+    for batch_id, (X, y) in enumerate(imdb_train_loader):
+        y_pred = lstm_rnn(X)
+        optimizer.zero_grad()
+        loss = crossEnt(y_pred, y.long())
+        loss.backward()
+        optimizer.step()
+
+        y_pred_new = lstm_rnn(X)
+        train_loss = crossEnt(y_pred_new, y.long())
+
+    print("train_loss: {:.4f}".format(train_loss))
