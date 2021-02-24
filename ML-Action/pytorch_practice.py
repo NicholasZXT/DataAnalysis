@@ -357,3 +357,56 @@ for epoch in range(1,5):
         train_loss = crossEnt(y_pred_new, y.long())
 
     print("train_loss: {:.4f}".format(train_loss))
+
+
+# ------------- Transformer-Encoder 使用-------------------------------------
+
+# Encoder层，需要设置的参数有：
+# 输入特征数 in_features=56, nhead, dim_feedforward是指self-attention后的前馈网络的中间层，
+# Encoder的不会改变输入样本的特征数量，也就是说，输入的in_features是多少，输出的就是多少
+in_features = 56
+encoder_layer = nn.TransformerEncoderLayer(d_model=in_features, nhead=4, dim_feedforward=24)
+# 输入数据，batch_size=10, seq_length = 32, 特征数为in_features
+src = torch.rand(10, 32, in_features)
+out = encoder_layer(src)
+
+src.shape
+out.shape
+
+class ImdbTransformer(nn.Module):
+    def __init__(self, input_size, hidden_size, seq_length):
+        super().__init__()
+        self.transformer = nn.TransformerEncoderLayer(d_model=input_size, dim_feedforward=hidden_size, nhead=4)
+        self.flatten = nn.Flatten()
+        self.linear = nn.Linear(in_features=seq_length*hidden_size, out_features=2, bias=True)
+
+    def forward(self, X):
+        trans_out = self.transformer(X)
+        trans_flatten = self.flatten(trans_out)
+        y_pred = self.linear(trans_flatten)
+        return y_pred
+
+
+# 初始化模型
+imdb_trans = ImdbTransformer(input_size=96, hidden_size=48, seq_length=20)
+# 定义损失函数
+crossEnt = nn.CrossEntropyLoss()
+# 定义优化器
+optimizer = optim.SGD(params=imdb_trans.parameters(), lr=0.1)
+# 测试
+# out = imdb_trans(X)
+# loss = crossEnt(out, y.long())
+
+# 开始迭代训练
+for epoch in range(1,5):
+    for batch_id, (X, y) in enumerate(imdb_train_loader):
+        y_pred = imdb_trans(X)
+        optimizer.zero_grad()
+        loss = crossEnt(y_pred, y.long())
+        loss.backward()
+        optimizer.step()
+
+        y_pred_new = imdb_trans(X)
+        train_loss = crossEnt(y_pred_new, y.long())
+
+    print("train_loss: {:.4f}".format(train_loss))
