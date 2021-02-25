@@ -1,6 +1,9 @@
+# packages import
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.datasets import load_files
+import spacy
 
 import torch
 from torch import nn, optim
@@ -217,8 +220,6 @@ for epoch in range(1, 31):
 
 
 # ------------------IMDB数据集的加载---------------------
-from sklearn.datasets import load_files
-import spacy
 
 class ImdbDataset(Dataset):
     def __init__(self, filepath, part=None):
@@ -298,13 +299,17 @@ doc_label.shape
 batch_size = 5
 imdb_train_loader = DataLoader(dataset=imdb_train, batch_size=batch_size)
 imdb_test_loader = DataLoader(dataset=imdb_test, batch_size=batch_size)
+# imdb_train_loader = DataLoader(dataset=imdb_train, batch_size=batch_size, num_workers=4)
+# imdb_test_loader = DataLoader(dataset=imdb_test, batch_size=batch_size, num_workers=4)
 iter_batch = iter(imdb_train_loader)
 X, y = next(iter_batch)
 X.__class__
-X.shape
 y.__class__
+X.shape
 y.shape
 
+
+# -------------使用LSTM来进行IMDB的文本分类------------------
 lstm_layer = nn.LSTM(input_size=96, hidden_size=48, num_layers=1, batch_first=True, bidirectional=False)
 res = lstm_layer(X)
 
@@ -318,8 +323,6 @@ res[1][0].shape
 res[1][1].shape
 
 
-
-# -------------使用LSTM来进行IMDB的文本分类------------------
 class ImdbLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, seq_length, num_layers):
         super().__init__()
@@ -369,26 +372,39 @@ encoder_layer = nn.TransformerEncoderLayer(d_model=in_features, nhead=4, dim_fee
 # 输入数据，batch_size=10, seq_length = 32, 特征数为in_features
 src = torch.rand(10, 32, in_features)
 out = encoder_layer(src)
-
 src.shape
 out.shape
+
+
+X.shape
+input_size = 96
+hidden_size=48
+seq_length=95
+encoder_layer = nn.TransformerEncoderLayer(d_model=input_size, dim_feedforward=hidden_size, nhead=4)
+out = encoder_layer(X.transpose(1,0))
+out.shape
+
 
 class ImdbTransformer(nn.Module):
     def __init__(self, input_size, hidden_size, seq_length):
         super().__init__()
         self.transformer = nn.TransformerEncoderLayer(d_model=input_size, dim_feedforward=hidden_size, nhead=4)
         self.flatten = nn.Flatten()
-        self.linear = nn.Linear(in_features=seq_length*hidden_size, out_features=2, bias=True)
+        self.linear = nn.Linear(in_features=seq_length*input_size, out_features=2, bias=True)
 
     def forward(self, X):
-        trans_out = self.transformer(X)
-        trans_flatten = self.flatten(trans_out)
+        X_transpose = X.transpose(1,0)
+        trans_out = self.transformer(X_transpose)
+        trans_flatten = self.flatten(trans_out.transpose(1,0))
         y_pred = self.linear(trans_flatten)
         return y_pred
 
 
 # 初始化模型
-imdb_trans = ImdbTransformer(input_size=96, hidden_size=48, seq_length=20)
+imdb_trans = ImdbTransformer(input_size=input_size, hidden_size=hidden_size, seq_length=seq_length)
+# 测试输出
+# y_pred = imdb_trans(X)
+# y_pred.shape
 # 定义损失函数
 crossEnt = nn.CrossEntropyLoss()
 # 定义优化器
@@ -405,8 +421,17 @@ for epoch in range(1,5):
         loss = crossEnt(y_pred, y.long())
         loss.backward()
         optimizer.step()
-
         y_pred_new = imdb_trans(X)
         train_loss = crossEnt(y_pred_new, y.long())
+        print("epoch {:2}, batch_id {:2}, train_loss: {}".format(epoch, batch_id, train_loss))
 
-    print("train_loss: {:.4f}".format(train_loss))
+
+# --------- 损失函数相关 -------------------
+
+# negative log likelihood loss
+nlloss = nn.NLLLoss(reduction='none')
+y_true = torch.tensor([1, 0, 0], dtype=torch.long)
+y_pred = torch.tensor([[1,0], [1,0], [0,1]], dtype=torch.float, requires_grad=True)
+y_true
+y_pred
+nlloss(input=y_pred, target=y_true)
