@@ -4,6 +4,8 @@ from elasticsearch import Elasticsearch
 import configparser
 import numpy as np
 import pandas as pd
+from datetime import datetime
+import datetime
 
 
 es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
@@ -93,10 +95,23 @@ s = set(['a', 'b'])
 
 
 from datetime import datetime, timedelta
+import datetime
+import pkg_resources
+pkg_resources.get_distribution("os")
+pkg_resources.get_distribution("DateTime").version
+pkg_resources.get_distribution("sys").version
 
 t1 = datetime.strptime('2021-01-28 10:11:21', '%Y-%m-%d %H:%M:%S')
 t2 = datetime.strptime('2021-01-29 08:00:11', '%Y-%m-%d %H:%M:%S')
 t3 = datetime.strptime('2021', '%Y')
+t4 = datetime.strptime('2021-01-29T18:00:11.000Z', "%Y-%m-%dT%H:%M:%S.%f%z")
+
+t4 = datetime.strptime('2021-01-29T09:43:47.000Z', "%Y-%m-%dT%H:%M:%S.%f%z")
+
+from datetime import datetime, timezone
+date_str = '2021-01-29T09:43:47.000Z'
+t4 = datetime.strptime(date_str[:-1], "%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=timezone.utc)
+
 
 t1.hour
 t2.hour
@@ -110,6 +125,13 @@ df = pd.DataFrame({'col1':list("aabbc"), 'col2':list("AABBC"), 'col3':[1,2,3,4,5
 df.groupby(['col1','col2'], as_index=False).apply(lambda x: x.iloc[0,0])
 
 df.groupby(['col1','col2'], as_index=False).apply(lambda x: x.sort_values(['col3'], ascending=False).nlargest(1, 'col3'))
+
+# datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
+date_list = ["2021-01-10 12:24:21", "2021-01-05 12:12:12", "2021-01-03 08:08:08", "2021-02-01 09:12:13", "2021-01-08 12:12:12",]
+df = pd.DataFrame({'col1':list("aabbc"), 'col2':list("AABBC"), 'col3':date_list})
+df['col4'] = df['col3'].apply(datetime.strptime, args=("%Y-%m-%d %H:%M:%S", ))
+df.groupby(['col1','col2'], as_index=False).apply(lambda x: x.sort_values(['col3'], ascending=False).nlargest(1, 'col3'))
+df.groupby(['col1','col2'], as_index=False).apply(lambda x: x.sort_values(['col4'], ascending=False).nlargest(1, 'col4'))
 
 
 df[['col1', 'col2']].set_index('col1')['col2'].to_dict()
