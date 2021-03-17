@@ -1,26 +1,35 @@
 # 用于练习 huggingface 的 transformer
 import os
+import time
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import load_files
 import torch
+from torch import nn
 from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizer, DistilBertTokenizer, BertForSequenceClassification, AdamW
+from transformers import BertTokenizer, DistilBertTokenizer, BertForSequenceClassification, DistilBertForSequenceClassification, AdamW
 
-
-tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
-
-sentence = "A Titan RTX has 24GB of VRAM"
-tokenized_sentence = tokenizer.tokenize(sentence)
-print(tokenized_sentence)
-
-encode_sentence_tokens = tokenizer(sentence)
-print(encode_sentence_tokens)
-
-decode_sentence = tokenizer.decode(encode_sentence_tokens['input_ids'])
-print(decode_sentence)
 
 # ---------------------使用IMDB数据集来 fine-tune BERT模型-----------------------------------------------------
+# 加载预训练模型 和 Tokenizer
+# model_path = r"BERT\bert-pre-trained-models\bert-base-uncased"
+# tokenizer = BertTokenizer.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
+# model = BertForSequenceClassification.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
+model_path = r"BERT\bert-pre-trained-models\distilbert-base-uncased"
+tokenizer = DistilBertTokenizer.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
+model = DistilBertForSequenceClassification.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
+
+# 在GPU上进行训练
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+# device = torch.device('cpu')
+model.to(device)
+
+
+# 设置读取的数据集大小
+train_size, train_batch_size = 200, 25
+test_size, test_batch_size = 100, 25
+
+
 #读取数据
 def read_imdb_split(split_dir, limit=None):
     split_dir = Path(split_dir)
@@ -41,23 +50,17 @@ data_test_dir = r"./datasets/aclImdb/test"
 # os.path.exists(data_train_dir)
 # train_texts, train_labels = read_imdb_split(data_train_dir)
 # test_texts, test_labels = read_imdb_split(data_test_dir)
-train_texts, train_labels = read_imdb_split(data_train_dir, limit=250)
-test_texts, test_labels = read_imdb_split(data_test_dir, limit=125)
+train_texts, train_labels = read_imdb_split(data_train_dir, limit=train_size)
+test_texts, test_labels = read_imdb_split(data_test_dir, limit=test_size)
 # len(train_texts)
 # 使用sklearn读取数据
 # text_train = load_files(data_train_dir)
+# t = tokenizer(train_texts[0])
 
 # 切分训练集和验证集
-train_texts, val_texts, train_labels, val_labels = train_test_split(train_texts, train_labels, test_size=.2)
-len(train_texts)
-len(val_texts)
-
-# 加载 Tokenizer
-# model_path = r"BERT\bert-pre-trained-models\distilbert-base-uncased"
-# tokenizer = DistilBertTokenizer.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
-model_path = r"BERT\bert-pre-trained-models\bert-base-uncased"
-tokenizer = BertTokenizer.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
-# t = tokenizer(train_texts[0])
+# train_texts, val_texts, train_labels, val_labels = train_test_split(train_texts, train_labels, test_size=.2)
+# len(train_texts)
+# len(val_texts)
 
 # 对原始文本进行分词
 train_encodings = tokenizer(train_texts, truncation=True, padding=True, max_length=128)
@@ -82,58 +85,49 @@ class IMDbDataset(Dataset):
 train_dataset = IMDbDataset(train_encodings, train_labels)
 # val_dataset = IMDbDataset(val_encodings, val_labels)
 test_dataset = IMDbDataset(test_encodings, test_labels)
-train_loader = DataLoader(train_dataset, batch_size=50, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=50)
+train_loader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=test_batch_size)
 # train_dataset[0]
 # test_dataset[0]["input_ids"].shape
-
-
-# model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
-model = BertForSequenceClassification.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
-model.to("cpu")
-# 验证一下输出
-batch_iter = iter(train_loader)
-batch = next(batch_iter)
-len(batch["input_ids"])
-input_ids = batch["input_ids"]
-attention_mask = batch['attention_mask']
-labels = batch['labels']
-outputs = model(input_ids, attention_mask=attention_mask, labels=labels, output_attentions=True, output_hidden_states=True)
-type(outputs)
-loss = outputs.loss  # 这里的 Loss 是交叉熵损失
-logits = outputs.logits  # logits 是输出的取各个类别的原始值，没有经过 softmax + log 变换
-hidden_states = outputs.hidden_states
-attentions = outputs.attentions
-# 手动计算 交叉熵，可以看出，两者是一样的.
-crossEntropy = torch.nn.CrossEntropyLoss()
-loss_manual = crossEntropy(logits, labels)
-print(loss, loss_manual)
-# 查看隐藏层状态和对应attention
-hidden_states[0].shape
-attentions[0].shape
-# 将 logits 转换成预测的概率
-softmax = torch.nn.Softmax(dim=1)
-logits_soft = softmax(logits)
-logits_soft.shape
-logits[:5, :]
-logits_soft[:5, :]
-# 再转换成预测结果，也就是获取每一行中概率最大处的index
-labels_pred = torch.argmax(logits_soft, dim=1)
-print(labels_pred[:5], labels[:5])
-# 计算分类错误率
-diff = torch.abs(labels_pred - labels).numpy()
-diff.sum()/diff.size
-
-# 在GPU上进行训练
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-model.to(device)
-optim = AdamW(model.parameters(), lr=5e-5)
 # 获取测试集，这里只取了一部分
 batch_test_iter = iter(test_loader)
 batch_test = next(batch_test_iter)
-test_input_ids, test_attention_mask, test_labels = batch_test["input_ids"], batch_test['attention_mask'], batch_test['labels']
+test_input_ids, test_attention_mask, test_labels = batch_test["input_ids"].to(device), batch_test['attention_mask'].to(device), batch_test['labels'].to(device)
+
+
+# 验证一下输出
+# batch_iter = iter(train_loader)
+# batch = next(batch_iter)
+# len(batch["input_ids"])
+# input_ids, attention_mask, labels = batch["input_ids"].to(device), batch['attention_mask'].to(device), batch['labels'].to(device)
+# outputs = model(input_ids, attention_mask=attention_mask, labels=labels, output_attentions=True, output_hidden_states=True)
+# loss = outputs.loss  # 这里的 Loss 是交叉熵损失
+# logits = outputs.logits  # logits 是输出的取各个类别的原始值，没有经过 softmax + log 变换
+# # hidden_states = outputs.hidden_states
+# # attentions = outputs.attentions
+# # 手动计算 交叉熵，可以看出，两者是一样的.
+# crossEntropy = nn.CrossEntropyLoss()
+# loss_manual = crossEntropy(logits, labels)
+# print(loss, loss_manual)
+# # 查看隐藏层状态和对应attention
+# # hidden_states[0].shape
+# # attentions[0].shape
+# # 将 logits 转换成预测的概率
+# softmax = nn.Softmax(dim=1)
+# logits_soft = softmax(logits)
+# # 再转换成预测结果，也就是获取每一行中概率最大处的index
+# labels_pred = torch.argmax(logits_soft, dim=1)
+# print(labels_pred[:5], labels[:5])
+# # 计算分类错误率
+# diff = torch.abs(labels_pred - labels).numpy()
+# diff.sum()/diff.size
+
+
+# 训练前的配置
+optim = AdamW(model.parameters(), lr=5e-5)
+softmax = nn.Softmax(dim=1)
 # 开始训练
-softmax = torch.nn.Softmax(dim=1)
+start_time = time.time()
 for epoch in range(3):
     model.train()
     for batch_id, batch in enumerate(train_loader):
@@ -145,21 +139,39 @@ for epoch in range(3):
         loss = outputs.loss
         loss.backward()
         optim.step()
-        if batch_id % 2 == 0:
+        if batch_id % 5 == 0:
             # 计算分类错误率
             logits_soft = softmax(outputs.logits)
-            labels_pred = torch.argmax(logits_soft)
-            diff = torch.abs(labels_pred - labels).numpy()
+            labels_pred = torch.argmax(logits_soft, dim=1)
+            diff = torch.abs(labels_pred - labels).cpu().numpy()
             error = diff.sum() / diff.size
-            print("epoch{:2} - training loss on batch{:2} is: {:.4f}, error rate is {:.2f}%.".format(epoch+1, batch_id, loss, error))
+            if error >= 1.0 :
+                print("diff.sum(): ", diff.sum(), "; diff.size: ", diff.size)
+            print("epoch {:2} - training loss on batch {:2} is: {:.4f}, error rate is {:.2f}%.".format(epoch+1, batch_id, loss, error*100))
     model.eval()
     test_outputs = model(test_input_ids, attention_mask=test_attention_mask, labels=test_labels)
     test_loss = test_outputs.loss
-    test_labels_pred = torch.argmax(softmax(test_outputs.logits))
-    test_diff = torch.abs(test_labels_pred - test_labels).numpy()
+    test_labels_pred = torch.argmax(softmax(test_outputs.logits), dim=1)
+    test_diff = torch.abs(test_labels_pred - test_labels).cpu().numpy()
     test_error = test_diff.sum()/test_diff.size
-    print("\nepoch{:2} - testing loss is: {:.4f}, error rate is {:2f}%".format(epoch+1, test_loss, test_error))
+    print("\nepoch {:2} - testing loss is: {:.4f}, error rate is {:2f}%".format(epoch+1, test_loss, test_error*100))
     print("---------------------------------------")
+end_time = time.time()
+print("time cost is : {:.2f}.".format(end_time-start_time))
+
+# 以下是 distill-bert 耗时
+# cpu训练，
+# train_size, train_batch_size = 100, 20
+# test_size, test_batch_size = 100, 20
+# 175.57
+# GPU训练
+# train_size, train_batch_size = 200, 20
+# test_size, test_batch_size = 100, 20
+# 11.19
+
+# RTX 2060 的 6G 根本带不动 BERT，连 distill-bert 都很困难
+# distill-bert 模型时，只计算一个batch时，最大的 batch_size 只能是 60, 即使是 65 都会报OOM；
+# 如果要循环迭代，最大的 batch_size 只能是20（训练和测试都是20）,25都会报OOM.
 
 
 # TODO
