@@ -26,8 +26,8 @@ model.to(device)
 
 
 # 设置读取的数据集大小
-train_size, train_batch_size = 200, 25
-test_size, test_batch_size = 100, 25
+train_size, train_batch_size = 2000, 20
+test_size, test_batch_size = 100, 20
 
 
 #读取数据
@@ -128,7 +128,7 @@ optim = AdamW(model.parameters(), lr=5e-5)
 softmax = nn.Softmax(dim=1)
 # 开始训练
 start_time = time.time()
-for epoch in range(3):
+for epoch in range(5):
     model.train()
     for batch_id, batch in enumerate(train_loader):
         optim.zero_grad()
@@ -168,6 +168,10 @@ print("time cost is : {:.2f}.".format(end_time-start_time))
 # train_size, train_batch_size = 200, 20
 # test_size, test_batch_size = 100, 20
 # 11.19
+# GPU训练
+# train_size, train_batch_size = 2000, 20  这个样本量得到的模型在测试集上的效果已经很好了，错误率接近于0
+# test_size, test_batch_size = 100, 20
+# 181.83
 
 # RTX 2060 的 6G 根本带不动 BERT，连 distill-bert 都很困难
 # distill-bert 模型时，只计算一个batch时，最大的 batch_size 只能是 60, 即使是 65 都会报OOM；
