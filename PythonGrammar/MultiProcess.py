@@ -1,9 +1,13 @@
 """
 Python 并行编程
 """
+# 多线程相关
 import threading
+from queue import Queue
+# 多进程相关
 import multiprocessing
 from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import time
 from time import sleep
 import random
@@ -11,13 +15,103 @@ import os
 
 
 # --- 基本的线程使用 ---------------------
-def my_fun(name):
-    print("thread " + name + " starting")
-    sleep(1)
-    print("thread " + name + " ending")
+# 方法一，传入函数
+def my_fun(num):
+    print("thread " + num + " starting")
+    sleep(0.2)
+    print("thread " + num + " ending")
 
 
-# --------- 线程锁 ---------------------
+# 方法二、继承线程类，并重载run方法
+class ThreadFunction(threading.Thread):
+    def __init__(self, num):
+        super().__init__()
+        self.num = num
+
+    # def run(self) -> None:
+    #     super().run()
+    def run(self):
+        print("thread " + self.num + " starting")
+        sleep(0.2)
+        print("thread " + self.num + " ending")
+
+
+# ---- 基本的进程使用 --------------------
+# 方法一，传入函数, 函数同线程的 my_fun
+# 方法二、继承进程类，并重载run方法
+class ProcessFunction(multiprocessing.Process):
+    def __init__(self, num):
+        super().__init__()
+        self.num = num
+
+    # def run(self) -> None:
+    #     super().run()
+    def run(self):
+        print("process " + self.num + " starting")
+        sleep(0.2)
+        print("process " + self.num + " ending")
+
+
+# ----------多线程+队列 的生产者-消费者模型---------------------
+class Producer(threading.Thread):
+    def __init__(self, queue):
+        super().__init__()
+        self.queue = queue
+
+    def run(self):
+        for i in range(10):
+            item = random.randint(0, 256)
+            self.queue.put(item)
+            print('Producer notify: item {} append to queue by {}'.format(item, self.name))
+            sleep(0.5)
+
+
+class Consumer(threading.Thread):
+    def __init__(self, queue):
+        super().__init__()
+        self.queue = queue
+
+    def run(self):
+        while True:
+            item = self.queue.get()
+            print("Consumer notify: item {} popped from queue by {}".format(item, self.name))
+            self.queue.task_done()
+
+
+# -----------多进程+队列 的生产者-消费者模型--------------------
+# 这里没有使用子类继承的方式
+def producer(name, queue):
+    print("producer " + name + " is running")
+    i = 0
+    while i < 20:
+        item = random.randint(0, 50)
+        queue.put(item)
+        print("producer {} putting item {} successfully".format(name, item))
+        i = i+1
+        sleep(0.5)
+
+
+def consumer(name, queue):
+    while True:
+        # print("consumer {} get Queue size : {}".format(name, queue.qsize()))
+        item = queue.get()
+        # item = queue.get(block=False, timeout=1000)
+        if item:
+            print("consumer {} getting item {}.".format(name, item))
+            sleep(0.5)
+
+
+# ----------------进程或线程池的使用---------------------------------------
+def worker(msg, level):
+    print("{} {} starting, {} num is: {}.".format(level, msg, level, os.getpid()))
+    # random.random()随机生成0~1之间的浮点数
+    sleep_time = random.random()*5
+    time.sleep(sleep_time)
+    print("{} {} sleep for {:.4f} second.".format(level, msg, sleep_time))
+    return sleep_time
+
+
+# ---------------- 线程同步 ---------------------
 shared_resource_with_lock = 0
 shared_resource_with_no_lock = 0
 COUNT = 50
@@ -59,76 +153,43 @@ def decrement_with_no_lock():
         sleep(1)
 
 
-# ----------多线程的生产者-消费者模型---------------------
-#
-
-
-
-
-
-
-# -----------多进程的生产者-消费者模型--------------------
-def producer(name, q):
-    print("producer " + name + " is running")
-    i = 0
-    while i <= 10:
-        # item = random.randint(0, 50)
-        item = i
-        q.put(item)
-        print("producer putting item {} successfully".format(item))
-        i = i+1
-        sleep(1)
-
-
-def consumer(name, q):
-    while True:
-        print("consumer {} get Queue size : {}".format(name, q.qsize()))
-        item = q.get()
-        if item:
-            print("consumer {} getting item {}.".format(name, item))
-        else:
-            print("consumer {} getting -----Nothing------.".format(name))
-        sleep(1)
-
-
-# ----------------进程池的使用---------------------------------------
-#
-def worker(msg):
-    print("进程 {} 开始执行,进程号为 {}.".format(msg, os.getpid()))
-    # random.random()随机生成0~1之间的浮点数
-    sleep_time = random.random()*5
-    time.sleep(sleep_time)
-    print("进程 ", msg, " 睡眠时间为：{:.4f}.".format(sleep_time))
-
-
-if __name__ == '__main__':
-    # -----基本线程使用---------------
-    # 创建线程
+if __name__ == "__main__":
+    # ---------基本线程使用---------------
+    # # 创建线程
     # t1 = threading.Thread(target=my_fun, args=("thread-1",), name="thread-1")
-    # t2 = threading.Thread(target=my_fun, args=("thread-2",), name="thread-2")
-    # 开始线程
+    # t2 = ThreadFunction(num="thread-2")
+    # # 开始线程
     # t1.start()
     # t2.start()
-    # join表示主进程在此处阻塞，等待线程执行结束后再继续
+    # # join表示主进程在此处阻塞，等待线程执行结束后再继续
     # t1.join()
     # t2.join()
 
-    #--- 线程锁的使用 ------
-    t1 = threading.Thread(target=increment_with_lock)
-    t2 = threading.Thread(target=decrement_with_lock)
-    t3 = threading.Thread(target=increment_with_no_lock)
-    t4 = threading.Thread(target=decrement_with_no_lock)
-    t1.start(), t2.start(), t3.start(), t4.start()
-    t1.join(), t2.join(), t3.join(), t4.join()
-    print("shared_resource_with_lock: ", shared_resource_with_lock)
-    print("shared_resource_with_no_lock: ", shared_resource_with_no_lock)
+    # ------- 进程的基本使用 ------------------
+    # t1 = multiprocessing.Process(target=my_fun, args=("process-1",), name="process-1")
+    # t2 = ThreadFunction(num="process-2")
+    # t1.start()
+    # t2.start()
+    # t1.join()
+    # t2.join()
 
+    # --------多线程+队列 的 生产者-消费者 模型 --------------
+    # queue = Queue()
+    # t1 = Producer(queue)
+    # t2 = Consumer(queue)
+    # t3 = Consumer(queue)
+    # t1.start()
+    # t2.start()
+    # t3.start()
+    # t1.join()
+    # t2.join()
+    # t3.join()
 
-    #--------多进程+队列 的 生产者-消费者 模型--------------
-    # q = multiprocessing.Queue()
-    # p = multiprocessing.Process(target=producer, args=('Random Number', q))
-    # c1 = multiprocessing.Process(target=consumer, args=('Consumer-1', q))
-    # c2 = multiprocessing.Process(target=consumer, args=('Consumer-2', q))
+    # --------多进程+队列 的 生产者-消费者 模型--------------
+    # queue = multiprocessing.Queue()
+    # p = multiprocessing.Process(target=producer, args=('Producer-1', queue))
+    # c1 = multiprocessing.Process(target=consumer, args=('Consumer-1', queue))
+    # c2 = multiprocessing.Process(target=consumer, args=('Consumer-2', queue))
     # p.start()
     # c1.start()
     # c2.start()
@@ -137,6 +198,13 @@ if __name__ == '__main__':
     # c2.join()
 
     # --------进程池的使用------------------
+    future_list = []
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for i in range(10):
+            future = executor.submit(worker, i+1, "Thread")
+            future_list.append(future)
+    for future in future_list:
+        print("future.result: ", future.result())
 
     # 一次提交一个进程
     # po = Pool(3)  # 定义一个进程池，最大进程数3
@@ -156,13 +224,13 @@ if __name__ == '__main__':
     # pool.join()  # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
     # print("-----end-----")
 
-
-
-
-
-
-
-
-
-
+    # --------------- 线程锁的使用 -----------------------
+    # t1 = threading.Thread(target=increment_with_lock)
+    # t2 = threading.Thread(target=decrement_with_lock)
+    # t3 = threading.Thread(target=increment_with_no_lock)
+    # t4 = threading.Thread(target=decrement_with_no_lock)
+    # t1.start(), t2.start(), t3.start(), t4.start()
+    # t1.join(), t2.join(), t3.join(), t4.join()
+    # print("shared_resource_with_lock: ", shared_resource_with_lock)
+    # print("shared_resource_with_no_lock: ", shared_resource_with_no_lock)
 
