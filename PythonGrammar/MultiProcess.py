@@ -6,7 +6,7 @@ import threading
 from queue import Queue
 # 多进程相关
 import multiprocessing
-from multiprocessing import Pool
+from multiprocessing import Pool, Semaphore, Condition
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import time
 from time import sleep
@@ -111,7 +111,7 @@ def worker(msg, level):
     return sleep_time
 
 
-# ---------------- 线程同步 ---------------------
+# ---------------- 带有锁 的线程同步 ---------------------
 shared_resource_with_lock = 0
 shared_resource_with_no_lock = 0
 COUNT = 50
@@ -151,6 +151,38 @@ def decrement_with_no_lock():
         print("no_lock: ", shared_resource_with_no_lock)
         shared_resource_with_no_lock -= 1
         sleep(1)
+
+
+# ------ 线程同步：信号量 实现的 生产者-消费者 模型 -----------------
+# 信号量的初始值=0，而不是1
+semaphore = threading.Semaphore(0)
+
+def producer_sem(name):
+    # item是一个全局变量
+    global item
+    for i in range(0, 10):
+        sleep(0.5)
+        item = random.randint(0, 256)
+        print("producer {} notify: produced item {}".format(name, item))
+        # 释放信号量，对其内部的计数器 +1
+        semaphore.release()
+
+def consumer_sem(name):
+    while True:
+        sleep(1)
+        print("consumer {} is waiting.".format(name))
+        # 获取信号量
+        semaphore.acquire()
+        print("consumer {} notify: consumed item {}".format(name, item))
+
+
+# ------ 线程同步：条件变量下的 生产者-消费者模型 ------------------------------
+items = []
+condition = threading.Condition()
+
+class Consumer_cond(threading.Thread):
+    def __init__(self):
+        super().__init__()
 
 
 if __name__ == "__main__":
@@ -198,13 +230,13 @@ if __name__ == "__main__":
     # c2.join()
 
     # --------进程池的使用------------------
-    future_list = []
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        for i in range(10):
-            future = executor.submit(worker, i+1, "Thread")
-            future_list.append(future)
-    for future in future_list:
-        print("future.result: ", future.result())
+    # future_list = []
+    # with ThreadPoolExecutor(max_workers=5) as executor:
+    #     for i in range(10):
+    #         future = executor.submit(worker, i+1, "Thread")
+    #         future_list.append(future)
+    # for future in future_list:
+    #     print("future.result: ", future.result())
 
     # 一次提交一个进程
     # po = Pool(3)  # 定义一个进程池，最大进程数3
@@ -223,6 +255,19 @@ if __name__ == "__main__":
     # pool.close()  # 关闭进程池，关闭后po不再接收新的请求
     # pool.join()  # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
     # print("-----end-----")
+
+
+    # ----- 线程同步：信号量 实现的 消费者-生产者 模型 ----------------
+    p = threading.Thread(target=producer_sem, args=('p-1', ))
+    c1 = threading.Thread(target=consumer_sem, args=('c-1', ))
+    c2 = threading.Thread(target=consumer_sem, args=('c-2', ))
+    p.start()
+    c1.start()
+    c2.start()
+    p.join()
+    c1.join()
+    c2.join()
+    print("--------------finished--------------")
 
     # --------------- 线程锁的使用 -----------------------
     # t1 = threading.Thread(target=increment_with_lock)
