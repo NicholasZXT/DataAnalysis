@@ -6,7 +6,7 @@ import threading
 from queue import Queue
 # 多进程相关
 import multiprocessing
-from multiprocessing import Pool, Semaphore, Condition
+from multiprocessing import Pool, Semaphore, Condition, Manager
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import time
 from time import sleep
@@ -21,7 +21,6 @@ def my_fun(num):
     sleep(0.2)
     print("thread " + num + " ending")
 
-
 # 方法二、继承线程类，并重载run方法
 class ThreadFunction(threading.Thread):
     def __init__(self, num):
@@ -34,7 +33,6 @@ class ThreadFunction(threading.Thread):
         print("thread " + self.num + " starting")
         sleep(0.2)
         print("thread " + self.num + " ending")
-
 
 # ---- 基本的进程使用 --------------------
 # 方法一，传入函数, 函数同线程的 my_fun
@@ -51,6 +49,65 @@ class ProcessFunction(multiprocessing.Process):
         sleep(0.2)
         print("process " + self.num + " ending")
 
+
+# ----------------进程或线程池的使用---------------------------------------
+def worker(msg, level):
+    print("{} {} starting, {} num is: {}.".format(level, msg, level, os.getpid()))
+    # random.random()随机生成0~1之间的浮点数
+    sleep_time = random.random()*5
+    time.sleep(sleep_time)
+    print("{} {} sleep for {:.4f} second.".format(level, msg, sleep_time))
+    return sleep_time
+
+
+# ---------------- 带有锁 的线程同步 ---------------------
+# 线程里迭代的次数
+COUNT = 2000
+shared_resource_with_lock = 0
+shared_resource_without_lock = 0
+# 线程锁
+# thread_lock = threading.Lock()
+thread_lock = threading.RLock()
+
+# 带有锁管理的 两个线程函数
+def increment_with_lock():
+    # 引入全局变量，这一句必须要有，它表示要 读并写 函数外部的变量
+    global shared_resource_with_lock
+    # COUNT 这个全局变量只是读，所以不需要 global 关键字
+    for i in range(COUNT):
+        thread_lock.acquire()
+        print("increment with lock: ", shared_resource_with_lock)
+        shared_resource_with_lock += 1
+        thread_lock.release()
+        sleep(0.5)
+
+def decrement_with_lock():
+    global shared_resource_with_lock
+    for i in range(COUNT):
+        thread_lock.acquire()
+        print("decrement with lock: ", shared_resource_with_lock)
+        shared_resource_with_lock -= 1
+        thread_lock.release()
+        sleep(0.5)
+
+# 没有锁管理 的两个线程函数
+def increment_without_lock():
+    global shared_resource_without_lock
+    for i in range(COUNT):
+        print("increment without lock: ", shared_resource_without_lock)
+        shared_resource_without_lock += 1
+        sleep(0.1)
+
+def decrement_without_lock():
+    global shared_resource_without_lock
+    for i in range(COUNT):
+        print("decrement without lock: ", shared_resource_without_lock)
+        shared_resource_without_lock -= 1
+        sleep(0.1)
+
+# ---------------------------------------------------------------
+# ------------ 生产者-消费者 模型的 多种实现 ------------------------
+# ---------------------------------------------------------------
 
 # ----------多线程+队列 的生产者-消费者模型---------------------
 class Producer(threading.Thread):
@@ -101,58 +158,6 @@ def consumer(name, queue):
             sleep(0.5)
 
 
-# ----------------进程或线程池的使用---------------------------------------
-def worker(msg, level):
-    print("{} {} starting, {} num is: {}.".format(level, msg, level, os.getpid()))
-    # random.random()随机生成0~1之间的浮点数
-    sleep_time = random.random()*5
-    time.sleep(sleep_time)
-    print("{} {} sleep for {:.4f} second.".format(level, msg, sleep_time))
-    return sleep_time
-
-
-# ---------------- 带有锁 的线程同步 ---------------------
-shared_resource_with_lock = 0
-shared_resource_with_no_lock = 0
-COUNT = 50
-# 线程锁
-thread_lock = threading.Lock()
-
-# 带有锁管理的 两个线程函数
-def increment_with_lock():
-    global shared_resource_with_lock # 引入全局变量，这一句必须要有
-    for i in range(COUNT):
-        thread_lock.acquire()
-        print("lock: ", shared_resource_with_lock)
-        shared_resource_with_lock += 1
-        thread_lock.release()
-        sleep(1)
-
-def decrement_with_lock():
-    global shared_resource_with_lock
-    for i in range(COUNT):
-        thread_lock.acquire()
-        print("lock: ", shared_resource_with_lock)
-        shared_resource_with_lock -= 1
-        thread_lock.release()
-        sleep(1)
-
-# 没有锁管理 的两个线程函数
-def increment_with_no_lock():
-    global shared_resource_with_no_lock
-    for i in range(COUNT):
-        print("no_lock: ", shared_resource_with_no_lock)
-        shared_resource_with_no_lock += 1
-        sleep(1)
-
-def decrement_with_no_lock():
-    global shared_resource_with_no_lock
-    for i in range(COUNT):
-        print("no_lock: ", shared_resource_with_no_lock)
-        shared_resource_with_no_lock -= 1
-        sleep(1)
-
-
 # ------ 线程同步：信号量 实现的 生产者-消费者 模型 -----------------
 # 信号量的初始值=0，而不是1
 semaphore = threading.Semaphore(0)
@@ -176,13 +181,56 @@ def consumer_sem(name):
         print("consumer {} notify: consumed item {}".format(name, item))
 
 
-# ------ 线程同步：条件变量下的 生产者-消费者模型 ------------------------------
+# ------ 线程同步：条件变量 实现的 生产者-消费者模型 ------------------------------
 items = []
 condition = threading.Condition()
 
 class Consumer_cond(threading.Thread):
     def __init__(self):
         super().__init__()
+
+    def consume(self):
+        global condition
+        global items
+        condition.acquire() # 这个锁必须要在下面的判断条件之前，保证条件和 wait 操作的原子性
+        if len(items) == 0:
+            condition.wait()
+            print("Consumer notify: no item to consume")
+        item = items.pop()
+        # 执行 notify 时必须要持有锁，所以要在这之后释放锁
+        condition.notify()
+        condition.release() # 释放锁
+        # print操作不用放在锁里面
+        print("Consumer notify: consume 1 item '{}'".format(item))
+        print("Consumer notify: items to be comsumed are {}".format(len(items)))
+
+    def run(self):
+        for i in range(20):
+            sleep(0.5)
+            self.consume()
+
+
+class Producer_cond(threading.Thread):
+    def __init__(self):
+        super().__init__()
+
+    def produce(self):
+        global condition
+        global items
+        condition.acquire() # 条件判断前必须要加锁
+        if len(items) == 10:
+            condition.wait()
+            print("Producer notify: items produced are {}".format(len(items)))
+            print("Producer notify: stop the production !")
+        items.append(random.randint(0, 256))
+        condition.notify() # notify 操作时必须要持有锁，所以 release 要在此之后
+        condition.release()
+        print("Producer notify: total items are {}".format(len(items)))
+
+    def run(self):
+        for i in range(0, 20):
+            sleep(0.5)
+            self.produce()
 
 
 if __name__ == "__main__":
@@ -191,43 +239,15 @@ if __name__ == "__main__":
     # t1 = threading.Thread(target=my_fun, args=("thread-1",), name="thread-1")
     # t2 = ThreadFunction(num="thread-2")
     # # 开始线程
-    # t1.start()
-    # t2.start()
+    # t1.start(), t2.start()
     # # join表示主进程在此处阻塞，等待线程执行结束后再继续
-    # t1.join()
-    # t2.join()
+    # t1.join(), t2.join()
 
     # ------- 进程的基本使用 ------------------
     # t1 = multiprocessing.Process(target=my_fun, args=("process-1",), name="process-1")
     # t2 = ThreadFunction(num="process-2")
-    # t1.start()
-    # t2.start()
-    # t1.join()
-    # t2.join()
-
-    # --------多线程+队列 的 生产者-消费者 模型 --------------
-    # queue = Queue()
-    # t1 = Producer(queue)
-    # t2 = Consumer(queue)
-    # t3 = Consumer(queue)
-    # t1.start()
-    # t2.start()
-    # t3.start()
-    # t1.join()
-    # t2.join()
-    # t3.join()
-
-    # --------多进程+队列 的 生产者-消费者 模型--------------
-    # queue = multiprocessing.Queue()
-    # p = multiprocessing.Process(target=producer, args=('Producer-1', queue))
-    # c1 = multiprocessing.Process(target=consumer, args=('Consumer-1', queue))
-    # c2 = multiprocessing.Process(target=consumer, args=('Consumer-2', queue))
-    # p.start()
-    # c1.start()
-    # c2.start()
-    # p.join()
-    # c1.join()
-    # c2.join()
+    # t1.start(), t2.start()
+    # t1.join(), t2.join()
 
     # --------进程池的使用------------------
     # future_list = []
@@ -257,25 +277,47 @@ if __name__ == "__main__":
     # print("-----end-----")
 
 
-    # ----- 线程同步：信号量 实现的 消费者-生产者 模型 ----------------
-    p = threading.Thread(target=producer_sem, args=('p-1', ))
-    c1 = threading.Thread(target=consumer_sem, args=('c-1', ))
-    c2 = threading.Thread(target=consumer_sem, args=('c-2', ))
-    p.start()
-    c1.start()
-    c2.start()
-    p.join()
-    c1.join()
-    c2.join()
-    print("--------------finished--------------")
-
     # --------------- 线程锁的使用 -----------------------
     # t1 = threading.Thread(target=increment_with_lock)
     # t2 = threading.Thread(target=decrement_with_lock)
-    # t3 = threading.Thread(target=increment_with_no_lock)
-    # t4 = threading.Thread(target=decrement_with_no_lock)
-    # t1.start(), t2.start(), t3.start(), t4.start()
-    # t1.join(), t2.join(), t3.join(), t4.join()
-    # print("shared_resource_with_lock: ", shared_resource_with_lock)
-    # print("shared_resource_with_no_lock: ", shared_resource_with_no_lock)
+    # t3 = threading.Thread(target=increment_without_lock)
+    # t4 = threading.Thread(target=decrement_without_lock)
+    # t1.start(), t2.start(), t1.join(), t2.join()
+    # print("------------shared_resource_with_lock: ", shared_resource_with_lock, "-----------")
+    # t3.start(), t4.start(), t3.join(), t4.join()
+    # print("------------shared_resource_with_no_lock: ", shared_resource_without_lock, "-----------")
+
+    # ---------------------------------------------------------------
+    # ------------- 生产者-消费者 模型的 多种实现 ------------------------
+    # ---------------------------------------------------------------
+
+    # --------多线程+队列 的 生产者-消费者 模型 --------------
+    # queue = Queue()
+    # t1 = Producer(queue)
+    # t2 = Consumer(queue)
+    # t3 = Consumer(queue)
+    # t1.start(), t2.start(), t3.start()
+    # t1.join(), t2.join(), t3.join()
+
+    # --------多进程+队列 的 生产者-消费者 模型--------------
+    # queue = multiprocessing.Queue()
+    # p = multiprocessing.Process(target=producer, args=('Producer-1', queue))
+    # c1 = multiprocessing.Process(target=consumer, args=('Consumer-1', queue))
+    # c2 = multiprocessing.Process(target=consumer, args=('Consumer-2', queue))
+    # p.start(), c1.start(), c2.start()
+    # p.join(), c1.join(), c2.join()
+
+    # ----- 线程同步：信号量 实现的 消费者-生产者 模型 ----------------
+    # p = threading.Thread(target=producer_sem, args=('p-1', ))
+    # c1 = threading.Thread(target=consumer_sem, args=('c-1', ))
+    # c2 = threading.Thread(target=consumer_sem, args=('c-2', ))
+    # p.start(), c1.start(), c2.start()
+    # p.join(), c1.join(), c2.join()
+    # print("--------------finished--------------")
+
+    # ----- 线程同步：条件变量 实现的 消费者-生产者 模型 -----------------
+    p = Producer_cond()
+    c = Consumer_cond()
+    p.start(), c.start()
+    p.join(), c.join()
 
