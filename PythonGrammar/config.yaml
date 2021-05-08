@@ -1,0 +1,20 @@
+section:
+  - sec-1:
+      how: left
+      rule: line
+      fields: [a, b, c, d]
+  - sec-2:
+      how: inner
+      rule: o_n_5
+      fields: [ 1, 2, 3, 4 ]
+  - sec-3:
+      how: right
+      rule: line
+      fields: [ a1, b2, c3, d4 ]
+  - sec-4:
+      how: out
+      rule: line
+      fields: [ aa, bb, cc, dd ]
+  - sec-5:
+      - a1: [1,2,3,4]
+      - a2: [6,7,8,9]
