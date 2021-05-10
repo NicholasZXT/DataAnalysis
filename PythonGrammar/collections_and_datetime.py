@@ -1,53 +1,13 @@
 import sys
 import os
-import configparser
-import logging
-import argparse
 import numpy as np
 import pandas as pd
-from datetime import datetime
-import datetime
-
-
-# 获取路径中的最后一个文件夹名称
-os.path.basename('/path/to/Kaggle')
-# 获取文件夹路径
-os.path.dirname('/path/to/Kaggle')
-
-
-config = configparser.ConfigParser()
-config['DEFAULT'] = {'ServerAliveInterval': '45',
-                     'Compression': 'yes',
-                     'CompressionLevel': '9'}
-config['bitbucket.org'] = {}
-config['bitbucket.org']['User'] = 'hg'
-config['topsecret.server.com'] = {}
-topsecret = config['topsecret.server.com']
-topsecret['Port'] = '50022'     # mutates the parser
-topsecret['ForwardX11'] = 'no'  # same here
-config['DEFAULT']['ForwardX11'] = 'yes'
-with open('config.ini', 'w') as configfile:
-  config.write(configfile)
-
-
-config.sections()
-config.get(section='bitbucket.org', option='User')
-config.get(section='bitbucket.org', option='nothing', fallback='not exist')
-
-
-# 练习使用python的logging模块
-
-parse = argparse.ArgumentParser()
-
-parse.add_argument('-a', help="parameter -a")
-
-args = parse.parse_args()
-
-print(args)
-print(args.a)
-
+from datetime import datetime, timedelta
 
 # ------------------数据库操作----------------
+def sql_practice():
+    pass
+
 # pymysql
 import pymysql
 connection = pymysql.connect(host='localhost', user='root', password='mysql2020', port=3306, database='crashcourse')
@@ -71,32 +31,16 @@ cursor.close()
 connection.close()
 
 
-d = {
-'a' : [1, 2, 3],
-'b' : [4, 5]
-}
-
-from collections import  defaultdict
-
-d = defaultdict(lambda :{'args':1, 'keargs': {}})
-
-d['a']
-
-
-d = {'a':1, 'b':2, 'c':3}
-
-a, b, c = d['a'], d['b'], d['c']
-
-
-s = set(['a', 'b'])
-
-
-from datetime import datetime, timedelta
+# -------------------------- 日期操作 -----------------------------------
+from datetime import datetime, timedelta, timezone
 import datetime
-import pkg_resources
-pkg_resources.get_distribution("os")
-pkg_resources.get_distribution("DateTime").version
-pkg_resources.get_distribution("sys").version
+
+def datetime_manipulate():
+    """
+    日期处理相关的操作
+    @return:
+    """
+    pass
 
 t1 = datetime.strptime('2021-01-28 10:11:21', '%Y-%m-%d %H:%M:%S')
 t2 = datetime.strptime('2021-01-29 08:00:11', '%Y-%m-%d %H:%M:%S')
@@ -105,10 +49,22 @@ t4 = datetime.strptime('2021-01-29T18:00:11.000Z', "%Y-%m-%dT%H:%M:%S.%f%z")
 
 t4 = datetime.strptime('2021-01-29T09:43:47.000Z', "%Y-%m-%dT%H:%M:%S.%f%z")
 
-from datetime import datetime, timezone
+datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 date_str = '2021-01-29T09:43:47.000Z'
 t4 = datetime.strptime(date_str[:-1], "%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=timezone.utc)
 
+datetime.today().strftime("%Y.%m.%d")
+timedelta(days=1)
+datetime.today() - timedelta(days=1)
+
+list(range(9, 0, -1))
+
+d = {'a':None, 'b':1}
+
+s = ['Is', 'Chicago', 'Not', 'Chicago?']
+'__'.join(s)
+"abc".join(['_1', '_2', '_3'])
 
 t1.hour
 t2.hour
@@ -139,17 +95,61 @@ for (k,v) in df.groupby(['col1','col2'], as_index=False):
     print(k)
     print(v)
 
-import getopt
+# ------------------ collections 数据结构 --------------------
+def collections_practice():
+    """
+    集合的数据结构相关操作
+    @return:
+    """
+    pass
+
+d = {
+'a' : [1, 2, 3],
+'b' : [4, 5]
+}
+
+from collections import defaultdict
+
+d = defaultdict(lambda :{'args':1, 'keargs': {}})
+
+d['a']
 
 
-if __name__ == "__main__":
-    args = sys.argv
-    print("name:", args[0])
-    print(args)
+d = {'a':1, 'b':2, 'c':3}
 
-    # t = os.environ.get("es", "localhost:19200")
+a, b, c = d['a'], d['b'], d['c']
 
-    # 测试getopt函数
-    opts, pargs = getopt.getopt(sys.argv[1:], "n:m:", ['param1=', 'param2='])
-    print("opts: ", opts)
-    print("pargs: ", pargs)
+t = (1, 2, 3, [4,5,6])
+
+
+s = set(['a', 'b'])
+
+from collections import OrderedDict
+d = OrderedDict({'a': 1, 'b': 2, 'c': 3})
+d.keys()
+d.popitem(last=False)
+d.popitem(last=False)[0]
+d.items()
+list(d.keys())
+
+d = {'a': [], 'b': 12}
+d['a'].append(2)
+d['a'].append(3)
+
+a = ['a', 'b', 'c']
+b = ['1', '2', '3']
+
+for i, (a_value, b_value) in enumerate(zip(a, b)):
+    print(i, a_value, b_value)
+
+
+t = [(a_value, b_value) for a_value, b_value in zip(a, b) if (a_value=='a' and b_value=='1')]
+
+d = dict(zip(['a','b','c'], [1,2,3]))
+d.items()
+
+for k, v in d.items():
+    print(k, ": ", v)
+
+from distutils.version import LooseVersion
+t = LooseVersion(np.__version__)
