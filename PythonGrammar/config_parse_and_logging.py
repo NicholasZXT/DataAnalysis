@@ -20,6 +20,8 @@ def os_practice():
 os.path.basename('/path/to/Kaggle')
 # 获取文件夹路径
 os.path.dirname('/path/to/Kaggle')
+# 获取当天py文件的路径
+print("os.path.abspath(__file__): ", os.path.abspath(__file__))
 
 import pkg_resources
 # pkg_resources.get_distribution("os")
@@ -131,19 +133,38 @@ def arg_parse():
     pass
 
 
-args = "-n n_value -m m_value --param1=param1_value --param2=param2_value unknow_value".split(" ")
-opts, pargs = getopt.getopt(sys.argv[1:], "n:m:", ['param1=', 'param2='])
+args = "-n n_value -m m_value --param1=param1_value --param2=param2_value".split(" ")
+# args = "-n n_value -m m_value --param1=param1_value --param2=param2_value unknow_value".split(" ")
+opts, pargs = getopt.getopt(args, "n:m:", ['param1=', 'param2='])
 print("opts: ", opts)
 print("pargs: ", pargs)
 
-# parse = argparse.ArgumentParser()
-# parse.add_argument('-a', help="parameter -a")
-# args = parse.parse_args()
+print("---------argparse usage-----------------------")
+parse = argparse.ArgumentParser(prog="config_parse", usage="test argparse", description="test how to use argparse")
+parse.add_argument('-n', help="parameter -n")
+parse.add_argument('-m', help="parameter -m")
+parse.add_argument('--param1', help="parameter --param1")
+parse.add_argument('--param2', help="parameter --param2")
+# 只解析已定义的参数，如果有未定义的参数，会报错
+args_res = parse.parse_args(args=args)
+print("args_res: ", args_res)
+print("args_res.n: ", args_res.n)
+print("args_res.m: ", args_res.m)
+print("args_res.param1: ", args_res.param1)
+print("args_res.param2: ", args_res.param2)
+
+# 下面的会解析已知参数，同时返回未知参数，不会报错
+args = "-n n_value -m m_value --param1=param1_value --param2=param2_value unknow_value".split(" ")
+args_known, args_unknown = parse.parse_known_args(args=args)
+print("args_known: ", args_known)
+print("args_unknown: ", args_unknown)
+
+
 
 if __name__ == "__main__":
     args = sys.argv
-    print("name: ", args[0])
-    print("args: ", args)
+    # print("name: ", args[0])
+    # print("args: ", args)
 
     # t = os.environ.get("es", "localhost:19200")
 
