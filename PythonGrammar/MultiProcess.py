@@ -6,9 +6,10 @@ from time import sleep
 import random
 # 多线程相关
 import threading
-from queue import Queue  # 这个队列是线程安全的
+from queue import Queue as TQueue  # 这个队列是线程安全的
 # 多进程相关
 from multiprocessing import Process, Pool, Semaphore, Condition
+from multiprocessing import Queue as MQueue
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 # =================== 基本的线程使用 ============================
@@ -198,70 +199,96 @@ def decrement_without_lock():
 
 # ---------- 多线程+队列 的生产者-消费者模型---------------------
 # 使用子类继承的方式
+# 使用的是 queue.Queue 这个线程安全的队列
+# 当然，多线程也可以使用 multiprocess.Queue
 class Producer(threading.Thread):
-    def __init__(self, queue):
+    def __init__(self, name, queue):
         super().__init__()
+        self.name = name
         self.queue = queue
 
     def run(self):
+        thread_id = threading.get_ident()
+        pid = os.getpid()
         for i in range(10):
             item = random.randint(0, 256)
-            self.queue.put(item)
-            print('Producer notify: item {} append to queue by {}'.format(item, self.name))
+            # queue.Queue的put方法，block=True表示队列已满时会阻塞
+            self.queue.put(item, block=True)
+            print("thread '{}' in process '{}' is running".format(thread_id, pid))
+            print('Producer notify: item {} is append to queue by {}'.format(item, self.name))
             sleep(0.5)
 
 
 class Consumer(threading.Thread):
-    def __init__(self, queue):
+    def __init__(self, name, queue):
         super().__init__()
+        self.name = name
         self.queue = queue
 
     def run(self):
+        thread_id = threading.get_ident()
+        pid = os.getpid()
         while True:
-            item = self.queue.get()
-            print("Consumer notify: item {} popped from queue by {}".format(item, self.name))
-            self.queue.task_done()
+            # queue.Queue的get方法，block=True表示队列为空时会阻塞
+            item = self.queue.get(block=True, timeout=5)
+            print("thread '{}' in process '{}' is running".format(thread_id, pid))
+            print("Consumer notify: item {} is popped from queue by {}".format(item, self.name))
+            # queue.Queue的task_done() 方法用于通知队列已处理一个任务
+            # self.queue.task_done()
 
 
 # ----------- 多进程+队列 的生产者-消费者模型--------------------
 # 这里没有使用子类继承的方式
+# 它使用的 multiprocess.Queue 这个进程安全的队列
 def producer(name, queue):
     print("producer " + name + " is running")
+    pid = os.getpid()
     i = 0
     while i < 20:
         item = random.randint(0, 50)
         queue.put(item)
+        print("process '{}' is running".format(pid))
         print("producer {} putting item {} successfully".format(name, item))
         i = i+1
         sleep(0.5)
 
 
 def consumer(name, queue):
+    pid = os.getpid()
     while True:
         # print("consumer {} get Queue size : {}".format(name, queue.qsize()))
-        item = queue.get()
-        # item = queue.get(block=False, timeout=1000)
-        if item:
-            print("consumer {} getting item {}.".format(name, item))
-            sleep(0.5)
+        # item = queue.get()
+        item = queue.get(block=True, timeout=5)
+        print("process '{}' is running".format(pid))
+        print("consumer {} getting item {} successfully.".format(name, item))
+        sleep(0.5)
 
 
 # if __name__ == "__main__":
     # --------多线程+队列 的 生产者-消费者 模型 --------------
-    # queue = Queue()
-    # t1 = Producer(queue)
-    # t2 = Consumer(queue)
-    # t3 = Consumer(queue)
+    # 这里的TQueue 是 qtueue.Queue，它是线程安全的队列数据结构
+    # queue = TQueue(3)
+    # t1 = Producer('Producer-1', queue)
+    # t2 = Consumer('Consumer-1', queue)
+    # t3 = Consumer('Consumer-2', queue)
     # t1.start(), t2.start(), t3.start()
     # t1.join(), t2.join(), t3.join()
 
     # --------多进程+队列 的 生产者-消费者 模型--------------
-    # queue = multiprocessing.Queue()
-    # p = multiprocessing.Process(target=producer, args=('Producer-1', queue))
-    # c1 = multiprocessing.Process(target=consumer, args=('Consumer-1', queue))
-    # c2 = multiprocessing.Process(target=consumer, args=('Consumer-2', queue))
+    # queue = MQueue()
+    # p = Process(target=producer, args=('Producer-1', queue))
+    # c1 = Process(target=consumer, args=('Consumer-1', queue))
+    # c2 = Process(target=consumer, args=('Consumer-2', queue))
     # p.start(), c1.start(), c2.start()
     # p.join(), c1.join(), c2.join()
+
+    # ---- 将 multiprocess.Queue 用于多线程 -----------
+    # queue = MQueue(3)
+    # t1 = Producer('Producer-1', queue)
+    # t2 = Consumer('Consumer-1', queue)
+    # t3 = Consumer('Consumer-2', queue)
+    # t1.start(), t2.start(), t3.start()
+    # t1.join(), t2.join(), t3.join()
 
 
 # ------ 线程同步：信号量 实现的 生产者-消费者 模型 -----------------
