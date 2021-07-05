@@ -1,6 +1,7 @@
-from elasticsearch import Elasticsearch, helpers
 import numpy as np
 import pandas as pd
+from elasticsearch import Elasticsearch, helpers
+from elasticsearch.exceptions import ConflictError, RequestError
 
 es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
 # es.cat.health(v=True)
@@ -8,6 +9,24 @@ es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
 # es.cat.master()
 # es.cluster.health()
 # es.close()
+
+query = {
+    "query": {
+        "term": {
+            "field-1": "abc"
+        }
+    }
+}
+
+res = es.delete_by_query(index='index-2', body=query)
+
+es.indices.exists(index="new-index-5")
+try:
+    res = es.indices.create(index="new-index-4")
+except RequestError as e:
+    print(e.info)
+    ex = e
+    raise IOError("failed to create index")
 
 body = {
     'field-1': 'data-1',
@@ -67,7 +86,13 @@ df = pd.DataFrame(data_dict)
 # i, row = next(t)
 
 def df2actions(df, index_name, use_source=True):
-    # 遍历df的每一行，将每一行变成一个actions
+    """
+    遍历df的每一行，将每一行变成一个actions
+    @param df:
+    @param index_name:
+    @param use_source:
+    @return:
+    """
     for i, row in df.iterrows():
         source = row.to_dict()
         if use_source:
