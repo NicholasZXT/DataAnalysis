@@ -1,20 +1,17 @@
 """
 Python 并行编程
 """
-# 多线程相关
-import threading
-from queue import Queue
-# 多进程相关
-import multiprocessing
-from multiprocessing import Pool, Semaphore, Condition, Manager
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-import time
+import os
 from time import sleep
 import random
-import os
+# 多线程相关
+import threading
+from queue import Queue  # 这个队列是线程安全的
+# 多进程相关
+from multiprocessing import Process, Pool, Semaphore, Condition
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
-
-# --- 基本的线程使用 ---------------------
+# =================== 基本的线程使用 ============================
 # 方法一，传入函数
 def my_fun(num):
     print("thread " + num + " starting")
@@ -34,10 +31,22 @@ class ThreadFunction(threading.Thread):
         sleep(0.2)
         print("thread " + self.num + " ending")
 
-# ---- 基本的进程使用 --------------------
+
+# if __name__ == "__main__":
+    # ---------基本线程使用---------------
+    # # 创建线程
+    # t1 = threading.Thread(target=my_fun, args=("thread-1",), name="thread-1")
+    # t2 = ThreadFunction(num="thread-2")
+    # # 开始线程
+    # t1.start(), t2.start()
+    # # join表示主进程在此处阻塞，等待线程执行结束后再继续
+    # t1.join(), t2.join()
+
+
+# =================== 基本的进程使用 =============================
 # 方法一，传入函数, 函数同线程的 my_fun
 # 方法二、继承进程类，并重载run方法
-class ProcessFunction(multiprocessing.Process):
+class ProcessFunction(Process):
     def __init__(self, num):
         super().__init__()
         self.num = num
@@ -50,16 +59,81 @@ class ProcessFunction(multiprocessing.Process):
         print("process " + self.num + " ending")
 
 
-# ----------------进程或线程池的使用---------------------------------------
-def worker(msg, level):
-    print("{} {} starting, {} num is: {}.".format(level, msg, level, os.getpid()))
+# if __name__ == "__main__":
+    # ------- 进程的基本使用 ------------------
+    # t1 = multiprocessing.Process(target=my_fun, args=("process-1",), name="process-1")
+    # t2 = ThreadFunction(num="process-2")
+    # t1.start(), t2.start()
+    # t1.join(), t2.join()
+
+
+# ============================================================
+# ----------------进程或线程池的使用-----------------------------
+# ============================================================
+def worker(level, msg):
+    print("{} of {} starting, process id is: {}.".format(level, msg, os.getpid()))
     # random.random()随机生成0~1之间的浮点数
     sleep_time = random.random()*5
-    time.sleep(sleep_time)
-    print("{} {} sleep for {:.4f} second.".format(level, msg, sleep_time))
+    sleep(sleep_time)
+    print("{} of {} sleep for {:.4f} second.".format(level, msg, sleep_time))
     return sleep_time
 
 
+# if __name__ == "__main__":
+    # -------- Pool 的使用------------------
+
+    # 使用 apply 方法，一次提交一个进程，并阻塞直到子进程执行完
+    # 这种方式不必使用 join 等待，返回的结果就是直接是函数的返回结果
+    # with Pool(3) as pool:
+    #     res = pool.apply(worker, ('process', 'worker-1'))
+    #     print("worker-1 is done, res is :", res)
+    #     res = pool.apply(worker, ('process', 'worker-2'))
+    #     print("worker-2 is done, res is :", res)
+    #     res = pool.apply(worker, ('process', 'worker-3'))
+    #     print("worker-3 is done, res is :", res)
+
+    # 使用 apply_async 进行异步调用，返回的 res 是一个 pool.ApplyResult 对象
+    # 必须要 使用 join 方法开启任务
+    # pool = Pool(3)
+    # res = pool.apply_async(worker, ('process', 'worker-1'))
+    # print("worker-1 is done, res is: ", res)
+    # res = pool.apply_async(worker, ('process', 'worker-2'))
+    # print("worker-2 is done, res is: ", res)
+    # res = pool.apply_async(worker, ('process', 'worker-3'))
+    # print("worker-3 is done, res is: ", res)
+    # print("----start----")
+    # pool.close()  # 关闭进程池，关闭后po不再接收新的请求
+    # pool.join()  # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
+    # print("-----end-----")
+
+    # 使用 map 方法一次提交多个进程，使用进程池中的所有进程并行执行某个函数 ----- 不好用
+    # pool = Pool(3)
+    # pool.map(worker, [('process', 'worker-1')])
+    # # pool.map(worker, [('process', 'worker-1'), ('process', 'worker-2'), ('process', 'worker-3')])
+    # print("----start----")
+    # pool.close()  # 关闭进程池，关闭后po不再接收新的请求
+    # pool.join()  # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
+    # print("-----end-----")
+
+    # --------- 使用  concurrent.futures ---------------------
+    # future_list = []
+    # with ThreadPoolExecutor(max_workers=3) as executor:
+    #     for i in range(3):
+    #         future = executor.submit(worker, "Thread",  i+1)
+    #         future_list.append(future)
+    # for future in future_list:
+    #     print("future.result: ", future.result())
+    # with ProcessPoolExecutor(max_workers=3) as executor:
+    #     for i in range(3):
+    #         future = executor.submit(worker, "Process",  i+1)
+    #         future_list.append(future)
+    # for future in future_list:
+    #     print("future.result: ", future.result())
+
+
+# ============================================================
+# ---------------- 线程同步 -----------------------------------
+# ============================================================
 # ---------------- 带有锁 的线程同步 ---------------------
 # 线程里迭代的次数
 COUNT = 2000
@@ -67,7 +141,7 @@ shared_resource_with_lock = 0
 shared_resource_without_lock = 0
 # 线程锁
 # thread_lock = threading.Lock()
-thread_lock = threading.RLock()
+thread_lock = threading.RLock()  # 可重入锁
 
 # 带有锁管理的 两个线程函数
 def increment_with_lock():
@@ -105,11 +179,25 @@ def decrement_without_lock():
         shared_resource_without_lock -= 1
         sleep(0.1)
 
-# ---------------------------------------------------------------
-# ------------ 生产者-消费者 模型的 多种实现 ------------------------
-# ---------------------------------------------------------------
 
-# ----------多线程+队列 的生产者-消费者模型---------------------
+# if __name__ == "__main__":
+    # --------------- 线程锁的使用 -----------------------
+    # t1 = threading.Thread(target=increment_with_lock)
+    # t2 = threading.Thread(target=decrement_with_lock)
+    # t3 = threading.Thread(target=increment_without_lock)
+    # t4 = threading.Thread(target=decrement_without_lock)
+    # t1.start(), t2.start(), t1.join(), t2.join()
+    # print("------------shared_resource_with_lock: ", shared_resource_with_lock, "-----------")
+    # t3.start(), t4.start(), t3.join(), t4.join()
+    # print("------------shared_resource_with_no_lock: ", shared_resource_without_lock, "-----------")
+
+
+# ===============================================================
+# ------------ 生产者-消费者 模型的 多种实现 ------------------------
+# ===============================================================
+
+# ---------- 多线程+队列 的生产者-消费者模型---------------------
+# 使用子类继承的方式
 class Producer(threading.Thread):
     def __init__(self, queue):
         super().__init__()
@@ -135,7 +223,7 @@ class Consumer(threading.Thread):
             self.queue.task_done()
 
 
-# -----------多进程+队列 的生产者-消费者模型--------------------
+# ----------- 多进程+队列 的生产者-消费者模型--------------------
 # 这里没有使用子类继承的方式
 def producer(name, queue):
     print("producer " + name + " is running")
@@ -156,6 +244,24 @@ def consumer(name, queue):
         if item:
             print("consumer {} getting item {}.".format(name, item))
             sleep(0.5)
+
+
+# if __name__ == "__main__":
+    # --------多线程+队列 的 生产者-消费者 模型 --------------
+    # queue = Queue()
+    # t1 = Producer(queue)
+    # t2 = Consumer(queue)
+    # t3 = Consumer(queue)
+    # t1.start(), t2.start(), t3.start()
+    # t1.join(), t2.join(), t3.join()
+
+    # --------多进程+队列 的 生产者-消费者 模型--------------
+    # queue = multiprocessing.Queue()
+    # p = multiprocessing.Process(target=producer, args=('Producer-1', queue))
+    # c1 = multiprocessing.Process(target=consumer, args=('Consumer-1', queue))
+    # c2 = multiprocessing.Process(target=consumer, args=('Consumer-2', queue))
+    # p.start(), c1.start(), c2.start()
+    # p.join(), c1.join(), c2.join()
 
 
 # ------ 线程同步：信号量 实现的 生产者-消费者 模型 -----------------
@@ -233,80 +339,7 @@ class Producer_cond(threading.Thread):
             self.produce()
 
 
-if __name__ == "__main__":
-    # ---------基本线程使用---------------
-    # # 创建线程
-    # t1 = threading.Thread(target=my_fun, args=("thread-1",), name="thread-1")
-    # t2 = ThreadFunction(num="thread-2")
-    # # 开始线程
-    # t1.start(), t2.start()
-    # # join表示主进程在此处阻塞，等待线程执行结束后再继续
-    # t1.join(), t2.join()
-
-    # ------- 进程的基本使用 ------------------
-    # t1 = multiprocessing.Process(target=my_fun, args=("process-1",), name="process-1")
-    # t2 = ThreadFunction(num="process-2")
-    # t1.start(), t2.start()
-    # t1.join(), t2.join()
-
-    # --------进程池的使用------------------
-    # future_list = []
-    # with ThreadPoolExecutor(max_workers=5) as executor:
-    #     for i in range(10):
-    #         future = executor.submit(worker, i+1, "Thread")
-    #         future_list.append(future)
-    # for future in future_list:
-    #     print("future.result: ", future.result())
-
-    # 一次提交一个进程
-    # po = Pool(3)  # 定义一个进程池，最大进程数3
-    # for i in range(0, 10):
-    #     po.apply_async(worker, (i,))
-    #
-    # print("----start----")
-    # po.close()  # 关闭进程池，关闭后po不再接收新的请求
-    # po.join()  # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
-    # print("-----end-----")
-
-    # 一次提交多个进程，使用进程池中的所有进程并行执行某个函数
-    # pool = Pool(4)
-    # pool.map(worker, range(0, 12))
-    # print("----start----")
-    # pool.close()  # 关闭进程池，关闭后po不再接收新的请求
-    # pool.join()  # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
-    # print("-----end-----")
-
-
-    # --------------- 线程锁的使用 -----------------------
-    # t1 = threading.Thread(target=increment_with_lock)
-    # t2 = threading.Thread(target=decrement_with_lock)
-    # t3 = threading.Thread(target=increment_without_lock)
-    # t4 = threading.Thread(target=decrement_without_lock)
-    # t1.start(), t2.start(), t1.join(), t2.join()
-    # print("------------shared_resource_with_lock: ", shared_resource_with_lock, "-----------")
-    # t3.start(), t4.start(), t3.join(), t4.join()
-    # print("------------shared_resource_with_no_lock: ", shared_resource_without_lock, "-----------")
-
-    # ---------------------------------------------------------------
-    # ------------- 生产者-消费者 模型的 多种实现 ------------------------
-    # ---------------------------------------------------------------
-
-    # --------多线程+队列 的 生产者-消费者 模型 --------------
-    # queue = Queue()
-    # t1 = Producer(queue)
-    # t2 = Consumer(queue)
-    # t3 = Consumer(queue)
-    # t1.start(), t2.start(), t3.start()
-    # t1.join(), t2.join(), t3.join()
-
-    # --------多进程+队列 的 生产者-消费者 模型--------------
-    # queue = multiprocessing.Queue()
-    # p = multiprocessing.Process(target=producer, args=('Producer-1', queue))
-    # c1 = multiprocessing.Process(target=consumer, args=('Consumer-1', queue))
-    # c2 = multiprocessing.Process(target=consumer, args=('Consumer-2', queue))
-    # p.start(), c1.start(), c2.start()
-    # p.join(), c1.join(), c2.join()
-
+# if __name__ == "__main__":
     # ----- 线程同步：信号量 实现的 消费者-生产者 模型 ----------------
     # p = threading.Thread(target=producer_sem, args=('p-1', ))
     # c1 = threading.Thread(target=consumer_sem, args=('c-1', ))
@@ -316,8 +349,8 @@ if __name__ == "__main__":
     # print("--------------finished--------------")
 
     # ----- 线程同步：条件变量 实现的 消费者-生产者 模型 -----------------
-    p = Producer_cond()
-    c = Consumer_cond()
-    p.start(), c.start()
-    p.join(), c.join()
+    # p = Producer_cond()
+    # c = Consumer_cond()
+    # p.start(), c.start()
+    # p.join(), c.join()
 
