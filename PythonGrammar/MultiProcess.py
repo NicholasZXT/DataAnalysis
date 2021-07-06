@@ -117,6 +117,7 @@ def worker(level, msg):
     # print("-----end-----")
 
     # --------- 使用  concurrent.futures ---------------------
+    # 线程池
     # future_list = []
     # with ThreadPoolExecutor(max_workers=3) as executor:
     #     for i in range(3):
@@ -124,6 +125,9 @@ def worker(level, msg):
     #         future_list.append(future)
     # for future in future_list:
     #     print("future.result: ", future.result())
+
+    #  进程池
+    # future_list = []
     # with ProcessPoolExecutor(max_workers=3) as executor:
     #     for i in range(3):
     #         future = executor.submit(worker, "Process",  i+1)
@@ -197,7 +201,7 @@ def decrement_without_lock():
 # ------------ 生产者-消费者 模型的 多种实现 ------------------------
 # ===============================================================
 
-# ---------- 多线程+队列 的生产者-消费者模型---------------------
+# ---------- 多线程 + 线程队列 的生产者-消费者模型---------------------
 # 使用子类继承的方式
 # 使用的是 queue.Queue 这个线程安全的队列
 # 当然，多线程也可以使用 multiprocess.Queue
@@ -237,7 +241,7 @@ class Consumer(threading.Thread):
             # self.queue.task_done()
 
 
-# ----------- 多进程+队列 的生产者-消费者模型--------------------
+# ----------- 多进程 + 进程队列 的生产者-消费者模型--------------------
 # 这里没有使用子类继承的方式
 # 它使用的 multiprocess.Queue 这个进程安全的队列
 def producer(name, queue):
