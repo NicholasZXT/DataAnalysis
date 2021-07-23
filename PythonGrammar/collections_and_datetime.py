@@ -49,7 +49,7 @@ t4 = datetime.strptime('2021-01-29T18:00:11.000Z', "%Y-%m-%dT%H:%M:%S.%f%z")
 
 t4 = datetime.strptime('2021-01-29T09:43:47.000Z', "%Y-%m-%dT%H:%M:%S.%f%z")
 
-datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
 date_str = '2021-01-29T09:43:47.000Z'
 t4 = datetime.strptime(date_str[:-1], "%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=timezone.utc)
@@ -153,3 +153,11 @@ for k, v in d.items():
 
 from distutils.version import LooseVersion
 t = LooseVersion(np.__version__)
+
+from enum import Enum
+class Table(Enum):
+    t1 = "t1"
+    t2 = "t2"
+
+Table.t1.label = "t1_label"
+Table.t1.headers = ("c1", "c2")
