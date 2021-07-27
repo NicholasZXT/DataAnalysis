@@ -7,6 +7,7 @@ class Echo_client_v1:
 
     def run(self, word):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            # 客户端的socket是主动式，它会调用 connect 方法
             s.connect((self.host, self.port))
             print("echo client sending words: ", word)
             s.sendall(str.encode(word))

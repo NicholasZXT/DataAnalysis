@@ -10,9 +10,11 @@ class Echo_server_v1:
 
     def run(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            # 服务端的socket是被动式，它会使用如下的 bind, listen, accept 三个方法
             s.bind((self.host, self.port))
             s.listen()
             print("echo server is listening...")
+            # 调用此方法会阻塞，直到接收到客户端传送过来的新socket
             conn, addr = s.accept()
             with conn:
                 print('Connected by', addr)
