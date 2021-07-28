@@ -1,5 +1,10 @@
 import socket
 import selectors
+import logging
+
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT, datefmt=DATE_FORMAT)
 
 class EchoServerV1:
     """
@@ -45,26 +50,32 @@ class EchoServerV2:
         sock.bind((self.host, self.port))
         sock.listen()
         sock.setblocking(False)
-        print('Echo server is listening on', (host, port))
+        logging.info('Echo server is listening on: {}, {}'.format(host, port))
         # 将服务端的 监听socket 注册到 selector，监听 READ 事件，同时附带的 data 用于标识此 socket
         # 如果 sel 返回的是服务端 socket，那么对应 key.data 就是这里的 data
         data = {"server_socket": sock.fileno()}
+        logging.info("Echo server register LISTENING socket '{}' to selector...".format(sock.fileno()))
         self.sel.register(sock, selectors.EVENT_READ, data=data)
+        logging.info("===============================================================")
         while True:
-            print("selector is waiting...")
+            logging.info("selector is waiting...")
             # 下面的 select 方法是阻塞的，直到有一个 socket 描述符进入IO就绪状态
             # 注意，后面还会把和客户端建立的对等 socket 注册到这个 sel 里，所以它返回的不一定是 服务端的 监听socket
             events = self.sel.select()
-            print("selector returns events of length: ", len(events))
+            logging.info("selector returns events of length: {}".format(len(events)))
             # 遍历 select 方法返回的 events 列表
             for key, mask in events:
-                print("key: ", key, "\nmask: ", mask)
+                logging.info("------------------------------------------------------")
+                logging.info("event.key.fileobj: {}".format(key.fileobj))
+                logging.info("event.key.data: {}".format(key.data))
+                logging.info("event.mask: {}".format(mask))
+                # logging.info("key: {},\nmask: {} ".format(key, mask))
                 # events 返回的不一定是 服务端的 监听socket，需要做判断
-                # 实际上，第一次返回的，肯定是 监听socket，表示它的 accept 方法就绪
+                # 实际上，第一次返回的肯定是 监听socket，表示它的 accept 方法就绪
                 if "server_socket" in key.data:
-                    # key.data 中含有 server-socket，说明返回的是服务端的 监听socket
+                    # key.data 中含有 server_socket，说明返回的是服务端的 监听socket
                     # 可以通过下面的方式，确认此时返回的就是之前 注册的 监听socket
-                    print(id(sock), id(key.fileobj))
+                    # logging.info("socket id compare: {} --- {}".format(id(sock), id(key.fileobj)))
                     # 此时 服务端监听socket的 accept() 方法一定是可执行，不会被阻塞的
                     client_sock, client_addr = key.fileobj.accept()
                     # 调用 accept_socket() 方法，处理客户端
@@ -72,6 +83,7 @@ class EchoServerV2:
                 else:
                     # 否则就是 客户端的 对等socket，进行相应的 I/O 操作
                     self.server_echo(key, mask)
+            logging.info("===============================================================")
 
     def accept_socket(self, client_sock, client_addr):
         """
@@ -82,14 +94,13 @@ class EchoServerV2:
         @param client_addr:
         @return:
         """
-        print('accepted connection from: ', client_addr)
+        logging.info('accepted connection from: {} with fileno {}'.format(client_addr, client_sock.fileno()))
         # 设置为非阻塞的 socket
         client_sock.setblocking(False)
         # 这里构造 客户端对等 socket 的 data，放入 selector 中
-        data = {"client_socket": client_sock.fileno(),
-                "client_addr": client_addr,
-                "contents": ""}
+        data = {"client_socket": client_sock.fileno(), "client_addr": client_addr, "contents": ""}
         events = selectors.EVENT_READ | selectors.EVENT_WRITE
+        logging.info("register CLIENT socket '{}' to selector.".format(client_sock.fileno()))
         self.sel.register(client_sock, events, data=data)
 
     def server_echo(self, key, mask):
@@ -102,28 +113,33 @@ class EchoServerV2:
         # 获取 SelectorKey 中的 socket 和相关的 data
         client_sock = key.fileobj
         sock_info = key.data
+        logging.info("processing connection from : {}".format(sock_info['client_socket']))
         # 检查 socket 是否 读就绪
         if mask & selectors.EVENT_READ:
+            logging.info("EVENT_READ is read for {}".format(sock_info['client_socket']))
             # 这里的 recv() 方法一定没有阻塞
             recv_data = client_sock.recv(1024)
             if recv_data:
                 # 接收到了data, 处理一下，放入 socke_info 里
                 data_decode = str(recv_data, encoding='utf-8')
-                print("Echo server recieved '{}' from {}".format(data_decode, sock_info['client_addr']))
-                sock_info['contents'] += data_decode
+                logging.info("Echo server recieved '{}' from '{}'".format(data_decode, sock_info['client_socket']))
+                sock_info['contents'] = data_decode
             else:
                 # 没收到data，说明客户端关闭了连接，此时服务端也要关闭连接，但是在此之前，要将其从 selector 中移除
-                print("Echo server closing connection to :", sock_info)
+                logging.info("Echo server closing connection to : {}".format(sock_info))
                 self.sel.unregister(client_sock)
                 client_sock.close()
-        # 检查 socket 是否 写就绪
+        # 检查 socket 是否 写就绪 —— 这个判断有点多余，socket的write通常总是就绪状态
         if mask & selectors.EVENT_WRITE:
+            logging.info("EVENT_WRITE is read for {}".format(sock_info['client_socket']))
             echo_data = sock_info['contents']
             if len(echo_data):
-                print("Echo server returns '{}' to {}".format(echo_data, sock_info['client_addr']))
+                logging.info("Echo server returns '{}' to '{}'".format(echo_data, sock_info['client_socket']))
                 # send 方法不一定能成功发送所有的数据
-                sent_num = client_sock.send(echo_data)
+                sent_num = client_sock.send(str.encode(echo_data))
                 sock_info['contents'] = sock_info['contents'][sent_num:]
+            else:
+                logging.info("there is no data to send")
 
 
 if __name__ == '__main__':
