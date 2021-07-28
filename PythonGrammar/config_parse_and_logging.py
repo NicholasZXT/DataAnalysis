@@ -87,9 +87,11 @@ def __Logging_Practice():
 # ------- 默认日志配置 ---------
 print("------------ 默认根日志器-----------------")
 # 日志格式
-LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+# LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 # 日期格式
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S %p"
+# DATE_FORMAT = "%Y-%m-%d %H:%M:%S %p"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 # 配置根记录器
 # 默认输出到控制台
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT, datefmt=DATE_FORMAT)
