@@ -64,6 +64,8 @@ class EchoClientV1:
         # 客户端的socket是主动式，它会调用 connect 方法，此方法不是阻塞的
         s.connect((self.host, self.port))
         s.sendall(str.encode(word))
+        # --- 如果后面紧跟着重新发一次消息，会发现TCP连接是流式的，两次的消息在服务端同一个recv中收到
+        # s.sendall(str.encode(word + " --repeat"))
         print("Echo client sending words: ", word)
         print("Echo client is waiting data...")
         # 等待服务器返回消息时，是阻塞的
@@ -75,7 +77,19 @@ class EchoClientV1:
 
 class EchoClientV2:
     """
-    提供多连接的客户端，使用 I/O多路复用 的方式
+    Echo客户端第 2 版
+    提供多连接的客户端，使用 I/O多路复用 selector 的方式。
+
+    这个客户端的实现有一个特别需要注意的地方！！！
+    此客户端提供的功能是，为每个发送的 word 建立一个socket连接，并接受服务器返回的消息，之后就不再交互了。
+    因此在处理 EVENT_READ 事件时，接受到服务器返回的消息后，就可以关闭 socket 的连接了，
+    不需要 174 行附近的 else ，同时也不需要在 EVENT_WRITE 中执行 socket.close() 操作。
+
+    如果在 EVENT_WRITE 中判断执行 socket.close() 操作，有个问题需要注意，客户端socket和服务端的socket的 EVENT_WRITE 总是就绪的，
+    客户端 第一次 EVENT_WRITE就绪 中，发送完数据后，selector.select()会马上返回第二次的 EVENT_WRITE 就绪，此时没有数据需要发送，就会执行
+    socket.close() 操作，在服务端socket看来，相当于客户端socket发送完数据就直接关闭了，这样客户端socket就 收不到 服务端返回的消息，
+    并且服务端在接受消息时会抛异常。
+    一个比较笨的解决办法是，执行 131 行的 sleep 操作，等待一下，让客户端socket发送完数据后，有时间接受返回的数据，然后再执行 close 操作。
     """
     def __init__(self, host, port):
         self.host = host
@@ -108,6 +122,10 @@ class EchoClientV2:
                 logging.info("event.key.data: {}".format(key.data))
                 logging.info("event.mask: {}".format(mask))
                 self.sending_data(key, mask)
+            """
+            # 如果 一定要在 EVENT_WRITE 处理逻辑里执行关闭 socket 的操作，那么这里一定要 sleep，否则会因为程序执行太快，
+            # EVENT_WRITE 中发送一次数据后，又马上在这里执行 socket.close()，导致服务端出现异常。
+            """
             # logging.info("sleeping for {} seconds.".format(sleep_time))
             # sleep(sleep_time)
         # logging.info("sleeping for {} seconds.".format(sleep_time))
@@ -156,13 +174,21 @@ class EchoClientV2:
                 # 接收到了data, 打印出来
                 data_decode = str(recv_data, encoding='utf-8')
                 logging.info("socket '{} -- {}' recieved '{}'".format(sock_info['conn_id'], sock.fileno(), data_decode))
-            else:
-                # 没有数据了，则关闭此 socket
+            # else:
+                """
+                # 注意，这里的 else 不需要，因为此 socket 接收到服务器返回的消息后，就不再交互了 ------------------------ KEY
+                # 如果这里添加了 else（且下面的 EVENT_WRITE 中没有关闭socket操作），
+                # 就会导致 服务端socket 和 客户端socket 同时处于 EVENT_WRITE就绪 的 死锁状态，
+                # 一直无法进入这个 else 分支，也就无法关闭 socket
+                """
+                # 没有数据需要发送了，关闭此 socket
                 logging.info("selector unregister socket '{} -- {}'".format(sock_info['conn_id'], sock.fileno()))
                 self.sel.unregister(sock)
                 logging.info("socket '{} -- {}' close.".format(sock_info['conn_id'], sock.fileno()))
                 sock.close()
-            # logging.info("socket '{} -- {}'".format(sock_info['conn_id'], sock.fileno()))
+        if sock.fileno() == -1:
+            logging.info("socket has closed, skip to process EVENT_WRITE.")
+            return None
         # 检查 socket 是否 写就绪 —— 这个判断有点多余，客户端socket的write通常总是就绪状态
         if mask & selectors.EVENT_WRITE:
             logging.info("EVENT_WRITE is ready for '{} -- {}'".format(sock_info['conn_id'], sock.fileno()))
@@ -174,12 +200,15 @@ class EchoClientV2:
                 # 发送完置空字符串
                 sock_info['contents'] = ""
             else:
-                # sock.sendall(b"exit")
-                # 已经发送过了，就不在发送了，关闭socket
+                # 已经发送过了，就不在发送了
                 logging.info("socket '{} -- {}' has sent data.".format(sock_info['conn_id'], sock.fileno()))
+                # 和服务端一样，客户端也不要在 EVENT_WRITE 里执行关闭 socket 的操作
                 # self.sel.unregister(sock)
                 # logging.info("socket '{} -- {}' finished.".format(sock_info['conn_id'], sock.fileno()))
                 # sock.close()
+                """
+                # 如果一定要在这里判断执行 socket.close() 操作，那么必须要执行 129 行的 sleep 操作.
+                """
 
 
 if __name__ == '__main__':
@@ -195,6 +224,6 @@ if __name__ == '__main__':
     # echo_client2.run("Hello world -- two")
 
     echo_client = EchoClientV2(host, port)
-    # word_list = ["Hello socket -- 1", "Hello socket -- 2", "Hello socket -- 3"]
-    word_list = ["Hello socket -- 1"]
+    word_list = ["Hello socket -- 1", "Hello socket -- 2", "Hello socket -- 3"]
+    # word_list = ["Hello socket -- 1"]
     echo_client.run(word_list)

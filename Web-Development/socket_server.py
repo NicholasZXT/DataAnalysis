@@ -131,6 +131,9 @@ class EchoServerV2:
                 self.sel.unregister(client_sock)
                 logging.info("Received nothing, selector unregister and close socket '{}'.".format(client_sock.fileno()))
                 client_sock.close()
+        if client_sock.fileno() == -1:
+            logging.info("socket has closed, skip to process EVENT_WRITE.")
+            return None
         # 检查 socket 是否 写就绪 —— 这个判断有点多余，客户端socket的write通常总是就绪状态
         if mask & selectors.EVENT_WRITE:
             logging.info("EVENT_WRITE is ready for {}".format(sock_info['client_socket']))
@@ -144,7 +147,7 @@ class EchoServerV2:
                 sock_info['contents'] = ""
             else:
                 logging.info("there is no data to send")
-                # client_sock.sendall(b"")
+                # 就这个服务的功能而言，服务端不要在 EVENT_WRITE 里执行关闭socket的操作
 
 
 if __name__ == '__main__':
