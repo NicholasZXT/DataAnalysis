@@ -3,8 +3,9 @@ import selectors
 import logging
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT, datefmt=DATE_FORMAT)
+# DATE_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
+# logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT, datefmt=DATE_FORMAT)
+logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
 class EchoServerV1:
     """
@@ -116,30 +117,34 @@ class EchoServerV2:
         logging.info("processing connection from : {}".format(sock_info['client_socket']))
         # 检查 socket 是否 读就绪
         if mask & selectors.EVENT_READ:
-            logging.info("EVENT_READ is read for {}".format(sock_info['client_socket']))
+            logging.info("EVENT_READ is ready for {}".format(sock_info['client_socket']))
             # 这里的 recv() 方法一定没有阻塞
             recv_data = client_sock.recv(1024)
-            if recv_data:
+            data_decode = str(recv_data, encoding='utf-8')
+            if len(data_decode):
                 # 接收到了data, 处理一下，放入 socke_info 里
-                data_decode = str(recv_data, encoding='utf-8')
                 logging.info("Echo server recieved '{}' from '{}'".format(data_decode, sock_info['client_socket']))
                 sock_info['contents'] = data_decode
             else:
                 # 没收到data，说明客户端关闭了连接，此时服务端也要关闭连接，但是在此之前，要将其从 selector 中移除
-                logging.info("Echo server closing connection to : {}".format(sock_info))
+                # logging.info("Echo server closing connection to : {}".format(sock_info))
                 self.sel.unregister(client_sock)
+                logging.info("Received nothing, selector unregister and close socket '{}'.".format(client_sock.fileno()))
                 client_sock.close()
-        # 检查 socket 是否 写就绪 —— 这个判断有点多余，socket的write通常总是就绪状态
+        # 检查 socket 是否 写就绪 —— 这个判断有点多余，客户端socket的write通常总是就绪状态
         if mask & selectors.EVENT_WRITE:
-            logging.info("EVENT_WRITE is read for {}".format(sock_info['client_socket']))
+            logging.info("EVENT_WRITE is ready for {}".format(sock_info['client_socket']))
             echo_data = sock_info['contents']
             if len(echo_data):
-                logging.info("Echo server returns '{}' to '{}'".format(echo_data, sock_info['client_socket']))
                 # send 方法不一定能成功发送所有的数据
-                sent_num = client_sock.send(str.encode(echo_data))
-                sock_info['contents'] = sock_info['contents'][sent_num:]
+                # sent_num = client_sock.send(str.encode(echo_data))
+                # sock_info['contents'] = sock_info['contents'][sent_num:]
+                client_sock.sendall(str.encode(echo_data))
+                logging.info("Echo server returns '{}' to '{}'".format(echo_data, sock_info['client_socket']))
+                sock_info['contents'] = ""
             else:
                 logging.info("there is no data to send")
+                # client_sock.sendall(b"")
 
 
 if __name__ == '__main__':
