@@ -2,10 +2,12 @@ import socket
 import selectors
 import traceback
 import logging
+from time import sleep
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT, datefmt=DATE_FORMAT)
+# DATE_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
+# logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT, datefmt=DATE_FORMAT)
+logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
 class EchoClientV1:
     """
@@ -44,16 +46,30 @@ class EchoClientV1:
         print("Echo client stop.")
 
     def run_word(self, word):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            print("socket is connecting to : ", (self.host, self.port))
-            # 客户端的socket是主动式，它会调用 connect 方法，此方法不是阻塞的
-            s.connect((self.host, self.port))
-            s.sendall(str.encode(word))
-            print("Echo client sending words: ", word)
-            print("Echo client is waiting data...")
-            # 等待服务器返回消息时，是阻塞的
-            data = s.recv(1024)
-            print("Recieved: ", str(data, encoding='utf-8'))
+        # 使用 with 语句管理上下文
+        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        #     print("socket is connecting to : ", (self.host, self.port))
+        #     # 客户端的socket是主动式，它会调用 connect 方法，此方法不是阻塞的
+        #     s.connect((self.host, self.port))
+        #     s.sendall(str.encode(word))
+        #     print("Echo client sending words: ", word)
+        #     print("Echo client is waiting data...")
+        #     # 等待服务器返回消息时，是阻塞的
+        #     data = s.recv(1024)
+        #     print("Recieved: ", str(data, encoding='utf-8'))
+        # print("Echo client stop.")
+        # 手动管理 socket 的 close
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print("socket is connecting to : ", (self.host, self.port))
+        # 客户端的socket是主动式，它会调用 connect 方法，此方法不是阻塞的
+        s.connect((self.host, self.port))
+        s.sendall(str.encode(word))
+        print("Echo client sending words: ", word)
+        print("Echo client is waiting data...")
+        # 等待服务器返回消息时，是阻塞的
+        data = s.recv(1024)
+        print("Recieved: ", str(data, encoding='utf-8'))
+        s.close()
         print("Echo client stop.")
 
 
@@ -67,19 +83,23 @@ class EchoClientV2:
         self.sel = selectors.DefaultSelector()
 
     def run(self, word_list):
+        sleep_time = 0.3
         # 创建 一系列的socket
-        logging.info("================= start connection ===================")
+        logging.info("***************** start connection *******************")
         self.start_connection(word_list)
+        # logging.info("sleeping for {} seconds.".format(sleep_time))
+        # sleep(sleep_time)
         # 开始循环监控 socket 的 IO事件
-        logging.info("================= monitoring I/O events ===================")
+        logging.info("*************** monitoring I/O events ****************")
         while True:
+            logging.info("======================================================")
             logging.info("selector is waiting...")
             try:
-                events = self.sel.select(timeout=10)
+                events = self.sel.select()
             except OSError as e:
                 logging.info("selector time out, stop Echo client")
-                # logging.info(e)
-                # traceback.logging.info_exc()
+                # print(e)
+                # traceback.print_exc()
                 break
             logging.info("selector returns events of length: {}".format(len(events)))
             for key, mask in events:
@@ -88,6 +108,10 @@ class EchoClientV2:
                 logging.info("event.key.data: {}".format(key.data))
                 logging.info("event.mask: {}".format(mask))
                 self.sending_data(key, mask)
+            # logging.info("sleeping for {} seconds.".format(sleep_time))
+            # sleep(sleep_time)
+        # logging.info("sleeping for {} seconds.".format(sleep_time))
+        # sleep(sleep_time)
 
     def start_connection(self, word_list):
         """
@@ -102,14 +126,15 @@ class EchoClientV2:
             conn_id = i + 1
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             logging.info("------------------------------------------------------")
-            logging.info("starting connection '{} : {}' to '{}'".format(conn_id, sock.fileno(), server_addr))
-            sock.setblocking(False)  # 设置为非阻塞的
-            sock.connect_ex(server_addr)   #
+            logging.info("starting connection '{} -- {}' to '{}'".format(conn_id, sock.fileno(), server_addr))
+            # 设置为非阻塞的
+            sock.setblocking(False)
+            sock.connect_ex(server_addr)
             # 设置该 socket 上的监控事件
             monitor_events = selectors.EVENT_READ | selectors.EVENT_WRITE
             # 为该 socket 添加一些附属信息
             data = {"conn_id": conn_id, "socket_fileno": sock.fileno(), "contents": word_list[i]}
-            logging.info("register socket '{}' to selector...".format(conn_id))
+            logging.info("register socket '{} -- {}' to selector...".format(conn_id, sock.fileno()))
             self.sel.register(sock, monitor_events, data)
 
     def sending_data(self, key, mask):
@@ -121,47 +146,55 @@ class EchoClientV2:
         """
         sock = key.fileobj
         sock_info = key.data
-        logging.info("processing socket: {}".format(sock_info['conn_id']))
+        logging.info("processing socket: '{} -- {}'".format(sock_info['conn_id'], sock.fileno()))
         # 检查 socket 是否 读就绪
         if mask & selectors.EVENT_READ:
-            logging.info("EVENT_READ is read for {}".format(sock_info['client_socket']))
+            logging.info("EVENT_READ is ready for '{} -- {}'".format(sock_info['conn_id'], sock.fileno()))
             # 这里的 recv() 方法一定没有阻塞
             recv_data = sock.recv(1024)
             if recv_data:
                 # 接收到了data, 打印出来
                 data_decode = str(recv_data, encoding='utf-8')
-                logging.info("socket '{}' recieved '{}'".format(sock_info['conn_id'], data_decode))
+                logging.info("socket '{} -- {}' recieved '{}'".format(sock_info['conn_id'], sock.fileno(), data_decode))
             else:
                 # 没有数据了，则关闭此 socket
+                logging.info("selector unregister socket '{} -- {}'".format(sock_info['conn_id'], sock.fileno()))
                 self.sel.unregister(sock)
+                logging.info("socket '{} -- {}' close.".format(sock_info['conn_id'], sock.fileno()))
                 sock.close()
-                logging.info("socket '{}' close.".format(sock_info['conn_id']))
-        # 检查 socket 是否 写就绪
+            # logging.info("socket '{} -- {}'".format(sock_info['conn_id'], sock.fileno()))
+        # 检查 socket 是否 写就绪 —— 这个判断有点多余，客户端socket的write通常总是就绪状态
         if mask & selectors.EVENT_WRITE:
-            logging.info("EVENT_WRITE is read for {}".format(sock_info['client_socket']))
+            logging.info("EVENT_WRITE is ready for '{} -- {}'".format(sock_info['conn_id'], sock.fileno()))
             send_data = sock_info['contents']
             if len(send_data):
                 # 如果此 socket 对应的 word 没有发送，则发送出去
-                logging.info("socket '{}' send data '{}'".format(sock_info['conn_id'], send_data))
-                sent_num = sock.sendall(str.encode(send_data))
+                sock.sendall(str.encode(send_data))
+                logging.info("socket '{} -- {}' send data '{}'".format(sock_info['conn_id'], sock.fileno(), send_data))
                 # 发送完置空字符串
                 sock_info['contents'] = ""
             else:
+                # sock.sendall(b"exit")
                 # 已经发送过了，就不在发送了，关闭socket
-                self.sel.unregister(sock)
-                sock.close()
-                logging.info("socket '{}' finished.".format(sock_info['conn_id']))
+                logging.info("socket '{} -- {}' has sent data.".format(sock_info['conn_id'], sock.fileno()))
+                # self.sel.unregister(sock)
+                # logging.info("socket '{} -- {}' finished.".format(sock_info['conn_id'], sock.fileno()))
+                # sock.close()
 
 
 if __name__ == '__main__':
     host = "127.0.0.1"
     port = 3200
     # echo_client = EchoClientV1(host, port)
-    # echo_client.run("Hello world -- one")
+    # echo_client.run("Hello world -- 1")
+    # echo_client.run("Hello world -- 2")
+    # echo_client.run("Hello world -- 3")
     # echo_client.input_flag = True
     # echo_client.run()
     # echo_client2 = EchoClientV1(host, port)
     # echo_client2.run("Hello world -- two")
+
     echo_client = EchoClientV2(host, port)
-    word_list = ["Hello socket -- 1", "Hello socket -- 2", "Hello socket -- 3"]
+    # word_list = ["Hello socket -- 1", "Hello socket -- 2", "Hello socket -- 3"]
+    word_list = ["Hello socket -- 1"]
     echo_client.run(word_list)
