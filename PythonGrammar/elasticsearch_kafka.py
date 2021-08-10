@@ -3,6 +3,11 @@ import pandas as pd
 from elasticsearch import Elasticsearch, helpers
 from elasticsearch.exceptions import ConflictError, RequestError
 
+
+# ======================= Elasticsearch ===============================
+def __Elasticsearch_Practice():
+    pass
+
 es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
 # es.cat.health(v=True)
 # es.cat.indices(v=True)
@@ -117,3 +122,8 @@ res_parallel = helpers.parallel_bulk(es, actions, chunk_size=2, thread_count=2)
 
 res_iter = iter(res)
 item = next(res_iter)
+
+
+# ========================== kafka ===========================
+def __Kafka_Practice():
+    pass
