@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
-# ------------------数据库操作----------------
-def sql_practice():
+# ===================== 数据库操作 ===========================
+def __SQL_Practice():
     pass
 
 # pymysql
@@ -31,15 +31,11 @@ cursor.close()
 connection.close()
 
 
-# -------------------------- 日期操作 -----------------------------------
+# =========================== 日期操作 ===========================
 from datetime import datetime, timedelta, timezone
 import datetime
 
-def datetime_manipulate():
-    """
-    日期处理相关的操作
-    @return:
-    """
+def __DateTime_Practice():
     pass
 
 t1 = datetime.strptime('2021-01-28 10:11:21', '%Y-%m-%d %H:%M:%S')
@@ -95,8 +91,8 @@ for (k,v) in df.groupby(['col1','col2'], as_index=False):
     print(k)
     print(v)
 
-# ------------------ collections 数据结构 --------------------
-def collections_practice():
+# =========================== collections 数据结构 ===========================
+def __Collections_Practice():
     """
     集合的数据结构相关操作
     @return:
@@ -161,3 +157,11 @@ class Table(Enum):
 
 Table.t1.label = "t1_label"
 Table.t1.headers = ("c1", "c2")
+
+
+def __Main_location():
+    pass
+
+
+if __name__ == '__main__':
+    pass
