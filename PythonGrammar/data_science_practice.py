@@ -11,10 +11,26 @@ def __Numpy_Practice():
 
 # ---------numpy 随机数----------------
 rng = np.random.RandomState(0)
+
+# 测试数组占据的内存大小
+a1 = rng.rand(1000, 1000)
+a2 = rng.rand(10000, 1000)
+a3 = rng.rand(10000, 10000)
+a4 = rng.rand(20000, 10000)
+a5 = rng.rand(20000, 20000)
+# __sizeof__() 返回的单位是 Byte, 转成 MB
+a1.__sizeof__()/(1024*1024)   # 7.63 MB, 100 0000 个 float 数
+a2.__sizeof__()/(1024*1024)   # 76.3 MB, 1000 0000 个 float 数
+a3.__sizeof__()/(1024*1024)   # 762.94 MB, 1 0000 0000 个
+a4.__sizeof__()/(1024*1024)   # 1525.88 MB, 2 0000 0000 个
+a5.__sizeof__()/(1024*1024)   # 3051.76 MB, 4 0000 0000 个
+# 另外 ndarray.nbytes 属性里存储了数据使用空间大小，它和 __sizeof__() 返回的大小之差是其他元属性的空间大小，通常为 112 Byte
+a1.nbytes
+a2.nbytes
+# 这里使用的是 64 位的 float，一个float数占用 8 个 Byte
+# 以 a1 为例，它有 100 0000 个数，占用为 800 0000 Byte，刚好是 a.nbyte 返回的大小
+
 np.random.rand(2,3)
-
-np.random.randn(2,3)
-
 np.random.choice(5,3)
 np.random.choice([1,3,5,7,9], 3)
 
