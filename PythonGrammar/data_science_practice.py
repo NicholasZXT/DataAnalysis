@@ -1,10 +1,38 @@
+import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-# ------------- numpy 和 pandas 练习 ----------------------
+# ====================== numpy 练习 =========================================
+def __Numpy_Practice():
+    pass
+
+# ---------numpy 随机数----------------
+rng = np.random.RandomState(0)
+np.random.rand(2,3)
+
+np.random.randn(2,3)
+
+np.random.choice(5,3)
+np.random.choice([1,3,5,7,9], 3)
+
+t = np.arange(10)
+np.roll(t, -1)
+
+
+# ----------------numpy ravel-------------------------------------\
+arr = np.arange(0,6).reshape((2,3))
+a1 = arr.ravel()
+a2 = arr.ravel("F")
+
+
+
+# ========================= pandas 练习 ==================================================
+def __Pandas_Practice():
+    pass
+
 arr = np.arange(0,6).reshape((2,3))
 df = pd.DataFrame(arr, index=['r1','r2'], columns=['c1','c2','c3'])
 
@@ -20,10 +48,9 @@ df.sum(axis=0)
 df.apply(np.sum, axis=0)
 
 
-planets = sns.load_dataset('planets')
-
 df = pd.DataFrame({'key': ['A', 'B', 'C', 'A', 'B', 'C'], 'data': range(6)}, columns=['key', 'data'])
 
+planets = sns.load_dataset('planets')
 for method, group in planets.groupby("method"):
     print(method, group.shape)
 
@@ -35,26 +62,29 @@ df = pd.DataFrame({'key': ['A', 'B', 'C', 'A', 'B', 'C'], 'data1': range(6), 'da
 df.groupby("key").aggregate(['min', np.median, 'max'])
 
 
-# ----------------numpy ravel-------------------------------------\
-arr = np.arange(0,6).reshape((2,3))
-a1 = arr.ravel()
-a2 = arr.ravel("F")
+arr = np.arange(8).reshape((4, 2))
+df = pd.DataFrame(arr, columns=['c1', 'c2'])
+
+t = df.rolling(window=2)
+
+for d in t:
+    print(type(d))
+    print(d)
+    print(d.sum())
+
+df
+df.shift(periods=-1) - df
+df.rolling(window=2).apply(lambda df_temp: df_temp.sum())
+df.rolling(window=2, on='c1').apply(lambda df_temp: df_temp.sum())
+df.rolling(window=2, on='c1').apply(lambda df_temp: df_temp.iloc[1, :] - df_temp[0, :])
 
 
+# ============================== matplotlib 练习 ====================================
+def __Matplotlib_Practice():
+    pass
 
-
-# ---------numpy 随机数----------------
-np.random.rand(2,3)
-
-np.random.randn(2,3)
-
-np.random.choice(5,3)
-np.random.choice([1,3,5,7,9], 3)
-
-
-# ------------------------matplotlib绘图---------------------------------
 # 查看可用的图形风格
-plt.style.available
+print(plt.style.available)
 # 使用图形风格
 plt.style.use("ggplot")
 
@@ -72,12 +102,15 @@ label = ['b','a','c','d']
 plt.bar(label,x)
 
 
-# ----------------------------seaborn绘图------------------------------------
+# =================================== seaborn绘图 ==============================================
+def __Seaborn_Plot():
+    pass
+
 plt.style.use("ggplot")
 
 titanic = sns.load_dataset('titanic')
 fmri = sns.load_dataset('fmri')
-
+planets = sns.load_dataset('planets')
 
 titanic.groupby(['sex', 'class'])['survived'].aggregate('mean')
 titanic.groupby(['sex', 'class'])['survived'].aggregate('mean').unstack()
@@ -93,9 +126,10 @@ fig.set_xticklabels(fig.get_xticklabels(),rotation=30)
 plt.show()
 
 
-# --------------sklearn---------------
+# ============================== sklearn ==========================================
+def __Sklearn_Practice():
+    pass
 
-import sys
 
 from sklearn.impute import SimpleImputer
 df = pd.DataFrame({'a':[1,2,2,np.nan], 'b':['A','A',None, 'B']})
@@ -113,10 +147,8 @@ imp.fit(df)
 imp.transform(df)
 
 
-
-
-
-
+def __Main_location():
+    pass
 
 
 if __name__ == "__main__":
