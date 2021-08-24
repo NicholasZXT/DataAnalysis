@@ -38,6 +38,10 @@ import datetime
 def __DateTime_Practice():
     pass
 
+t1 = datetime.strptime('2021-03-01', '%Y-%m-%d')
+t2 = datetime.strptime('2021-03-01', '%Y-%m-%d')
+t1 == t2
+
 t1 = datetime.strptime('2021-01-28 10:11:21', '%Y-%m-%d %H:%M:%S')
 t2 = datetime.strptime('2021-01-29 08:00:11', '%Y-%m-%d %H:%M:%S')
 t3 = datetime.strptime('2021', '%Y')

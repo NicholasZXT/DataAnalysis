@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from datetime import datetime, timedelta
 
 
 # ====================== numpy 练习 =========================================
@@ -93,6 +94,23 @@ df.shift(periods=-1) - df
 df.rolling(window=2).apply(lambda df_temp: df_temp.sum())
 df.rolling(window=2, on='c1').apply(lambda df_temp: df_temp.sum())
 df.rolling(window=2, on='c1').apply(lambda df_temp: df_temp.iloc[1, :] - df_temp[0, :])
+
+# ------------------------------- 时间序列相关 ------------------------------------
+def __Pandas_TimeSeries():
+    pass
+
+# 构建一个DF
+dates = ['2021-08-01', '2021-08-02', '2021-08-03', '2021-08-04', '2021-08-05']
+no = np.arange(1, 6)
+df = pd.DataFrame({'no': no, 'date': dates})
+# 查看数据类型
+df.info()
+# 转换成 datetime 类型
+df['datetime'] = df['date'].apply(lambda date: datetime.strptime(date, '%Y-%m-%d'))
+# 可以看出 datetime 这一列本来是 datetime类型，但是pandas 转成了 datetime64[ns] 类型
+df.info()
+# 根据日期过滤，可以使用 Series 的 .dt 属性——它存储了时间序列类型
+t1 = df[df['datetime'].dt.day == 3]
 
 
 # ============================== matplotlib 练习 ====================================
