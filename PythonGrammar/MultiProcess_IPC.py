@@ -11,6 +11,9 @@ from queue import Queue as TQueue, Full, Empty
 # 多进程相关
 from multiprocessing import Process, Pool, Semaphore, Condition, Queue as MQueue
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+# 多进程间的管理器
+from multiprocessing import Manager
+from multiprocessing.managers import BaseManager, SyncManager, Namespace, BaseProxy
 # 其他
 from elasticsearch import Elasticsearch
 
@@ -89,6 +92,9 @@ def process_fun(name, es):
 
 
 # ======================= 对象序列化 ===================================
+def __Serialization():
+    pass
+
 # Person 类可以序列化
 class Person:
     def __init__(self, name):
@@ -131,6 +137,9 @@ class EsClient:
 
 
 # ================= 进程池 + 队列的序列化问题 -- KEY ===============================
+def __Pool():
+    pass
+
 def producer(name, queue):
     pid = os.getpid()
     print("producer ’{}‘ with pid ’{}‘ start.".format(name, pid))
@@ -219,3 +228,15 @@ def consumer(name, queue):
     #         future_list.append(future)
     # for future in future_list:
     #     print("future.result: ", future.result())
+
+
+
+# ======================== Manager 使用 =======================================
+def __Manager_Practice():
+    pass
+
+
+if __name__ == '__main__':
+    manager = Manager()
+    l = manager.list()
+    print('hello')
