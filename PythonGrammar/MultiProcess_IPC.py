@@ -230,13 +230,69 @@ def consumer(name, queue):
     #     print("future.result: ", future.result())
 
 
-
 # ======================== Manager 使用 =======================================
 def __Manager_Practice():
     pass
 
+def worker(dict_proxy, list_proxy, key, item):
+    dict_proxy[key] = item
+    list_proxy.append(key)
+
+
+# -------------- 自定义管理器 ----------------------
+class MyManager(BaseManager):
+    pass
+
+# 需要向自定义管理器中添加的共享数据对象，为 callable 对象，可以是类或者函数，甚至是匿名函数
+class MathsClass:
+    def __init__(self, x, y):
+        self._x = x
+        self._y = y
+    @property
+    def x(self):
+        return self._x
+    @property
+    def y(self):
+        return self._y
+    def set(self, x, y):
+        self._x = x
+        self._y = y
+    def add(self):
+        return self.x + self.y
+    def mul(self):
+        return self.x * self.y
+
+def num_dict_fun(num):
+    dict_shared = {i: i*2 for i in range(num)}
+    return dict_shared
+
+# 将上述共享对象类型注册到自定义的管理器中
+MyManager.register('Maths', MathsClass)
+MyManager.register('NumDict', num_dict_fun)
+
 
 if __name__ == '__main__':
-    manager = Manager()
-    l = manager.list()
-    print('hello')
+    # 第 1 种使用方式，也是最简单的使用方式：使用已有的 SyncManager对象
+    # ------ 注意，这种方式必须要是执行中，不能是被导入----
+    # SyncManager 对象通常由顶层函数 Manager() 返回，不要手动创建
+    with Manager() as manager:
+        # SyncManager 的监听地址
+        print('manager.address: ', manager.address)
+        # 创建列表和字典的代理对象
+        l = manager.list()
+        d = manager.dict()
+        # 起 3 个进程，每个进程都要操作上面的两个代理对象
+        # ------- 注意，代理对象一定可以被序列化，它可以在多个进程间传递 --------
+        proc_list = [Process(target=worker, args=(d, l, i, i*2)) for i in [1, 2, 3]]
+        for p in proc_list:
+            p.start()
+        for p in proc_list:
+            p.join()
+        print(l)
+        print(d)
+
+    # ------- 第 2 种，自定义管理器 ---------------
+    # with MyManager() as manager:
+    #     maths = manager.Maths()
+    #     print(maths.add(4, 3))
+    #     print(maths.mul(7, 8))
