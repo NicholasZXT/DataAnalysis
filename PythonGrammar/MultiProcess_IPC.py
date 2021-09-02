@@ -330,4 +330,6 @@ if __name__ == '__main__':
     manager = MyManager(address=('', 50000), authkey=b'abc')
     m_server = manager.get_server()
     print(f'm_server.address: {m_server.address}')
+    # 启动服务进程，会阻塞
     m_server.serve_forever()
+    # 对应的客户端见 MultiProcess.py

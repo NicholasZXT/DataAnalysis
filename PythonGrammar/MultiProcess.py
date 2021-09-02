@@ -389,3 +389,37 @@ class Producer_cond(threading.Thread):
 # ======================== Manager 使用 =======================================
 def __Manager_Practice():
     pass
+
+# 自定义Manager管理器，用作客户端
+from multiprocessing.managers import BaseManager
+# 进程里执行的函数
+from PythonGrammar.MultiProcess_IPC import worker_fun
+
+class MyManagerClient(BaseManager):
+    # 类的定义体中什么都不需要写
+    pass
+
+# 这里注册共享对象时，只需要提供共享数据类型的 typeid ——它们对应于远程Manager服务端的共享数据类型
+# 由远程Manager服务端返回，所以这里不需要提供定义
+MyManagerClient.register('Maths')
+MyManagerClient.register('NumDict')
+
+if __name__ == '__main__':
+    manager_client = MyManagerClient(address=('localhost', 50000), authkey=b'abc')
+    # 调用这一句连接远程Manager服务
+    manager_client.connect()
+    maths = manager_client.Maths(0, 0)
+    num_dict = manager_client.NumDict()
+    print(f'math.class: {maths.__class__}, math: {maths}')
+    print(f'num_dict.class: {num_dict.__class__}, num_dict: {num_dict}')
+    # 在下面的两个子进程中使用上述两个自定义共享对象的代理
+    proc_list = [Process(target=worker_fun, args=(maths, num_dict, i)) for i in [1, 2]]
+    for p in proc_list:
+        p.start()
+    for p in proc_list:
+        p.join()
+    print(f'math: {maths}')
+    print(f'num_dict: {num_dict}')
+    num_dict['a'] = 1
+    # num_dict.setdefault('a', 1)
+    print(f'num_dict: {num_dict}')
