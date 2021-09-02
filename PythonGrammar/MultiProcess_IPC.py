@@ -13,7 +13,7 @@ from multiprocessing import Process, Pool, Semaphore, Condition, Queue as MQueue
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 # 多进程间的管理器
 from multiprocessing import Manager
-from multiprocessing.managers import BaseManager, SyncManager, Namespace, BaseProxy
+from multiprocessing.managers import BaseManager, SyncManager, Namespace, BaseProxy, DictProxy
 # 其他
 from elasticsearch import Elasticsearch
 
@@ -238,12 +238,13 @@ def worker(dict_proxy, list_proxy, key, item):
     dict_proxy[key] = item
     list_proxy.append(key)
 
-
 # -------------- 自定义管理器 ----------------------
+# 1. 自定义管理器必须继承于 BaseManager
 class MyManager(BaseManager):
+    # 类的定义体中什么都不需要写
     pass
 
-# 需要向自定义管理器中添加的共享数据对象，为 callable 对象，可以是类或者函数，甚至是匿名函数
+# 2. 需要向自定义管理器中添加的共享数据对象，为 callable 对象，可以是类或者函数，甚至是匿名函数
 class MathsClass:
     def __init__(self, x, y):
         self._x = x
@@ -259,40 +260,74 @@ class MathsClass:
         self._y = y
     def add(self):
         return self.x + self.y
-    def mul(self):
-        return self.x * self.y
+    def __repr__(self):
+        return f'(x: {self._x}, y: {self._y})'
 
-def num_dict_fun(num):
-    dict_shared = {i: i*2 for i in range(num)}
-    return dict_shared
+def num_dict_fun():
+    # 此函数返回 dict 作为共享对象
+    num_dict = dict()
+    return num_dict
 
-# 将上述共享对象类型注册到自定义的管理器中
+# 3. 将上述共享对象类型注册到自定义的管理器中
 MyManager.register('Maths', MathsClass)
-MyManager.register('NumDict', num_dict_fun)
+# num_dict_fun 返回的共享对象是 dict，为了能正常使用，需要手动指定 DictProxy 代理类，这样才能使用 [] 访问符
+MyManager.register('NumDict', num_dict_fun, DictProxy)
+# MyManager.register('NumDict', num_dict_fun)  # 不指定代理类的话，[] 访问符就用不了
+
+# 子进程执行的函数
+def worker_fun(maths, num_dict, i):
+    print(f'process {i}: math -- {maths}, dict -- {num_dict}')
+    maths.set(i, i*2)
+    print(f'process {i}: math -- {maths}')
+    print(f'process {i}: math.add -- {maths.add()}')
+    # 下面使用字典时需要注意，如果 register() 方法里没有指定代理对象，那么只能使用 setdefault 方法，因为自动生成的代理对象不会代理 特殊方法
+    # 而 [] 访问符使用的是 __setitem__ 或者 __getitem__ 方法
+    # 如果想正常使用字典，需要手动指定一个 DictProxy 代理对象
+    num_dict[str(i)] = i*2
+    # num_dict.setdefault(str(i), i*2)
+    print(f'process {i}: dict -- {num_dict}')
 
 
 if __name__ == '__main__':
     # 第 1 种使用方式，也是最简单的使用方式：使用已有的 SyncManager对象
     # ------ 注意，这种方式必须要是执行中，不能是被导入----
     # SyncManager 对象通常由顶层函数 Manager() 返回，不要手动创建
-    with Manager() as manager:
-        # SyncManager 的监听地址
-        print('manager.address: ', manager.address)
-        # 创建列表和字典的代理对象
-        l = manager.list()
-        d = manager.dict()
-        # 起 3 个进程，每个进程都要操作上面的两个代理对象
-        # ------- 注意，代理对象一定可以被序列化，它可以在多个进程间传递 --------
-        proc_list = [Process(target=worker, args=(d, l, i, i*2)) for i in [1, 2, 3]]
-        for p in proc_list:
-            p.start()
-        for p in proc_list:
-            p.join()
-        print(l)
-        print(d)
+    # with Manager() as manager:
+    #     # SyncManager 的监听地址
+    #     print('manager.address: ', manager.address)
+    #     # 创建列表和字典的代理对象
+    #     l = manager.list()
+    #     d = manager.dict()
+    #     # 起 3 个进程，每个进程都要操作上面的两个代理对象
+    #     # ------- 注意，代理对象一定可以被序列化，它可以在多个进程间传递 --------
+    #     proc_list = [Process(target=worker, args=(d, l, i, i*2)) for i in [1, 2, 3]]
+    #     for p in proc_list:
+    #         p.start()
+    #     for p in proc_list:
+    #         p.join()
+    #     print(l)
+    #     print(d)
 
     # ------- 第 2 种，自定义管理器 ---------------
     # with MyManager() as manager:
-    #     maths = manager.Maths()
-    #     print(maths.add(4, 3))
-    #     print(maths.mul(7, 8))
+    #     maths = manager.Maths(0, 0)
+    #     num_dict = manager.NumDict()
+    #     print(f'math.class: {maths.__class__}, math: {maths}')
+    #     print(f'num_dict.class: {num_dict.__class__}, num_dict: {num_dict}')
+    #     # 在下面的两个子进程中使用上述两个自定义共享对象的代理
+    #     proc_list = [Process(target=worker_fun, args=(maths, num_dict, i)) for i in [1, 2]]
+    #     for p in proc_list:
+    #         p.start()
+    #     for p in proc_list:
+    #         p.join()
+    #     print(f'math: {maths}')
+    #     print(f'num_dict: {num_dict}')
+    #     num_dict['a'] = 1
+    #     # num_dict.setdefault('a', 1)
+    #     print(f'num_dict: {num_dict}')
+
+    # ------ 第 3 种，通过远程方式使用管理器 ---------------------
+    manager = MyManager(address=('', 50000), authkey=b'abc')
+    m_server = manager.get_server()
+    print(f'm_server.address: {m_server.address}')
+    m_server.serve_forever()

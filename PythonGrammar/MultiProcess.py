@@ -385,3 +385,7 @@ class Producer_cond(threading.Thread):
     # p.start(), c.start()
     # p.join(), c.join()
 
+
+# ======================== Manager 使用 =======================================
+def __Manager_Practice():
+    pass
