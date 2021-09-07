@@ -117,14 +117,50 @@ class Person:
         return "Person.name : {}".format(self.name)
 
 
+# if __name__ == '__main__':
+#     # 初始化这个类的时候，检查一下 Company 类的实例过程
+#     p = Person('Daniel', 'Empire')
+#     # 开启子进程时，检查一下传入的内容
+#     print('Process : {}, PID: {}, object id(p): {}'.format(current_process(), os.getpid(), id(p)))
+#     proc = Process(target=p.print_name)
+#     proc.start()
+#     proc.join()
+
+
+# ================== 单例模式 + 多进程 =========================
+class Single:
+  __instance = None
+
+  def __init__(self, data):
+    self.data = data
+
+  @classmethod
+  def get_instance(cls, data):
+    if cls.__instance is None:
+      # print('creating instance')
+      cls.__instance = Single(data)
+    return cls.__instance
+
+  def print_data(self):
+      print(self.data)
+
+def sub_proc(single):
+    single.data = 'new + ' + single.data
+    print(f"id(single): {id(single)}")
+    single.print_data()
+
+
 if __name__ == '__main__':
-    # 初始化这个类的时候，检查一下 Company 类的实例过程
-    p = Person('Daniel', 'Empire')
-    # 开启子进程时，检查一下传入的内容
-    print('Process : {}, PID: {}, object id(p): {}'.format(current_process(), os.getpid(), id(p)))
-    proc = Process(target=p.print_name)
+    data = 'singleton'
+    single = Single.get_instance(data)
+    print(f"id(single): {id(single)}")
+    single_2 = Single.get_instance(data)
+    print(f"id(single_2): {id(single_2)}")
+    single.print_data()
+    proc = Process(target=sub_proc, args=(single,))
     proc.start()
     proc.join()
+    single.print_data()
 
 
 # ============================================================
