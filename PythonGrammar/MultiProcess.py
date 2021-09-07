@@ -8,12 +8,12 @@ import random
 import threading
 from queue import Queue as TQueue  # 这个队列是线程安全的
 # 多进程相关
-from multiprocessing import Process, Pool, Semaphore, Condition
+from multiprocessing import Process, Pool, Semaphore, Condition, current_process
 from multiprocessing import Queue as MQueue
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 # =================== 基本的线程使用 ============================
-# 方法一，传入函数
+# 方法一，传入线程里要执行的函数
 def my_fun(num):
     print("thread " + num + " starting")
     sleep(0.2)
@@ -45,7 +45,7 @@ class ThreadFunction(threading.Thread):
 
 
 # =================== 基本的进程使用 =============================
-# 方法一，传入函数, 函数同线程的 my_fun
+# 方法一，传入进程里要执行的函数, 函数同线程的 my_fun
 # 方法二、继承进程类，并重载run方法
 class ProcessFunction(Process):
     def __init__(self, num):
@@ -68,9 +68,68 @@ class ProcessFunction(Process):
     # t1.join(), t2.join()
 
 
+# =================== 对象在进程间的传递 ============================
+def __Object_Passing():
+    pass
+
+# 创建进程时，使用继承Process的方法比较容易理解，但是使用传入函数涉及到对象时，会碰到如下两个问题：
+# 1. 某个对象可以将自身传入到另一个对象吗？            --- 可以
+# 1. 传入进程的函数是某个对象的方法时，会发生什么情况？   --- 会将当前对象也传入到子进程中，所以当前对象必须要是可序列化的
+
+class Company:
+    def __init__(self, person, company_name):
+        # person 是一个 Person 类实例, company_name 是 str
+        # 如果在这里打断点，debug停在这里时：
+        # 1. 调用 id(person) 会发现和外面的 person 是同一个实例，表明实例对象可以将自己传入到另一个对象中
+        # 2. 调用 person.print_company() 时会触发 AttributeError，提示 company_info 属性不存在——因为这里的 Company 对象还没完成实例化，所以
+        # 外面 person 的 company_info 属性此时还没有创建，所以调用 print_company() 方法访问不到该属性
+        self.person = person
+        self.company_name = company_name
+
+    def print_company(self):
+        print(f"{self.person} is a member of company {self.company_name}.")
+
+
+class Person:
+    def __init__(self, name, company_name=None):
+        self.name = name
+        if company_name:
+            # 注意，这里传入 self 表示 当前Person类实例对象本身
+            self.company_info = Company(self, company_name)
+        else:
+            self.company_info = None
+
+    def print_name(self):
+        # 这个方法会被传递到子进程中执行，通过打印的如下信息，会发现在传递 print_name 方法的同时，也会将 当前类的实例传递到 子进程中
+        print('Process : {}, Process id: {}, object id(self): {}'.format(current_process(), os.getpid(), id(self)))
+        print("Person name is :", self.name)
+
+    def print_company(self):
+        if self.company_info:
+            self.company_info.print_company()
+        else:
+            print(f"{self.name} is freedom.")
+
+    def __repr__(self):
+        return "Person.name : {}".format(self.name)
+
+
+if __name__ == '__main__':
+    # 初始化这个类的时候，检查一下 Company 类的实例过程
+    p = Person('Daniel', 'Empire')
+    # 开启子进程时，检查一下传入的内容
+    print('Process : {}, Process id: {}, object id(p): {}'.format(current_process(), os.getpid(), id(p)))
+    proc = Process(target=p.print_name)
+    proc.start()
+    proc.join()
+
+
 # ============================================================
 # ----------------进程或线程池的使用-----------------------------
 # ============================================================
+def __Pool_Practice():
+    pass
+
 def worker(level, msg):
     print("{} of {} starting, process id is: {}.".format(level, msg, os.getpid()))
     # random.random()随机生成0~1之间的浮点数
@@ -139,6 +198,9 @@ def worker(level, msg):
 # ============================================================
 # ---------------- 线程同步 -----------------------------------
 # ============================================================
+def __Lock_Practice():
+    pass
+
 # ---------------- 带有锁 的线程同步 ---------------------
 # 线程里迭代的次数
 COUNT = 2000
@@ -200,6 +262,8 @@ def decrement_without_lock():
 # ===============================================================
 # ------------ 生产者-消费者 模型的 多种实现 ------------------------
 # ===============================================================
+def __Producer_Consumer_Practice():
+    pass
 
 # ---------- 多线程 + 线程队列 的生产者-消费者模型---------------------
 # 使用子类继承的方式
@@ -387,7 +451,7 @@ class Producer_cond(threading.Thread):
 
 
 # ======================== Manager 使用 =======================================
-def __Manager_Practice():
+def __Manager_Client_Practice():
     pass
 
 # 自定义Manager管理器，用作客户端
@@ -404,22 +468,22 @@ class MyManagerClient(BaseManager):
 MyManagerClient.register('Maths')
 MyManagerClient.register('NumDict')
 
-if __name__ == '__main__':
-    manager_client = MyManagerClient(address=('localhost', 50000), authkey=b'abc')
-    # 调用这一句连接远程Manager服务
-    manager_client.connect()
-    maths = manager_client.Maths(0, 0)
-    num_dict = manager_client.NumDict()
-    print(f'math.class: {maths.__class__}, math: {maths}')
-    print(f'num_dict.class: {num_dict.__class__}, num_dict: {num_dict}')
-    # 在下面的两个子进程中使用上述两个自定义共享对象的代理
-    proc_list = [Process(target=worker_fun, args=(maths, num_dict, i)) for i in [1, 2]]
-    for p in proc_list:
-        p.start()
-    for p in proc_list:
-        p.join()
-    print(f'math: {maths}')
-    print(f'num_dict: {num_dict}')
-    num_dict['a'] = 1
-    # num_dict.setdefault('a', 1)
-    print(f'num_dict: {num_dict}')
+# if __name__ == '__main__':
+#     manager_client = MyManagerClient(address=('localhost', 50000), authkey=b'abc')
+#     # 调用这一句连接远程Manager服务
+#     manager_client.connect()
+#     maths = manager_client.Maths(0, 0)
+#     num_dict = manager_client.NumDict()
+#     print(f'math.class: {maths.__class__}, math: {maths}')
+#     print(f'num_dict.class: {num_dict.__class__}, num_dict: {num_dict}')
+#     # 在下面的两个子进程中使用上述两个自定义共享对象的代理
+#     proc_list = [Process(target=worker_fun, args=(maths, num_dict, i)) for i in [1, 2]]
+#     for p in proc_list:
+#         p.start()
+#     for p in proc_list:
+#         p.join()
+#     print(f'math: {maths}')
+#     print(f'num_dict: {num_dict}')
+#     num_dict['a'] = 1
+#     # num_dict.setdefault('a', 1)
+#     print(f'num_dict: {num_dict}')
