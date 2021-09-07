@@ -101,7 +101,10 @@ class Person:
 
     def print_name(self):
         # 这个方法会被传递到子进程中执行，通过打印的如下信息，会发现在传递 print_name 方法的同时，也会将 当前类的实例传递到 子进程中
-        print('Process : {}, Process id: {}, object id(self): {}'.format(current_process(), os.getpid(), id(self)))
+        # 但是 Linux 和  Windows 下不一样的是：
+        # Linux是通过 fork() 产生子进程，子进程继承父进程里的所有对象，因此这里的 id(self) 等同于父进程的 id
+        # Windows下是通过 pickle 之后传入子进程的，因此这里的 id(self) 不同于父进程里的 id
+        print('Process : {}, PID: {}, object id(self): {}'.format(current_process(), os.getpid(), id(self)))
         print("Person name is :", self.name)
 
     def print_company(self):
@@ -118,7 +121,7 @@ if __name__ == '__main__':
     # 初始化这个类的时候，检查一下 Company 类的实例过程
     p = Person('Daniel', 'Empire')
     # 开启子进程时，检查一下传入的内容
-    print('Process : {}, Process id: {}, object id(p): {}'.format(current_process(), os.getpid(), id(p)))
+    print('Process : {}, PID: {}, object id(p): {}'.format(current_process(), os.getpid(), id(p)))
     proc = Process(target=p.print_name)
     proc.start()
     proc.join()
