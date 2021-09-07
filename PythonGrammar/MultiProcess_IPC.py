@@ -137,7 +137,7 @@ class EsClient:
 
 
 # ================= 进程池 + 队列的序列化问题 -- KEY ===============================
-def __Pool():
+def __Pool_Serialization():
     pass
 
 def producer(name, queue):
