@@ -128,9 +128,10 @@ class Person:
 
 
 # ================== 单例模式 + 多进程 =========================
+# 下面这个例子可以看出，单例模式的作用范围是 单进程，跨进程的话是可以有两个对象的，并且这两个对象的修改都是独立的
 class Single:
   __instance = None
-
+  # 这里不是严格的单例模式，因为这个构造方法没有被隐藏起来
   def __init__(self, data):
     self.data = data
 
@@ -148,6 +149,9 @@ def sub_proc(single):
     single.data = 'new + ' + single.data
     print(f"id(single): {id(single)}")
     single.print_data()
+    single_2 = Single.get_instance('new-data-2')
+    print(f"id(single_2): {id(single_2)}")
+    single_2.print_data()
 
 
 if __name__ == '__main__':
