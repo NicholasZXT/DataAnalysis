@@ -1,8 +1,11 @@
+import sys
+# print("sys.path: ", sys.path)
 import os
-# import pandas as pd
+import pandas as pd
 from pyspark import SparkConf, SparkContext
 from pyspark.sql import SparkSession, Row, Column
 from pyspark.sql.functions import expr
+from pyspark.sql.types import FloatType
 
 
 def read_data(spark, data_dir=None):
@@ -24,6 +27,14 @@ def read_data(spark, data_dir=None):
         high_df = spark.sql('select * from HIGH')
     return equip_subs_df, model_cell_df, cell_mp_df, high_df
 
+def proc_fun_doc(doc):
+    doc_stat = doc.groupby(['SUBS_NAME', 'SUBS_ID'], as_index=False)['MP_ID'].count()
+    return doc_stat
+
+def proc_fun_data(data):
+    data_stat = data.groupby(['MP_ID'], as_index=False)['DATA_DATE'].count()
+    return data_stat
+
 
 if __name__ == '__main__':
     data_dir = r'D:\Desktop\关口项目\冀北一体化关口数据验证\湖南中台验证'
@@ -33,6 +44,8 @@ if __name__ == '__main__':
     print("Spark.version: ", spark.version)
     # print("SparkSession.configs: ", spark.sparkContext.getConf().getAll())
     equip_subs_df, model_cell_df, cell_mp_df, high_df = read_data(spark, data_dir)
+    # 如果是从本地csv读入，分区数就是 1
+    print("equip_subs_df.partitions: ", equip_subs_df.rdd.getNumPartitions())
     # equip_subs_df.explain()
     # model_cell_df.explain()
     # cell_mp_df.explain()
@@ -51,6 +64,8 @@ if __name__ == '__main__':
         .withColumnRenamed('MP_ID', 'MP_ID_origin')\
         .withColumn('MP_ID', expr("substring(MP_ID_origin, 3, length(MP_ID_origin)-1)"))\
         .dropDuplicates()
+    # dropDuplicates() 算子里执行了 HashAggregation 操作，所以更改了分区数，默认为 200
+    print('cell_mp_df.partitions: ', cell_mp_df.rdd.getNumPartitions())
     model_cell_lines = model_cell_df.where("CELL_TYPE == '03'")
     model_cell_trans = model_cell_df.where("CELL_TYPE == '02'")
     # equip_subs_df.explain()
@@ -58,8 +73,6 @@ if __name__ == '__main__':
     # cell_mp_df.explain()
     # model_cell_lines.explain()
     # model_cell_trans.explain()
-    spark.udf.register('fun_name', )
-    model_cell_df.select('fun_name(col, col)')
 
     # 开始关联
     # 关联 母线段 和 计量点
@@ -105,16 +118,37 @@ if __name__ == '__main__':
     # mp_lines_rela.printSchema()
     # mp_trans_rela.printSchema()
     # subs_group.printSchema()
-    subs_group_df.printSchema()
+    # subs_group_df.printSchema()
     # high_df.printSchema()
-    high_df_arch.printSchema()
-    print('subs_group_df.count: ', subs_group_df.count())
-    print('high_df_arch.count: ', high_df_arch.count())
+    # high_df_arch.printSchema()
+    # print('subs_group_df.count: ', subs_group_df.count())
+    # print('high_df_arch.count: ', high_df_arch.count())
     # mp_lines_rela.show()
     # mp_trans_rela.show()
-    subs_group_df.show()
+    # subs_group_df.show()
     # high_df.show()
-    high_df_arch.show()
+    # high_df_arch.show()
 
-    spark.stop()
+    # 调用模型
+    archive = subs_group_df.selectExpr('SUBS_NAME', 'SUBS_ID', 'SUBS_TYPE', 'SUBS_ADDR', 'ASSET_TYPE', 'VOLT_LEVEL_subs', 'RUN_STATUS', 'GROUP_ID',
+                'MODEL_ID', 'CELL_ID', 'CELL_NO', 'CELL_NAME', 'CELL_TYPE', 'VOLT_LEVEL', 'ORG_ID', 'MP_ID_origin',
+                'MP_NO', 'MP_NAME', 'cast(MP_RATE as FLOAT) as MP_RATE', 'TRAN_OBJ_ID', 'SG_CODE')\
+                .withColumnRenamed('VOLT_LEVEL_subs', 'GROUP_VOLT_CODE')\
+                .withColumnRenamed('MP_RATE', 'T_FACTOR')\
+                .withColumnRenamed('TRAN_OBJ_ID', 'TF_ID')\
+                .withColumnRenamed('MP_ID_origin', 'MP_ID')
+    data = high_df.selectExpr("ID as MP_ID", "DATA_DATE", "cast(PAP as FLOAT) as PAP_PHI", "cast(RAP as FLOAT) as RAP_PHI")
+
+    archive.printSchema()
+    data.printSchema()
+    # archive.show()
+    # data.show()
+
+    print('archive.partitions: ', archive.rdd.getNumPartitions())
+    archive_rep = archive.repartition(3, 'SUBS_ID')
+    print('archive_rep.partitions: ', archive_rep.rdd.getNumPartitions())
+    # archive_rep.foreachPartition(lambda df: df.show())
+
+
+    # spark.stop()
 
