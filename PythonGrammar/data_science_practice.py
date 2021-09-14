@@ -78,6 +78,7 @@ df = pd.DataFrame({'key': ['A', 'B', 'C', 'A', 'B', 'C'], 'data1': range(6), 'da
                   columns=['key', 'data1', 'data2'])
 df.groupby("key").aggregate(['min', np.median, 'max'])
 
+t = df.to_dict(orient='records')
 
 arr = np.arange(8).reshape((4, 2))
 df = pd.DataFrame(arr, columns=['c1', 'c2'])
