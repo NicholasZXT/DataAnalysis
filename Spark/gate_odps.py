@@ -37,7 +37,8 @@ def proc_fun_data(data):
 
 
 if __name__ == '__main__':
-    data_dir = r'D:\Desktop\关口项目\冀北一体化关口数据验证\湖南中台验证'
+    # data_dir = r'D:\Desktop\关口项目\冀北一体化关口数据验证\湖南中台验证'
+    data_dir = r'D:\Project-Workspace\Python-Projects\DataAnalysis\datasets\zshield'
     spark = SparkSession.builder.master('local[*]').appName('HelloSpark').getOrCreate()
     # data_dir = None
     # spark = SparkSession.builder.appName('HelloSpark').getOrCreate()
