@@ -27,18 +27,56 @@ def read_data(spark, data_dir=None):
         high_df = spark.sql('select * from HIGH')
     return equip_subs_df, model_cell_df, cell_mp_df, high_df
 
-def proc_fun_doc(doc):
-    doc_stat = doc.groupby(['SUBS_NAME', 'SUBS_ID'], as_index=False)['MP_ID'].count()
-    return doc_stat
+def foreach_subs_test(partition):
+    count = 0
+    for row in partition:
+        count += 1
+        if count == 1:
+            print("row.__class__: ", row.__class__)
+            print("row: ", row)
+    print('partition.__class__: ', partition.__class__, '; partition.count: ', count)
+    return [count]
 
-def proc_fun_data(data):
-    data_stat = data.groupby(['MP_ID'], as_index=False)['DATA_DATE'].count()
-    return data_stat
+def foreach_subs_test_2(partition):
+    res_dict = []
+    for row in partition:
+        res_dict.append(row.asDict())
+    res_df = pd.DataFrame(res_dict)
+    df_stat = res_df.groupby(['SUBS_ID', 'SUBS_NAME', 'SUBS_ADDR'], as_index=False)['MP_ID'].count()
+    df_stat_dict = df_stat.to_dict(orient='records')
+    for row in df_stat_dict:
+        yield Row(**row)
+
+def foreach_subs_proc(index, partition):
+    archive_cols = ['SUBS_NAME', 'SUBS_ID', 'SUBS_TYPE', 'SUBS_ADDR', 'MP_ID', 'MP_NAME', 'GROUP_VOLT_CODE', 'GROUP_ID',
+                    'T_FACTOR', 'TF_ID', 'RUN_STATUS']
+    data_cols = ['MP_ID', 'DATA_DATE', 'PAP_PHI', 'RAP_PHI']
+    res = []
+    res_return = []
+    for row in partition:
+        res.append(row.asDict())
+    if len(res):
+        df = pd.DataFrame(res)
+        print('df.shape: ', df.shape)
+        # print('row example: ', res[0])
+        archive = df[archive_cols].drop_duplicates()
+        data = df[data_cols].drop_duplicates()
+        # archive = df[archive_cols].copy()
+        # data = df[data_cols].copy()
+        # 测试代码
+        archive_stat = archive.groupby(['SUBS_NAME', 'SUBS_ID', 'SUBS_ADDR', 'MP_ID'], as_index=False)['MP_NAME'].count()
+        data_stat = data.groupby(['MP_ID'], as_index=False)['DATA_DATE'].count()
+        res = pd.merge(archive_stat, data_stat, on='MP_ID', how='outer')
+        res['index'] = index
+        for row in res.to_dict(orient='records'):
+            # yield Row(**row)
+            res_return.append(Row(**row))
+    return res_return
 
 
 if __name__ == '__main__':
-    # data_dir = r'D:\Desktop\关口项目\冀北一体化关口数据验证\湖南中台验证'
-    data_dir = r'D:\Project-Workspace\Python-Projects\DataAnalysis\datasets\zshield'
+    data_dir = r'D:\Desktop\关口项目\冀北一体化关口数据验证\湖南中台验证'
+    # data_dir = r'D:\Project-Workspace\Python-Projects\DataAnalysis\datasets\zshield'
     spark = SparkSession.builder.master('local[*]').appName('HelloSpark').getOrCreate()
     # data_dir = None
     # spark = SparkSession.builder.appName('HelloSpark').getOrCreate()
@@ -113,9 +151,19 @@ if __name__ == '__main__':
     high_df = high_p_w_fa.join(high_p_w_ba, ['ID', 'D'], 'outer')\
         .withColumnRenamed('D', 'DATA_DATE')\
         .select('ID', 'DATA_DATE', 'PAP', 'RAP')
-    # 电量数据关联档案
-    high_df_arch = subs_group_df.join(high_df, subs_group_df.MP_ID_origin == high_df.ID, 'right')
 
+    # 字段重命名 + 类型转换
+    archive = subs_group_df.selectExpr('SUBS_NAME', 'SUBS_ID', 'SUBS_TYPE', 'SUBS_ADDR', 'ASSET_TYPE', 'VOLT_LEVEL_subs', 'RUN_STATUS', 'GROUP_ID',
+                'MODEL_ID', 'CELL_ID', 'CELL_NO', 'CELL_NAME', 'CELL_TYPE', 'VOLT_LEVEL', 'ORG_ID', 'MP_ID_origin',
+                'MP_NO', 'MP_NAME', 'cast(MP_RATE as FLOAT) as MP_RATE', 'TRAN_OBJ_ID', 'SG_CODE')\
+                .withColumnRenamed('VOLT_LEVEL_subs', 'GROUP_VOLT_CODE')\
+                .withColumnRenamed('MP_RATE', 'T_FACTOR')\
+                .withColumnRenamed('TRAN_OBJ_ID', 'TF_ID')\
+                .withColumnRenamed('MP_ID_origin', 'MP_ID')
+    data = high_df.selectExpr("ID as MP_ID", "DATA_DATE", "cast(PAP as FLOAT) as PAP_PHI", "cast(RAP as FLOAT) as RAP_PHI")
+    # 电量数据关联档案
+    archive_data = archive.join(data, archive.MP_ID == data.MP_ID, 'right')
+    # high_df_arch = subs_group_df.join(high_df, subs_group_df.MP_ID_origin == high_df.ID, 'right')
     # mp_lines_rela.printSchema()
     # mp_trans_rela.printSchema()
     # subs_group.printSchema()
@@ -129,27 +177,43 @@ if __name__ == '__main__':
     # subs_group_df.show()
     # high_df.show()
     # high_df_arch.show()
-
-    # 调用模型
-    archive = subs_group_df.selectExpr('SUBS_NAME', 'SUBS_ID', 'SUBS_TYPE', 'SUBS_ADDR', 'ASSET_TYPE', 'VOLT_LEVEL_subs', 'RUN_STATUS', 'GROUP_ID',
-                'MODEL_ID', 'CELL_ID', 'CELL_NO', 'CELL_NAME', 'CELL_TYPE', 'VOLT_LEVEL', 'ORG_ID', 'MP_ID_origin',
-                'MP_NO', 'MP_NAME', 'cast(MP_RATE as FLOAT) as MP_RATE', 'TRAN_OBJ_ID', 'SG_CODE')\
-                .withColumnRenamed('VOLT_LEVEL_subs', 'GROUP_VOLT_CODE')\
-                .withColumnRenamed('MP_RATE', 'T_FACTOR')\
-                .withColumnRenamed('TRAN_OBJ_ID', 'TF_ID')\
-                .withColumnRenamed('MP_ID_origin', 'MP_ID')
-    data = high_df.selectExpr("ID as MP_ID", "DATA_DATE", "cast(PAP as FLOAT) as PAP_PHI", "cast(RAP as FLOAT) as RAP_PHI")
-
-    archive.printSchema()
-    data.printSchema()
+    # archive.printSchema()
+    # data.printSchema()
+    # archive_data.printSchema()
     # archive.show()
     # data.show()
 
-    print('archive.partitions: ', archive.rdd.getNumPartitions())
-    archive_rep = archive.repartition(3, 'SUBS_ID')
+    # 调用模型
+    # cache 一下，避免重复运算
+    archive.cache()
+    data.cache()
+    archive_data.cache()
+    print('data.count: ', data.count())
+    print('archive_data.count: ', archive_data.count())
+    print('archive_data.partitions: ', archive_data.rdd.getNumPartitions())
+    archive_rep = archive_data.repartition(10, 'SUBS_ID')
     print('archive_rep.partitions: ', archive_rep.rdd.getNumPartitions())
-    # archive_rep.foreachPartition(lambda df: df.show())
+    # archive_proc = archive_rep.rdd.mapPartitions(foreach_subs_proc)
+    archive_proc = archive_rep.rdd.mapPartitionsWithIndex(foreach_subs_proc)
+    archive_proc.cache()
+    print('archive_proc.count: ', archive_proc.count())
+    # archive_proc.foreach(print)
+    # for row in archive_proc.take(5):
+    # for row in archive_proc.collect():
+    #     print(row)
+    archive_proc.toDF().show()
 
+    # 测试代码
+    # print('archive.partitions: ', archive.rdd.getNumPartitions())
+    # archive_rep = archive.repartition(3, 'SUBS_ID')
+    # print('archive_rep.partitions: ', archive_rep.rdd.getNumPartitions())
+    # archive_test = archive_rep.select('SUBS_ID', 'SUBS_NAME', 'SUBS_ADDR', 'GROUP_VOLT_CODE', 'MP_ID').rdd.mapPartitions(foreach_subs_test)
+    # print("archive_test.__class__: ", archive_test.__class__)
+    # print(archive_test.collect())
+    # archive_test_2 = archive_rep.select('SUBS_ID', 'SUBS_NAME', 'SUBS_ADDR', 'GROUP_VOLT_CODE', 'MP_ID').rdd.mapPartitions(foreach_subs_test_2)
+    # print('archive_test_2.count: ', archive_test_2.count())
+    # for row in archive_test_2.take(5):
+    #     print(row)
 
     # spark.stop()
 
