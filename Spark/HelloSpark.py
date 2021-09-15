@@ -76,3 +76,10 @@ if __name__ == '__main__':
     print(rdd.toDebugString().decode())
     sleep(20)
     print('rdd.count: ', rdd.count())
+
+# pyspark --master local[4] --conf spark.sql.shuffle.partitions=10
+data_dir = r'D:\Project-Workspace\Python-Projects\DataAnalysis\datasets\zshield'
+data_path = os.path.join(data_dir, 'LOSS_ARCH_EQUIP_SUBS-test.csv')
+df = spark.read.option('header', 'true').csv(data_path)
+df.repartition(4).select('SUBS_ID', 'SUBS_NAME', 'VOLT_LEVEL', 'RUN_STATUS')\
+    .filter("RUN_STATUS == '1'").groupBy('VOLT_LEVEL').count().collect()
