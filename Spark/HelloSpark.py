@@ -83,3 +83,19 @@ data_path = os.path.join(data_dir, 'LOSS_ARCH_EQUIP_SUBS-test.csv')
 df = spark.read.option('header', 'true').csv(data_path)
 df.repartition(4).select('SUBS_ID', 'SUBS_NAME', 'VOLT_LEVEL', 'RUN_STATUS')\
     .filter("RUN_STATUS == '1'").groupBy('VOLT_LEVEL').count().collect()
+
+# hadoop fs -mkdir -p /table/cell_mp
+# hadoop fs -put /home/LOSS_ARCH_REL_CELL_MP-test.csv /table/cell_mp/
+# pyspark --master yarn --deploy-mode client --num-executors 3
+# pyspark --master yarn --deploy-mode client --num-executors 3 --conf spark.sql.shuffle.partitions=10
+df = spark.read.option('header', 'true').csv("hdfs:/table/cell_mp")
+df.printSchema()
+df.rdd.getNumPartitions()
+df.cache()
+df.unpersist()
+df.select('MP_ID', 'MP_NAME', 'MP_RATE', 'REL_ADD_MINUS_PAP', 'REL_ADD_MINUS_RAP', 'IN_OUT').filter("IN_OUT == '01'").show()
+df.select('MP_ID', 'MP_NAME', 'MP_RATE', 'REL_ADD_MINUS_PAP', 'REL_ADD_MINUS_RAP', 'IN_OUT').filter("IN_OUT == '01'")\
+    .groupBy('MP_RATE').count().show()
+spark.read.option('header', 'true').csv("hdfs:/table/cell_mp")\
+    .select('MP_ID', 'MP_NAME', 'MP_RATE', 'REL_ADD_MINUS_PAP', 'REL_ADD_MINUS_RAP', 'IN_OUT').filter("IN_OUT == '01'")\
+    .groupBy('MP_RATE').count().collect()
