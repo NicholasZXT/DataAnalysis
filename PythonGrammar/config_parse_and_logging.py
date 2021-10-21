@@ -135,8 +135,8 @@ logger.critical('critical message')
 
 
 # ===================命令行参数解析================================
-# import getopt
-# import argparse
+import getopt
+import argparse
 def __Args_Parse():
     pass
 
@@ -150,15 +150,17 @@ print("opts: ", opts)
 print("pargs: ", pargs)
 
 print("---------argparse usage-----------------------")
-parse = argparse.ArgumentParser(prog="config_parse", usage="test argparse", description="test how to use argparse")
-parse.add_argument('-n', help="parameter -n")
-parse.add_argument('-m', help="parameter -m")
-parse.add_argument('--param1', help="parameter --param1")
-parse.add_argument('--param2', help="parameter --param2")
+# 1. 创建一个参数解析器对象
+parser = argparse.ArgumentParser(prog="config_parse", usage="test argparse", description="test how to use argparse")
+# 2. 添加参数
+parser.add_argument('-n', help="parameter -n")
+parser.add_argument('-m', help="parameter -m")
+parser.add_argument('--param1', help="parameter --param1")
+parser.add_argument('--param2', help="parameter --param2")
 # bool 参数的设置
-parse.add_argument('--flag', help="bool flag parameter --flag", action="store_false")
-# 只解析已定义的参数，如果有未定义的参数，会报错
-args_res = parse.parse_args(args=args)
+parser.add_argument('--flag', help="bool flag parameter --flag", action="store_false")
+# 3.1 解析参数，此方法只解析已定义的参数，如果有未定义的参数，会报错
+args_res = parser.parse_args(args=args)
 print("args_res: ", args_res)
 print("args_res.n: ", args_res.n)
 print("args_res.m: ", args_res.m)
@@ -168,11 +170,28 @@ print("args_res.param2: ", args_res.param2)
 args_res_dict = vars(args_res)
 args_res_dict
 
-# 下面的会解析已知参数，同时返回未知参数，不会报错
+# 3.2 解析参数，下面的方法不仅会解析已知参数，同时返回未知参数，不会报错
 args = "-n n_value -m m_value --param1=param1_value --param2=param2_value unknow_value".split(" ")
-args_known, args_unknown = parse.parse_known_args(args=args)
+args_known, args_unknown = parser.parse_known_args(args=args)
 print("args_known: ", args_known)
 print("args_unknown: ", args_unknown)
+
+# 添加子命令解析类
+subparser = parser.add_subparsers(help='sub-command help')
+# 然后添加子命令解析器，注意，这里是解析器
+# 添加一个子命令 sub_a
+parser_sub_a = subparser.add_parser(name='sub_a', help='sub_a command help')
+# 在子命令解析器中添加解析参数
+parser_sub_a.add_argument('-a')
+# 添加另一个子命令解析器
+parser_sub_b = subparser.add_parser(name='sub_b', help='sub_b command help')
+parser_sub_b.add_argument('-b')
+# 参数
+args_a = "-n n_value -m m_value --param1=param1_value --param2=param2_value sub_a -a a_value".split(" ")
+args_b = "-n n_value -m m_value --param1=param1_value --param2=param2_value sub_b -b b_value".split(" ")
+# 多个子命令，每次只能生效一个
+args_a_res = parser.parse_args(args_a)
+args_b_res = parser.parse_args(args_b)
 
 
 def __Main_location():
