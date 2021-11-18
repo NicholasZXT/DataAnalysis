@@ -19,8 +19,10 @@ a2 = rng.rand(10000, 1000)
 a3 = rng.rand(10000, 10000)
 a4 = rng.rand(20000, 10000)
 a5 = rng.rand(20000, 20000)
+a11 = a1.astype(np.float32)
 # __sizeof__() 返回的单位是 Byte, 转成 MB
 a1.__sizeof__()/(1024*1024)   # 7.63 MB, 100 0000 个 float 数
+a11.__sizeof__()/(1024*1024)
 a2.__sizeof__()/(1024*1024)   # 76.3 MB, 1000 0000 个 float 数
 a3.__sizeof__()/(1024*1024)   # 762.94 MB, 1 0000 0000 个
 a4.__sizeof__()/(1024*1024)   # 1525.88 MB, 2 0000 0000 个
@@ -30,6 +32,12 @@ a1.nbytes
 a2.nbytes
 # 这里使用的是 64 位的 float，一个float数占用 8 个 Byte
 # 以 a1 为例，它有 100 0000 个数，占用为 800 0000 Byte，刚好是 a.nbyte 返回的大小
+
+aa = rng.rand(159, 14400)
+aa.__sizeof__()/(1024*1024)
+aa.__sizeof__()/(1024*1024)*390/150
+aa.__sizeof__()/(1024*1024)*390/150*30
+aa.__sizeof__()/(1024*1024)*390/150*30/159
 
 np.random.rand(2,3)
 np.random.choice(5,3)
@@ -44,7 +52,31 @@ arr = np.arange(0,6).reshape((2,3))
 a1 = arr.ravel()
 a2 = arr.ravel("F")
 
+# 求分位数
+a = np.arange(0, 10)
+np.percentile(a, q=50)
+b = [0,0,0,0,0,6,7,8,9]
+np.percentile(b, q=50)
 
+# numpy 插值 + 差分
+a = np.arange(12).reshape(3,4)
+a = a.astype(np.float32)
+a[0,0] = np.nan
+a[1,1] = np.nan
+a[2,2] = np.nan
+a[0,3] = np.nan
+
+a_diff = np.diff(a, axis=1)
+a_diff_nan = np.isnan(a_diff)
+a1 = pd.DataFrame(a).interpolate(method='linear', limit_area='inside', axis=1).values
+a1_diff = np.diff(a1, axis=1)
+a1_diff_nan = np.isnan(a1_diff)
+a1_diff_not_nan = ~np.isnan(a1_diff)
+
+a_diff_nan & a1_diff_nan
+a_diff_nan & a1_diff_not_nan
+
+a_miss = a_diff_nan & a1_diff_not_nan
 
 # ========================= pandas 练习 ==================================================
 def __Pandas_Practice():
@@ -95,6 +127,10 @@ df.shift(periods=-1) - df
 df.rolling(window=2).apply(lambda df_temp: df_temp.sum())
 df.rolling(window=2, on='c1').apply(lambda df_temp: df_temp.sum())
 df.rolling(window=2, on='c1').apply(lambda df_temp: df_temp.iloc[1, :] - df_temp[0, :])
+
+df = pd.DataFrame([(0.0, np.nan, -1.0, 1.0), (np.nan, 2.0, np.nan, np.nan), (2.0, 3.0, np.nan, 9.0), (np.nan, 4.0, -4.0, 16.0)], columns=list('abcd'))
+df.interpolate(method='linear', axis=0, limit_area='inside')
+
 
 # ------------------------------- 时间序列相关 ------------------------------------
 def __Pandas_TimeSeries():
