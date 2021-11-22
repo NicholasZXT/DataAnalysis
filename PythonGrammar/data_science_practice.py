@@ -38,6 +38,8 @@ aa.__sizeof__()/(1024*1024)
 aa.__sizeof__()/(1024*1024)*390/150
 aa.__sizeof__()/(1024*1024)*390/150*30
 aa.__sizeof__()/(1024*1024)*390/150*30/159
+aa = rng.rand(1, 96*390)
+aa.__sizeof__()/(1024*1024)
 
 np.random.rand(2,3)
 np.random.choice(5,3)
@@ -52,11 +54,43 @@ arr = np.arange(0,6).reshape((2,3))
 a1 = arr.ravel()
 a2 = arr.ravel("F")
 
+
+# 掩码操作
+a = np.array([1,2,3,4,5])
+a_mask = np.ma.masked_array(a, [0,0,0,1,0])
+
 # 求分位数
 a = np.arange(0, 10)
 np.percentile(a, q=50)
 b = [0,0,0,0,0,6,7,8,9]
 np.percentile(b, q=50)
+
+a = np.array([[10, 7, 4], [3, 2, 1]])
+# 求所有元素的分位数
+np.percentile(a, 50)
+# 求每一列的分位数
+np.percentile(a, 50, axis=0)
+# 保留数组的维度
+np.percentile(a, 50, axis=0, keepdims=True)
+# 求每一行的分位数
+np.percentile(a, 50, axis=1)
+np.percentile(a, 50, axis=1, keepdims=True)
+
+# 分位数的方法对于掩码矩阵没有效果
+a = np.array([[4, 7, 9, 10], [1, 2, 3, 4]])
+a_mask = np.ma.masked_array(a, mask=a==2)
+np.percentile(a_mask, 50, axis=1, keepdims=True)
+# 得使用其他的方式
+a = np.array([[4, 7, 9, 10], [4, 7, np.nan, 10], [1, 2, 3, 4], [1, np.nan, 3, 4]])
+np.percentile(a, 50, axis=1, keepdims=True)
+np.nanpercentile(a, 50, axis=1, keepdims=True)
+
+
+def fun(a):
+    a[np.isnan(a)] = 123
+    a[1,1] = 123
+
+a = np.array([[True, True, True], [True, False, True]])
 
 # numpy 插值 + 差分
 a = np.arange(12).reshape(3,4)
@@ -77,6 +111,12 @@ a_diff_nan & a1_diff_nan
 a_diff_nan & a1_diff_not_nan
 
 a_miss = a_diff_nan & a1_diff_not_nan
+
+a = np.array([np.nan, 1.0, 2.0, np.nan, 4.0, 5.0, np.nan]).reshape(1, -1)
+a1 = pd.DataFrame(a).interpolate(method='linear', limit_area='inside', axis=1).values
+a1_diff = np.diff(a1, axis=1)
+a_diff = np.diff(a, axis=1)
+
 
 # ========================= pandas 练习 ==================================================
 def __Pandas_Practice():
