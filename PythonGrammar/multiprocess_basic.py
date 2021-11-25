@@ -500,7 +500,7 @@ def __Manager_Client_Practice():
 # 自定义Manager管理器，用作客户端
 from multiprocessing.managers import BaseManager
 # 进程里执行的函数
-from PythonGrammar.MultiProcess_IPC import worker_fun
+from PythonGrammar.multiprocess_ipc import worker_fun
 
 class MyManagerClient(BaseManager):
     # 类的定义体中什么都不需要写
