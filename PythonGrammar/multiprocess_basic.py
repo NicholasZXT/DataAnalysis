@@ -34,14 +34,18 @@ class ThreadFunction(threading.Thread):
 
 
 # if __name__ == "__main__":
-    # ---------基本线程使用---------------
-    # # 创建线程
-    # t1 = threading.Thread(target=my_fun, args=("thread-1",), name="thread-1")
-    # t2 = ThreadFunction(num="thread-2")
-    # # 开始线程
-    # t1.start(), t2.start()
-    # # join表示主进程在此处阻塞，等待线程执行结束后再继续
-    # t1.join(), t2.join()
+#     # ---------基本线程使用---------------
+#     # 创建线程
+#     t1 = threading.Thread(target=my_fun, args=("thread-1",), name="thread-1")
+#     t2 = ThreadFunction(num="thread-2")
+#     # 开始线程
+#     t1.start(), t2.start()
+#     # 由于 GIL 的限制，如果主进程一直在执行，那么就不会释放 GIL ，导致该进程中的其他线程拿不到控制权  ----------- KEY
+#     # 所以如果下面一直在执行 while 循环，到不了 join，那么子进程就一直不会执行
+#     while True:
+#         print('main thread running.')
+#     # join表示 主线程 在此处阻塞，等待线程执行结束后再继续，只有主线程阻塞了，其他线程才能拿到CPU
+#     t1.join(), t2.join()
 
 
 # =================== 基本的进程使用 =============================
@@ -154,17 +158,17 @@ def sub_proc(single):
     single_2.print_data()
 
 
-if __name__ == '__main__':
-    data = 'singleton'
-    single = Single.get_instance(data)
-    print(f"id(single): {id(single)}")
-    single_2 = Single.get_instance(data)
-    print(f"id(single_2): {id(single_2)}")
-    single.print_data()
-    proc = Process(target=sub_proc, args=(single,))
-    proc.start()
-    proc.join()
-    single.print_data()
+# if __name__ == '__main__':
+#     data = 'singleton'
+#     single = Single.get_instance(data)
+#     print(f"id(single): {id(single)}")
+#     single_2 = Single.get_instance(data)
+#     print(f"id(single_2): {id(single_2)}")
+#     single.print_data()
+#     proc = Process(target=sub_proc, args=(single,))
+#     proc.start()
+#     proc.join()
+#     single.print_data()
 
 
 # ============================================================
