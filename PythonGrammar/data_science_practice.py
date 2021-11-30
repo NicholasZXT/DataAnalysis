@@ -123,7 +123,13 @@ def __Pandas_Practice():
     pass
 
 arr = np.arange(0,6).reshape((2,3))
-df = pd.DataFrame(arr, index=['r1','r2'], columns=['c1','c2','c3'])
+df = pd.DataFrame(arr, index=['r1', 'r2'], columns=['c1', 'c2', 'c3'])
+df = df.astype(str)
+
+# 传入df不会影响外面的变量
+def replace_df(df):
+    df = None
+    return df
 
 arr
 df
@@ -189,6 +195,33 @@ df.info()
 # 根据日期过滤，可以使用 Series 的 .dt 属性——它存储了时间序列类型
 t1 = df[df['datetime'].dt.day == 3]
 
+# 按日期对齐填充
+rng = np.random.RandomState(0)
+df = pd.DataFrame({'key': ['A', 'A', 'A', 'B', 'B', 'C', 'C'],
+                   'date': ['2021-11-01', '2021-11-02', '2021-11-03', '2021-11-01', '2021-11-02', '2021-11-01', '2021-11-03'],
+                   'data1': range(7), 'data2': rng.randint(0, 10, 7)},
+                  columns=['key', 'date', 'data1', 'data2'])
+df_align = pd.DataFrame({'date_align': ['2021-11-01', '2021-11-02', '2021-11-03']})
+df_part = df[df['key']=='B']
+df_join = pd.merge(df_part, df_align, left_on='date', right_on='date_align', how='right')
+pd.merge(df, df_align, left_on='date', right_on='date_align', how='right')
+cols = ['key', 'data1']
+df_part[cols].dropna().iloc[0].to_dict()
+df_part[cols].fillna()
+
+df.groupby('key', as_index=False).apply(lambda df: print(df))
+
+
+def align_data(df, df_align):
+    df_columns = df.columns.to_list()
+    key = df['key'].iloc[0]
+    df_join = pd.merge(df, df_align, left_on='date', right_on='date_align', how='right')
+    df_join['date'] = df_join['date_align']
+    df_join['key'].fillna(key, inplace=True)
+    return df_join[df_columns]
+
+
+df.groupby('key', as_index=False).apply(align_data, df_align=df_align)
 
 # ============================== matplotlib 练习 ====================================
 def __Matplotlib_Practice():
