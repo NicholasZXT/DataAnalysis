@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from configparser import ConfigParser
@@ -192,6 +193,33 @@ args_b = "-n n_value -m m_value --param1=param1_value --param2=param2_value sub_
 # 多个子命令，每次只能生效一个
 args_a_res = parser.parse_args(args_a)
 args_b_res = parser.parse_args(args_b)
+
+
+# ========= 使用 zipfile 读取压缩文件 ===========
+def __Zipfile_Practice():
+    pass
+
+
+import zipfile
+path = r"D:\Desktop\光伏专项\冀北光伏\yc_meter_archives.zip"
+file = zipfile.ZipFile(path, mode='r')
+# 获取压缩文件内的各个子文件名称
+file.namelist()
+# 获取压缩文件内的各个子文件详细信息
+file.infolist()
+# 获取某个子文件的句柄，返回的是 ZipInfo 对象
+subfile_handler = file.getinfo('yc_meter_archives')
+# 打开某个子文件，返回的是 zipfile.ZipExtFile 对象，在该对象上可以执行read, readlines, readline 等方法读取数据
+subfile = file.open(subfile_handler)
+# 读取压缩文件的一行，为 bytes 类型
+line_bytes = subfile.readline()
+# 解码成字符串
+line = line_bytes.decode()
+line = json.loads(line)
+
+# 关闭对象，实践中最好使用上下文管理器
+subfile.close()
+file.close()
 
 
 def __Main_location():
