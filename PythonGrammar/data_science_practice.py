@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
+import json
 
 
 # ====================== numpy 练习 =========================================
@@ -211,6 +212,9 @@ df_part[cols].fillna()
 
 df.groupby('key', as_index=False).apply(lambda df: print(df))
 
+t = df.groupby(['key', 'date'], as_index=False).size()
+t2 = t.pivot(index='key', columns='date', values='size')
+
 
 def align_data(df, df_align):
     df_columns = df.columns.to_list()
@@ -222,6 +226,25 @@ def align_data(df, df_align):
 
 
 df.groupby('key', as_index=False).apply(align_data, df_align=df_align)
+
+df.apply(lambda row: pd.Series(row.to_dict()), axis=1)
+
+for char in str('123dsafa'):
+    print(char)
+
+for i, row in df.iterrows():
+    # print(row.__class__)
+    # print(row)
+    # print(row.to_dict())
+    print(json.dumps(row.to_dict()))
+
+s = pd.Series([{'a':1, 'b':2}, {'a': 2, 'b': 3}, {'a': 3, 'b': 4}])
+for v in s:
+    # print(v)
+    print(json.dumps(v))
+
+df.iloc[2, 2] = None
+df.where(pd.notnull(df), 123)
 
 # ============================== matplotlib 练习 ====================================
 def __Matplotlib_Practice():
