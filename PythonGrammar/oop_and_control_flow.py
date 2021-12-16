@@ -1,8 +1,9 @@
 import sys
 import os
+from collections import namedtuple
 
 
-# --------- 类的定义和使用 --------------------
+# ========= 类的定义和使用 ====================
 def __Class_Practice():
     pass
 
@@ -36,17 +37,17 @@ class Person:
 # p2 = Person('Daniel', 'male', 65 ,170)
 
 
-# -------继承-----------------
+# =======继承=================
 class Student(Person):
-    def __init__(self,name,sex,weight,sid):
-        super().__init__(name,sex,weight)
+    def __init__(self, name, sex, weight, sid):
+        super().__init__(name, sex, weight)
         self.sid = sid
         
         
 # s1 = Student('Daniel', 'male', 65, 20161212)
 
 
-# ----------------装饰器----------------------------
+# ================装饰器============================
 def __Decorator_Practice():
     pass
 
@@ -95,11 +96,11 @@ def add(x, y):
 # add(3,4)
 
 
-# ---------- 协程 ----------------------------
+# ========== 协程 ============================
 def __Coroutine_Practice():
     pass
 
-# yield 的生成器用法
+# -------- yield 的生成器用法 ----------
 def gen_fun():
     # 通常 yield 会在一个循环里，不过不是必须的
     print('start')
@@ -111,16 +112,16 @@ def gen_fun():
 
 # if __name__ == '__main__':
 #     for v in gen_fun():
-#         print('--->', v)
+#         print('===>', v)
 
-# yield 的协程用法
+# -------- yield 的协程用法 -----------
 def simple_coroutine():
-    print('-> coroutine start')
+    print('=> coroutine start')
     # 注意这里 yield 关键字的右边没有值，而左边有一个赋值表达式
     # 实际上，yield 有两种含义：1. 将yield右边的值发送给调用方；2.yield停止的地方可以接受调用方传来的数据，yield将该数据赋值给左边的表达式
     # 这里的 yield 后面没有值，只有左边有接收的表达式，说明此函数只接受数据，不产出数据
     x = yield
-    print('-> coroutine received: ', x)
+    print('=> coroutine received: ', x)
 
 # if __name__ == '__main__':
 #     my_coro = simple_coroutine()
@@ -142,13 +143,57 @@ def coroutine_average():
         count += 1
         average = sum/count
 
-cor_average = coroutine_average()
-# 激活协程
-next(cor_average)
-# 计算均值
-cor_average.send(2)
-cor_average.send(3)
-cor_average.send(4)
-cor_average.send(5)
-# 关闭协程
-cor_average.close()
+# if __name__ == '__main__':
+#     cor_average = coroutine_average()
+#     # 激活协程
+#     next(cor_average)
+#     # 或者
+#     # cor_average.send(None)
+#     # 计算均值
+#     cor_average.send(2)
+#     cor_average.send(3)
+#     cor_average.send(4)
+#     cor_average.send(5)
+#     # 关闭协程
+#     cor_average.close()
+    
+    
+# -------- yield from -----------
+Result = namedtuple('Result', ['count', 'average'])
+
+def sub_averager():
+    """计算均值"""
+    total = 0
+    count = 0
+    average = None
+    while True:
+        value = yield
+        if value is None:
+            break
+        total += value
+        count += 1
+        average = total/count
+    return Result(count, average)
+
+def grouper(result, key):
+    while True:
+        result[key] = yield from sub_averager()
+
+def main(data):
+    """用于计算data中每组的均值"""
+    result = {}
+    for key, values in data.items():
+        group = grouper(result, key)
+        next(group)
+        for value in values:
+            group.send(value)
+        group.send(None)
+    print("result: ", result)
+
+data = {
+    'arr1': [1, 2, 3, 4, 5],
+    'arr2': [6, 7, 8, 9, 10]
+}
+
+if __name__ == '__main__':
+    main(data)
