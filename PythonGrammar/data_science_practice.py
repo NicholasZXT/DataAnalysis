@@ -299,11 +299,26 @@ def __Sklearn_Practice():
 
 
 from sklearn.impute import SimpleImputer
-df = pd.DataFrame({'a':[1,2,2,np.nan], 'b':['A','A',None, 'B']})
 
-df.fillna(0)
+df = pd.DataFrame({'col-1': [1, 2, np.nan, 4, np.nan, np.nan, 8], 'col-2': ['A', None, None, 'B', None, 'B', 'C']})
+df.info()
+
+# fillna 方法里，value 和 method 参数不能同时使用
+# 所有列均使用指定值填充
+df1 = df.fillna(value='NaN')
+# 注意此时 col-1 的类型变成了object
+df1.info()
+df1
+# 每个列单独使用填充值
+df2 = df.fillna(value={'col-1': 100, 'col-2': 'fill'})
+df2.info()
+df2
+# 前向填充
 df.fillna(method='ffill')
+df.fillna(method='pad')
+# 后向填充
 df.fillna(method='backfill')
+df.fillna(method='bfill')
 
 imp = SimpleImputer(strategy='mean')
 imp.fit(df)
