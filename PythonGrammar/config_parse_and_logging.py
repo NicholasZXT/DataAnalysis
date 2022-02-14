@@ -1,12 +1,14 @@
-import json
-import os
 import sys
+import os
 from configparser import ConfigParser
 import yaml
+import json
 import logging
 import psutil
 import getopt
 import argparse
+
+PWD = os.path.basename()
 
 # ================== 系统资源监控 ============================
 # import psutil
@@ -70,7 +72,7 @@ def __YAML_Parse():
     pass
 
 
-yaml_file = r"D:\Projects\DataAnalysis\PythonGrammar\config.yaml"
+yaml_file = os.path.join(os.getcwd(), r"PythonGrammar\config.yaml")
 with open(yaml_file, 'r+') as file:
     config_yaml = yaml.load(file, Loader=yaml.FullLoader)
 

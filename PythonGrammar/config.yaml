@@ -1,4 +1,4 @@
-section:
+section-1:
   - sec-1:
       how: left
       rule: line
@@ -11,10 +11,14 @@ section:
       how: right
       rule: line
       fields: [ a1, b2, c3, d4 ]
-  - sec-4:
-      how: out
-      rule: line
-      fields: [ aa, bb, cc, dd ]
-  - sec-5:
-      - a1: [1,2,3,4]
-      - a2: [6,7,8,9]
+
+section-2:
+  sec-4:
+    how: out
+    rule: line
+    fields: [ aa, bb, cc, dd ]
+  sec-5:
+    - a1: [1,2,3,4]
+    - a2: [6,7,8,9]
+  sec-6:
+    key-1: [k, [1,2,3]]
