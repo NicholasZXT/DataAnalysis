@@ -1,0 +1,3 @@
+使用 spark-submit 命令运行 pyspark
+
+spark-submit --master local[*] --conf spark.pyspark.python=<python解释器位置> Spark/HelloSpark.py
