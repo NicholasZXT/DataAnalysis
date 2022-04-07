@@ -435,3 +435,20 @@ y_pred = torch.tensor([[1,0], [1,0], [0,1]], dtype=torch.float, requires_grad=Tr
 y_true
 y_pred
 nlloss(input=y_pred, target=y_true)
+
+
+embed_dim, num_heads = 512, 8
+E, S, L, N = embed_dim, 20, 10, 5
+query = torch.rand(L, N, E)
+key = torch.rand(S, N, E)
+value = torch.rand(S, N, E)
+multihead_attn = nn.MultiheadAttention(embed_dim, num_heads)
+attn_output, attn_output_weights = multihead_attn(query, key, value)
+
+embed_dim, num_heads = 512, 8
+E, S, L, N = embed_dim, 20, 10, 5
+query = torch.rand(L, N, E)
+key = torch.rand(S, N, 256)
+value = torch.rand(S, N, 256)
+multihead_attn = nn.MultiheadAttention(embed_dim, num_heads, kdim=256, vdim=256)
+attn_output, attn_output_weights = multihead_attn(query, key, value, )
