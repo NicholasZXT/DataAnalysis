@@ -4,20 +4,14 @@
 __pycache__/
 # 忽略任何目录下的 dataset 文件夹
 dataset/
+/datasets/*
 
 /.idea
 
-/Kaggle/Titanic/predict.csv
-/Kaggle/Titanic/predict_2.csv
-/Kaggle/IMDB/aclImdb/
-/Kaggle/Titanic/logistic_pred.csv
-
-/ML-Action/LianjiaHousePrice.xlsx
-/ML-Action/TensorFlow-Saved-Models/*
-/ML-Action/TensorBoard-Logs/*
-/ML-Action/datasets/PTB-simple-examples/
-
-/ScoringCard/all_data_woe.csv
-/datasets/*
-/BERT/bert-pre-trained-models/
-/BERT/output/
+/BERT-source-codes/bert-pre-trained-models/
+/BERT-source-codes/output/
+/DeepLearning-Actions/TensorBoard-Logs/
+/DeepLearning-Actions/TensorFlow-Saved-Models/
+/DataMining-Actions/LianjiaHousePrice.xlsx
+/DeepLearning-Actions/TensorFlow-Saved-Models/*
+/DeepLearning-Actions/TensorBoard-Logs/*

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""BERT finetuning runner with TF-Hub."""
+"""BERT-source-codes finetuning runner with TF-Hub."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -31,7 +31,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     "bert_hub_module_handle", None,
-    "Handle for the BERT TF-Hub module.")
+    "Handle for the BERT-source-codes TF-Hub module.")
 
 
 def create_model(is_training, input_ids, input_mask, segment_ids, labels,
