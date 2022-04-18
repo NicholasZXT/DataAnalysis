@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run BERT on SQuAD 1.1 and SQuAD 2.0."""
+"""Run BERT-source-codes on SQuAD 1.1 and SQuAD 2.0."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -36,11 +36,11 @@ FLAGS = flags.FLAGS
 ## Required parameters
 flags.DEFINE_string(
     "bert_config_file", None,
-    "The config json file corresponding to the pre-trained BERT model. "
+    "The config json file corresponding to the pre-trained BERT-source-codes model. "
     "This specifies the model architecture.")
 
 flags.DEFINE_string("vocab_file", None,
-                    "The vocabulary file that the BERT model was trained on.")
+                    "The vocabulary file that the BERT-source-codes model was trained on.")
 
 flags.DEFINE_string(
     "output_dir", None,
@@ -56,7 +56,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     "init_checkpoint", None,
-    "Initial checkpoint (usually from a pre-trained BERT model).")
+    "Initial checkpoint (usually from a pre-trained BERT-source-codes model).")
 
 flags.DEFINE_bool(
     "do_lower_case", True,
@@ -1113,7 +1113,7 @@ def validate_flags_or_throw(bert_config):
 
   if FLAGS.max_seq_length > bert_config.max_position_embeddings:
     raise ValueError(
-        "Cannot use sequence length %d because the BERT model "
+        "Cannot use sequence length %d because the BERT-source-codes model "
         "was only trained up to sequence length %d" %
         (FLAGS.max_seq_length, bert_config.max_position_embeddings))
 

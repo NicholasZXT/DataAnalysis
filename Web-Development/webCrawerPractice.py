@@ -108,7 +108,7 @@ url = "http://www.pythonscraping.com/pages/page1.html"
 url = 'https://www.baidu.com'
 url = 'http://www.pythonscraping.com/pages/warandpeace.html'
 r = requests.get(url)
-with open('./ML-Action/warandpeace.html', 'r') as file:
+with open('./DataMining-Actions/warandpeace.html', 'r') as file:
     html = file.read()
 soup = BeautifulSoup(html, 'html.parser')
 soup.title

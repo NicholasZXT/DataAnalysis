@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""The main BERT model and related functions."""
+"""The main BERT-source-codes model and related functions."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -105,7 +105,7 @@ class BertConfig(object):
 
 
 class BertModel(object):
-  """BERT model ("Bidirectional Encoder Representations from Transformers").
+  """BERT-source-codes model ("Bidirectional Encoder Representations from Transformers").
 
   Example usage:
 

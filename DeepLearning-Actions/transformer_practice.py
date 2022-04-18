@@ -12,10 +12,10 @@ from transformers import BertTokenizer, DistilBertTokenizer, BertForSequenceClas
 
 # ---------------------使用IMDB数据集来 fine-tune BERT模型-----------------------------------------------------
 # 加载预训练模型 和 Tokenizer
-# model_path = r"BERT\bert-pre-trained-models\bert-base-uncased"
+# model_path = r"BERT-source-codes\bert-pre-trained-models\bert-base-uncased"
 # tokenizer = BertTokenizer.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
 # model = BertForSequenceClassification.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
-model_path = r"BERT\bert-pre-trained-models\distilbert-base-uncased"
+model_path = r"BERT-source-codes\bert-pre-trained-models\distilbert-base-uncased"
 tokenizer = DistilBertTokenizer.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
 model = DistilBertForSequenceClassification.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
 
@@ -173,7 +173,7 @@ print("time cost is : {:.2f}.".format(end_time-start_time))
 # test_size, test_batch_size = 100, 20
 # 181.83
 
-# RTX 2060 的 6G 根本带不动 BERT，连 distill-bert 都很困难
+# RTX 2060 的 6G 根本带不动 BERT-source-codes，连 distill-bert 都很困难
 # distill-bert 模型时，只计算一个batch时，最大的 batch_size 只能是 60, 即使是 65 都会报OOM；
 # 如果要循环迭代，最大的 batch_size 只能是20（训练和测试都是20）,25都会报OOM.
 

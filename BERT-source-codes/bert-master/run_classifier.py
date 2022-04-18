@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""BERT finetuning runner."""
+"""BERT-source-codes finetuning runner."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -38,13 +38,13 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     "bert_config_file", None,
-    "The config json file corresponding to the pre-trained BERT model. "
+    "The config json file corresponding to the pre-trained BERT-source-codes model. "
     "This specifies the model architecture.")
 
 flags.DEFINE_string("task_name", None, "The name of the task to train.")
 
 flags.DEFINE_string("vocab_file", None,
-                    "The vocabulary file that the BERT model was trained on.")
+                    "The vocabulary file that the BERT-source-codes model was trained on.")
 
 flags.DEFINE_string(
     "output_dir", None,
@@ -54,7 +54,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     "init_checkpoint", None,
-    "Initial checkpoint (usually from a pre-trained BERT model).")
+    "Initial checkpoint (usually from a pre-trained BERT-source-codes model).")
 
 flags.DEFINE_bool(
     "do_lower_case", True,
@@ -405,7 +405,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
     if len(tokens_a) > max_seq_length - 2:
       tokens_a = tokens_a[0:(max_seq_length - 2)]
 
-  # The convention in BERT is:
+  # The convention in BERT-source-codes is:
   # (a) For sequence pairs:
   #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
   #  type_ids: 0     0  0    0    0     0       0 0     1  1  1  1   1 1
@@ -801,7 +801,7 @@ def main(_):
 
   if FLAGS.max_seq_length > bert_config.max_position_embeddings:
     raise ValueError(
-        "Cannot use sequence length %d because the BERT model "
+        "Cannot use sequence length %d because the BERT-source-codes model "
         "was only trained up to sequence length %d" %
         (FLAGS.max_seq_length, bert_config.max_position_embeddings))
 
