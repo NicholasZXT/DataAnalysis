@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run masked LM/next sentence masked_lm pre-training for BERT."""
+"""Run masked LM/next sentence masked_lm pre-training for BERT-source-codes."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -30,7 +30,7 @@ FLAGS = flags.FLAGS
 ## Required parameters
 flags.DEFINE_string(
     "bert_config_file", None,
-    "The config json file corresponding to the pre-trained BERT model. "
+    "The config json file corresponding to the pre-trained BERT-source-codes model. "
     "This specifies the model architecture.")
 
 flags.DEFINE_string(
@@ -44,7 +44,7 @@ flags.DEFINE_string(
 ## Other parameters
 flags.DEFINE_string(
     "init_checkpoint", None,
-    "Initial checkpoint (usually from a pre-trained BERT model).")
+    "Initial checkpoint (usually from a pre-trained BERT-source-codes model).")
 
 flags.DEFINE_integer(
     "max_seq_length", 128,

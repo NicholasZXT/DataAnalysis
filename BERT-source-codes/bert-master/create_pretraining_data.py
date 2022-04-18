@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Create masked LM/next sentence masked_lm TF examples for BERT."""
+"""Create masked LM/next sentence masked_lm TF examples for BERT-source-codes."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -35,7 +35,7 @@ flags.DEFINE_string(
     "Output TF example file (or comma-separated list of files).")
 
 flags.DEFINE_string("vocab_file", None,
-                    "The vocabulary file that the BERT model was trained on.")
+                    "The vocabulary file that the BERT-source-codes model was trained on.")
 
 flags.DEFINE_bool(
     "do_lower_case", True,
