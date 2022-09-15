@@ -4,16 +4,20 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder, KBinsDiscretizer
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score, learning_curve
-from sklearn.metrics import accuracy_score,  precision_score, recall_score, confusion_matrix, roc_curve, classification_report
+from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, classification_report, make_scorer
 from sklearn.compose import ColumnTransformer, make_column_transformer
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.ensemble import GradientBoostingClassifier
+import xgboost as xgb
+import warnings
+warnings.filterwarnings('ignore')
 
 # %% 读取数据
 base_path = os.path.join(os.getcwd(), r'dataset/ds_takehome_challenges')
+# base_path = r'/Users/danielzhang/Documents/Python-Projects/DataAnalysis/dataset/ds_takehome_challenges'
 data_file = r'01. conversion_project.csv'
 data_path = os.path.join(base_path, data_file)
 print(os.path.exists(data_path))
@@ -98,15 +102,18 @@ X_test_ = pd.concat([X_test_p1, X_test_p2, X_test[['new_user']]], axis=1)
 
 # %% 构造特征工程流水线
 # 自定义特征转换器，实现对 country 和 source 进行 one-hot 编码，对 age 和 total_pages_visited 进行分箱的处理，方便后续使用pipeline
+# 不过其实 one-hot 编码这个特征处理不需要放到 pipeline 里，它不涉及数据泄露问题，而 分箱操作则需要使用 pipeline
 class FeaturesTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, onehot_transformer, onehot_cols, kbin_transformer, kbin_cols, other_cols):
-        self.onehot = onehot_transformer
+    def __init__(self, onehot_encoder, onehot_cols, kbins_discretizer, kbin_cols, other_cols):
+        # 下面只要是在形参中出现过的参数，名称必须和形参一样，因为BaseEstimator的get_params()方法会遍历函数签名中的形参，
+        # 如果不一致，会导致 get_params() 方法报错
+        self.onehot_encoder = onehot_encoder
         self.onehot_cols = onehot_cols
-        self.kbin = kbin_transformer
+        self.kbins_discretizer = kbins_discretizer
         self.kbin_cols = kbin_cols
         self.other_cols = other_cols
         # 使用 ColumnTransformer 来对不同的列进行不同的特征处理
-        transformers = [(onehot_transformer, onehot_cols), (kbin_transformer, kbin_cols)]
+        transformers = [(self.onehot_encoder, onehot_cols), (self.kbins_discretizer, kbin_cols)]
         self.cols_transformer = make_column_transformer(*transformers, remainder='passthrough')
         self.onehot_cols_res = []
 
@@ -121,9 +128,11 @@ class FeaturesTransformer(BaseEstimator, TransformerMixin):
             for idx, col in enumerate(onehot_cols):
                 self.onehot_cols_res.extend([col + '_' + v for v in onehot.categories_[idx].tolist()])
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         self.cols_transformer.fit(X)
         self.make_onehot_cols_res()
+        # 为了支持 fit_transform() 方法里执行的链式调用 fit(X).transform(X)，这里必须要返回 self
+        return self
 
     def transform(self, X):
         X_ = self.cols_transformer.transform(X)
@@ -148,6 +157,11 @@ X_train_enc = features_transformer.transform(X_train)
 # 对比手动特征工程的结果
 # t = X_train_ - X_train_enc
 # t.sum()
+
+# 检查 get_params 方法是否能正常执行
+# features_transformer.get_params()
+# 检查链式调用是否能执行
+# t = features_transformer.fit_transform(X_train)
 
 
 # %% logistic regression 基本建模
@@ -186,12 +200,136 @@ print(classification_report(y_train, y_train_pred, labels=labels, target_names=[
 
 
 # %% logistic regression 超参数搜索建模
+estimators = [('featureTransformer', features_transformer), ('logistic', LogisticRegression())]
+pipe = Pipeline(steps=estimators)
+param_grid = {'logistic__C': [0.1, 0.5, 0.7, 1.0, 1.5, 1.8]}
+# logits_grid = GridSearchCV(pipe, param_grid, cv=4)
+# 使用 召回率作为得分指标，注意，必须要先封装一下
+recall_scorer = make_scorer(recall_score)
+logits_grid = GridSearchCV(pipe, param_grid, cv=4, scoring=recall_scorer)
+logits_grid.fit(X_trainval, y_trainval)
+# logits_grid.best_estimator_
+
+labels = [1, 0]
+y_trainval_pred = logits_grid.predict(X_trainval)
+print(classification_report(y_trainval, y_trainval_pred, labels=labels, target_names=['正类', '负类']))
+y_train_pred = logits_grid.predict(X_train)
+print(classification_report(y_train, y_train_pred, labels=labels, target_names=['正类', '负类']))
+
+# 效果如下
+# logistic regression classification_report of labels [1, 0]:
+# train set, normal fit, score=accuracy
+#               precision    recall  f1-score   support
+#           正类       0.84      0.63      0.72      9000
+#           负类       0.99      1.00      0.99    270000
+#     accuracy                           0.98    279000
+#    macro avg       0.91      0.81      0.85    279000
+# weighted avg       0.98      0.98      0.98    279000
+#
+# train set, pipeline+grid_search, score=recall
+#               precision    recall  f1-score   support
+#           正类       0.84      0.63      0.72      9000
+#           负类       0.99      1.00      0.99    270000
+#     accuracy                           0.98    279000
+#    macro avg       0.91      0.81      0.85    279000
+# weighted avg       0.98      0.98      0.98    279000
+#
+# train+val set, pipeline+grid_search, score=accuracy
+#               precision    recall  f1-score   support
+#           正类       0.84      0.62      0.72     10000
+#           负类       0.99      1.00      0.99    300000
+#     accuracy                           0.98    310000
+#    macro avg       0.91      0.81      0.85    310000
+# weighted avg       0.98      0.98      0.98    310000
+#
+# train+val set, pipeline+grid_search, score=recall
+#               precision    recall  f1-score   support
+#           正类       0.84      0.62      0.72     10000
+#           负类       0.99      1.00      0.99    300000
+#     accuracy                           0.98    310000
+#    macro avg       0.91      0.81      0.85    310000
+# weighted avg       0.98      0.98      0.98    310000
 
 
 # %% svm 模型
+estimators = [('featureTransformer', features_transformer), ('svc', SVC(kernel='rbf'))]
+pipe = Pipeline(steps=estimators)
+param_grid = {'svc__C': [0.1, 0.5, 0.7, 1.0, 1.5, 1.8]}
+svc_grid = GridSearchCV(pipe, param_grid, cv=4)
+# svc_grid = GridSearchCV(pipe, param_grid, cv=4, scoring=recall_scorer)
 
+# svm 的网格搜索+交叉验证非常非常耗时！！！
+svc_grid.fit(X_trainval, y_trainval)
+
+labels = [1, 0]
+y_trainval_pred = svc_grid.predict(X_trainval)
+print(classification_report(y_trainval, y_trainval_pred, labels=labels, target_names=['正类', '负类']))
 
 # %% gbdt 模型
+estimators = [('featureTransformer', features_transformer), ('gbdt', GradientBoostingClassifier())]
+pipe = Pipeline(steps=estimators)
+param_grid = {
+    'gbdt__learning_rate': [0.1, 0.5, 1.0],
+    'gbdt__n_estimators': [60, 100, 140, 180],
+    'gbdt__max_depth': [3, 5]
+}
+gbdt_grid = GridSearchCV(pipe, param_grid, cv=4)
+# GBDT 的交叉验证时间也很长，MacBook Pro跑了26min
+gbdt_grid.fit(X_trainval, y_trainval)
+# gbdt_grid.best_estimator_
+# {
+#     'gbdt__learning_rate': 0.1,
+#     'gbdt__min_samples_leaf': 1,
+#     'gbdt__min_samples_split': 2,
+#     'gbdt__n_estimators': 140,
+# }
+
+labels = [1, 0]
+y_trainval_pred = gbdt_grid.predict(X_trainval)
+print(classification_report(y_trainval, y_trainval_pred, labels=labels, target_names=['正类', '负类']))
+# 结果
+#               precision    recall  f1-score   support
+#           正类       0.81      0.67      0.73     10000
+#           负类       0.99      0.99      0.99    300000
+#     accuracy                           0.98    310000
+#    macro avg       0.90      0.83      0.86    310000
+# weighted avg       0.98      0.98      0.98    310000
 
 
 # %% xbgoost 模型
+xgb_estimator = xgb.XGBClassifier(booster='gbtree', objective='binary:logistic', eval_matric='logloss')
+estimators = [('featureTransformer', features_transformer), ('xgb', xgb_estimator)]
+pipe = Pipeline(steps=estimators)
+param_grid = {
+    'xgb__n_estimators': [60, 100, 140, 180],
+    'xgb__learning_rate': [0.1, 0.5, 1.0],
+    'xgb__max_depth': [3, 5],
+    'xgb__colsample_bytree': [0.6, 1.0]
+}
+xgb_grid = GridSearchCV(pipe, param_grid, cv=4)
+# MacBook Pro耗时10min
+xgb_grid.fit(X_trainval, y_trainval)
+# xgb_grid.best_estimator_.get_params()
+# {
+#     'xgb__booster': 'gbtree',
+#     'xgb__objective': 'binary:logistic',
+#     'xgb__n_estimators': 100,
+#     'xgb__max_depth': 3,
+#     'xgb__learning_rate': 0.1,
+#     'xgb__tree_method': 'exact',
+#     'xgb__base_score': 0.5,
+#     'xgb__colsample_bylevel': 1,
+#     'xgb__colsample_bynode': 1,
+#     'xgb__colsample_bytree': 1.0,
+# }
+
+labels = [1, 0]
+y_trainval_pred = xgb_grid.predict(X_trainval)
+print(classification_report(y_trainval, y_trainval_pred, labels=labels, target_names=['正类', '负类']))
+# 结果
+#               precision    recall  f1-score   support
+#          正类       0.86      0.60      0.71     10000
+#          负类       0.99      1.00      0.99    300000
+#     accuracy                           0.98    310000
+#    macro avg       0.93      0.80      0.85    310000
+# weighted avg       0.98      0.98      0.98    310000
