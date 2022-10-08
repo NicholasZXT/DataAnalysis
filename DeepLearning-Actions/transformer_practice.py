@@ -1,4 +1,4 @@
-# 用于练习 huggingface 的 transformer
+# 用于练习 pytorch本身的transformer 和 huggingface 的 transformer
 import os
 import time
 from pathlib import Path
@@ -7,10 +7,136 @@ from sklearn.datasets import load_files
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizer, DistilBertTokenizer, BertForSequenceClassification, DistilBertForSequenceClassification, AdamW
+from torch.nn import MultiheadAttention, TransformerEncoder, TransformerEncoderLayer, TransformerDecoder, \
+    TransformerDecoderLayer, Transformer
+from transformers import BertTokenizer, DistilBertTokenizer, BertForSequenceClassification, \
+    DistilBertForSequenceClassification, AdamW
 
 
-# ---------------------使用IMDB数据集来 fine-tune BERT模型-----------------------------------------------------
+# %% ----------- pytorch Transformer-MultiheadAttention ---------------
+def __Pytorch_MultiHeadAttention():
+    pass
+
+embed_dim, num_heads = 512, 8
+batch_size, target_len, source_len = 5, 10, 20
+
+query = torch.rand(batch_size, target_len, embed_dim)
+key = torch.rand(batch_size, source_len, embed_dim)
+value = torch.rand(batch_size, source_len, embed_dim)
+
+multihead_attn = MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads,
+                                    dropout=0, bias=False, add_bias_kv=False, batch_first=True)
+attn_output, attn_output_weights = multihead_attn(query, key, value)
+print(attn_output.shape)
+print(attn_output_weights.shape)
+
+
+# %% ------------- pytorch Transformer-------------------------------------
+def __Pytorch_Transformer():
+    pass
+
+# Encoder层，需要设置的参数有：
+# 输入特征数 in_features=56, nhead, dim_feedforward是指self-attention后的前馈网络的中间层，
+# Encoder的不会改变输入样本的特征数量，也就是说，输入的in_features是多少，输出的就是多少
+# in_features = 56
+# encoder_layer = nn.TransformerEncoderLayer(d_model=in_features, nhead=4, dim_feedforward=24)
+# # 输入数据，batch_size=10, seq_length = 32, 特征数为in_features
+# src = torch.rand(10, 32, in_features)
+# out = encoder_layer(src)
+# src.shape
+# out.shape
+#
+#
+# X.shape
+# input_size = 96
+# hidden_size = 48
+# seq_length = 95
+# encoder_layer = nn.TransformerEncoderLayer(d_model=input_size, dim_feedforward=hidden_size, nhead=4)
+# out = encoder_layer(X.transpose(1, 0))
+# out.shape
+
+
+
+# %% ------------- pytorch transformer 的IMDB练习 ------------------
+def __PyTorch_Transformer_IMDB():
+    pass
+
+class ImdbTransformer(nn.Module):
+    def __init__(self, input_size, hidden_size, seq_length):
+        super().__init__()
+        self.transformer = nn.TransformerEncoderLayer(d_model=input_size, dim_feedforward=hidden_size, nhead=4)
+        self.flatten = nn.Flatten()
+        self.linear = nn.Linear(in_features=seq_length*input_size, out_features=2, bias=True)
+
+    def forward(self, X):
+        X_transpose = X.transpose(1,0)
+        trans_out = self.transformer(X_transpose)
+        trans_flatten = self.flatten(trans_out.transpose(1,0))
+        y_pred = self.linear(trans_flatten)
+        return y_pred
+
+
+# 初始化模型
+imdb_trans = ImdbTransformer(input_size=input_size, hidden_size=hidden_size, seq_length=seq_length)
+# 测试输出
+# y_pred = imdb_trans(X)
+# y_pred.shape
+# 定义损失函数
+crossEnt = nn.CrossEntropyLoss()
+# 定义优化器
+optimizer = optim.SGD(params=imdb_trans.parameters(), lr=0.1)
+# 测试
+# out = imdb_trans(X)
+# loss = crossEnt(out, y.long())
+
+# 开始迭代训练
+for epoch in range(1, 5):
+    for batch_id, (X, y) in enumerate(imdb_train_loader):
+        y_pred = imdb_trans(X)
+        optimizer.zero_grad()
+        loss = crossEnt(y_pred, y.long())
+        loss.backward()
+        optimizer.step()
+        y_pred_new = imdb_trans(X)
+        train_loss = crossEnt(y_pred_new, y.long())
+        print("epoch {:2}, batch_id {:2}, train_loss: {}".format(epoch, batch_id, train_loss))
+
+
+# --------- 损失函数相关 -------------------
+
+# negative log likelihood loss
+nlloss = nn.NLLLoss(reduction='none')
+y_true = torch.tensor([1, 0, 0], dtype=torch.long)
+y_pred = torch.tensor([[1, 0], [1, 0], [0, 1]], dtype=torch.float, requires_grad=True)
+y_true
+y_pred
+nlloss(input=y_pred, target=y_true)
+
+
+embed_dim, num_heads = 512, 8
+E, S, L, N = embed_dim, 20, 10, 5
+query = torch.rand(L, N, E)
+key = torch.rand(S, N, E)
+value = torch.rand(S, N, E)
+multihead_attn = nn.MultiheadAttention(embed_dim, num_heads)
+attn_output, attn_output_weights = multihead_attn(query, key, value)
+
+embed_dim, num_heads = 512, 8
+E, S, L, N = embed_dim, 20, 10, 5
+query = torch.rand(L, N, E)
+key = torch.rand(S, N, 256)
+value = torch.rand(S, N, 256)
+multihead_attn = nn.MultiheadAttention(embed_dim, num_heads, kdim=256, vdim=256)
+attn_output, attn_output_weights = multihead_attn(query, key, value, )
+
+
+# %% ----------------- huggingface transformer ------------------
+def __Huggingface_Transformer():
+    pass
+
+# --------------------- 在IMDB数据集上 fine-tune BERT模型-----------------------------------------------------
+def __BERT_fine_tune():
+    pass
 # 加载预训练模型 和 Tokenizer
 # model_path = r"BERT-source-codes\bert-pre-trained-models\bert-base-uncased"
 # tokenizer = BertTokenizer.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
@@ -179,7 +305,9 @@ print("time cost is : {:.2f}.".format(end_time-start_time))
 
 
 # TODO
-#---------------训练一个BERT模型-----------------
+# %% --------------- 手动训练一个BERT模型-----------------
+def __BERT_Training():
+    pass
 # 使用的是 世界语 esperanto 的语料库
 from pathlib import Path
 from tokenizers import ByteLevelBPETokenizer # 这个tokenizer包也是huggingfacing开源的，配合transformer使用
