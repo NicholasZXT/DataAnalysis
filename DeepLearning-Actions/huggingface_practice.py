@@ -1,9 +1,35 @@
 # %% importing packages
 import os
 import torch
+import warnings
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertConfig, BertTokenizer, BertModel, BertForPreTraining, BertForSequenceClassification
+from datasets import load_dataset_builder, get_dataset_config_names, get_dataset_config_info, \
+    get_dataset_infos, get_dataset_split_names,  load_dataset
+warnings.filterwarnings('ignore')
+
+# 基于 wikitext 语料，训练一个自己的BERT模型
+# %% ---------------- 加载数据集 -----------------------
+dataset_name = 'wikitext'
+# 查看该数据集下的配置，也就是有哪些类型的数据集可供使用
+get_dataset_config_names(dataset_name)
+# 查看指定数据集的split
+get_dataset_split_names(dataset_name, 'wikitext-2-raw-v1')
+builder = load_dataset_builder(dataset_name, 'wikitext-2-raw-v1')
+# 加载数据集
+# data = load_dataset(dataset_name, 'wikitext-2-raw-v1')
+print("hello")
+
+# ------------------- 训练 tokenizer ------------------
+
+
+
+# ------------------- 训练 BERT 模型 ------------------
+
+
+
+
 
 
 # %% 加载 Bert的 配置文件，Tokenizer 和 预训练模型
