@@ -5,7 +5,8 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset_builder, get_dataset_config_names, get_dataset_config_info, \
     get_dataset_infos, get_dataset_split_names,  load_dataset
-from tokenizers import normalizers, pre_tokenizers, models, processors, trainers, decoders, Tokenizer
+from tokenizers import Tokenizer, normalizers, pre_tokenizers, models, processors, trainers
+from transformers import PreTrainedTokenizerFast
 from transformers import BertConfig, BertTokenizer, BertModel, BertForPreTraining, \
     BertForSequenceClassification, DataCollatorForLanguageModeling
 
@@ -19,7 +20,8 @@ warnings.filterwarnings('ignore')
 # 只使用数据集名称，会下载数据处理脚本，速度慢一些，后续各种查询元数据信息也会比较慢
 # path = 'wikitext'
 # 使用已经下载好的 数据集脚本 会快一些
-path = r'D:\Project-Workspace\Python-Projects\DataAnalysis\datasets\huggingface\wikitext.py'
+# path = r'D:\Project-Workspace\Python-Projects\DataAnalysis\datasets\huggingface\wikitext.py'
+path = r'.\datasets\huggingface\wikitext.py'
 # 查看该数据集下的配置，也就是有哪些子数据集可供使用
 get_dataset_config_names(path)
 # 查看指定子数据集的split
@@ -40,7 +42,7 @@ def get_training_corpus(text_data):
 # 这部分基本是参照huggingface的官方教程实现的
 # [Building a WordPiece tokenizer from scratch](https://huggingface.co/course/chapter6/8?fw=pt#building-a-wordpiece-tokenizer-from-scratch)
 # 一个 tokenizer 其实也是 pipeline，里面包含了多个步骤。
-# 1. 实例化一个 Tokenizer 类，使用的词向量模型是 WordPiece
+# 1. 实例化一个 Tokenizer 类，使用的sub-word分词模型是 WordPiece
 tokenizer = Tokenizer(models.WordPiece(unk_token="[UNK]"))
 
 # 2. 规范化（Normalization）步骤：分词，去除大小写，词形还原等
@@ -53,7 +55,7 @@ tokenizer.pre_tokenizer = pre_tokenizers.BertPreTokenizer()
 # 或者手动进行精细化处理
 # tokenizer.pre_tokenizer = pre_tokenizers.Sequence([pre_tokenizers.WhitespaceSplit(), pre_tokenizers.Punctuation()])
 
-# 4. 配置词向量模型的训练器
+# 4. 配置sub-word分词模型的训练器
 special_tokens = ["[UNK]", "[PAD]", "[CLS]", "[SEP]", "[MASK]"]
 trainer = trainers.WordPieceTrainer(vocab_size=25000, special_tokens=special_tokens)
 
@@ -72,8 +74,9 @@ tokenizer.post_processor = processors.TemplateProcessing(
 )
 
 # 7. 保存训练的 tokenizer
-tokenizer.save(r"datasets\huggingface\tokenizer.json")
-
+tokenizer.save(r".\datasets\huggingface\wikitext-2-raw-v1_tokenizer.json")
+# 读取
+tokenizer = Tokenizer.from_file(r".\datasets\huggingface\wikitext-2-raw-v1_tokenizer.json")
 # 测试训练的 tokenizer
 single_sen = "Let's test my pre-tokenizer."
 pair_sen = "Let's test this tokenizer...", "on a pair of sentences."
@@ -89,7 +92,10 @@ print(pair_encoding.attention_mask)
 
 # %% ------------------- 训练 BERT 模型 ------------------
 # 1. 加载上面训练好的 tokenizer
-custom_tokenizer = Tokenizer.from_file(r"datasets\huggingface\tokenizer.json")
+raw_tokenizer = Tokenizer.from_file(r".\datasets\huggingface\wikitext-2-raw-v1_tokenizer.json")
+# 封装成 PreTrainedTokenizerFast对象
+custom_tokenizer = PreTrainedTokenizerFast(tokenizer_object=raw_tokenizer)
+# print(custom_tokenizer.is_fast)
 
 # 2. 初始化 BERT 模型
 vocab_size = custom_tokenizer.get_vocab_size()
