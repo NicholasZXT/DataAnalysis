@@ -6,6 +6,8 @@ from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset_builder, get_dataset_config_names, get_dataset_config_info, \
     get_dataset_infos, get_dataset_split_names,  load_dataset
 from tokenizers import Tokenizer, normalizers, pre_tokenizers, models, processors, trainers
+from transformers import DistilBertConfig, DistilBertTokenizer, DistilBertTokenizerFast, DistilBertForMaskedLM, \
+    DataCollatorForLanguageModeling
 from transformers import PreTrainedTokenizerFast
 from transformers import BertConfig, BertTokenizer, BertModel, BertForPreTraining, \
     BertForSequenceClassification, DataCollatorForLanguageModeling
@@ -14,7 +16,9 @@ from transformers import BertConfig, BertTokenizer, BertModel, BertForPreTrainin
 import warnings
 warnings.filterwarnings('ignore')
 
-# ***************** 基于 wikitext 语料，训练一个自己的BERT模型 *****************
+# ***************** 基于 wikitext 语料，训练一个 Tokenizer *****************
+def __Train_tokenizer():
+    pass
 
 # %% ---------------- 加载数据集 -----------------------
 # 只使用数据集名称，会下载数据处理脚本，速度慢一些，后续各种查询元数据信息也会比较慢
@@ -88,6 +92,97 @@ print(single_encoding.attention_mask)
 print(pair_encoding.tokens)
 print(pair_encoding.type_ids)
 print(pair_encoding.attention_mask)
+
+
+# ****************** Fine-tune BERT 模型 ****************
+def __Fine_Tune():
+    pass
+
+# %% ----------- 加载 Distil-Bert 模型 -----------------
+base_path = r"D:\Project-Workspace\Python-Projects\DataAnalysis\bert-pretrained-models"
+model_path = os.path.join(base_path, 'distilbert-base-uncased')
+# tokenizer = DistilBertTokenizer.from_pretrained(model_path)
+tokenizer = DistilBertTokenizerFast.from_pretrained(model_path)
+config = DistilBertConfig.from_pretrained(model_path)
+# model = DistilBertModel(config)
+# 这里选择的是 Masked Language Model
+model_mlm = DistilBertForMaskedLM(config)
+# 查看信息
+# print(model_mlm.num_parameters())
+# print(tokenizer.__class__)
+# print(tokenizer.all_special_tokens)
+# print(tokenizer.all_special_ids)
+# print(tokenizer.is_fast)
+
+# %% ------------ 使用 IMDB 数据集来 Fine-tune ------------
+# data_name = 'imdb'
+data_name = r'.\datasets\huggingface\imdb.py'
+print(get_dataset_config_names(data_name))
+print(get_dataset_split_names(data_name))
+imdb = load_dataset(data_name, split='unsupervised')
+
+# %% --------------- 处理数据 -----------------------
+# 对于 Masked Language Model，在准备训练语料的时候，通常的做法是将 一个batch里 所有样本的文本段落拼在一起，然后按照固定长度分成 chunk，用这些
+# chunk 作为训练语料，在这个过程中，还需要对训练语料进行 随机 mask 处理
+
+# 1. 首先使用 tokenizer 进行分词，在分词的过程中，还要新增一个 word_ids，记录下每个batch中，句子token的下标
+# examples = imdb['text'][0:5]
+# result = tokenizer(examples)
+# print(len(result["input_ids"]))
+# t = [result.word_ids(i) for i in range(len(result["input_ids"]))]
+def tokenize_function(examples):
+    # examples 是以 batch 传入的样本
+    # result 是分词后的结果(BatchEncoding对象)，包括 input_ids 和 attention_mask 两个key
+    result = tokenizer(examples["text"])
+    if tokenizer.is_fast:
+        # 新增一个key，记录下每个batch的句子里，各个token的下标
+        result["word_ids"] = [result.word_ids(i) for i in range(len(result["input_ids"]))]
+    return result
+
+# 使用 Dataset 对象的 map 方法，以 batch 方式处理
+imdb_tokenized = imdb.map(tokenize_function, batched=True, remove_columns=["text", "label"])
+print(imdb_tokenized)
+
+# 2. 分词结束后，需要将 一个batch 里的所有样本拼接起来，然后按照固定长度(chunk_size)分割成 chunk
+chunk_size = 128
+# 使用下面的函数完成操作
+def group_texts(examples):
+    # examples 是一个 batch 的样本，keys()返回的是 input_ids, attention_mask, word_ids
+    # 分别将上述 3 个key在 一个batch 下样本都拼凑到一起
+    # sum函数签名为 sum(Iterable, start=0)，examples[k] 是一个 List[List], 使用 sum 时，会对其中的 子list 执行 + ，也就是list的拼接，
+    # 最后的结果再 + start，由于 start默认是整数0，无法和 list 执行 +， 所以这里使用了一个空列表
+    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+    # 计算拼接后的总长度，list(examples.keys())[0] 就是 input_ids 这个key
+    total_length = len(concatenated_examples[list(examples.keys())[0]])
+    # 对于最后一个chunk，它的长度可能小于 chunk_size，这里直接丢弃
+    total_length = (total_length // chunk_size) * chunk_size
+    # 对拼接后的 token 序列按照 chunk_size 进行分割
+    # k 依次是 input_ids, attention_mask, word_ids —— 也就是依然是这 3 个特征
+    result = {
+        k: [t[i: i + chunk_size] for i in range(0, total_length, chunk_size)]
+        for k, t in concatenated_examples.items()
+    }
+    # Create a new labels column —— 这个 label 后面会被作为被 mask 词的预测标签
+    result["labels"] = result["input_ids"].copy()
+    return result
+
+imdb_chunks = imdb_tokenized.map(group_texts, batched=True)
+# 这里可以看出，样本个数已经比原来的 50000 要多了
+print(imdb_chunks)
+
+# 3. 对数据集进行分割 chunk 之后，还需要每个chunk中的 token 进行随机 mask，这一步是通过 DataCollatorForLanguageModeling 完成的
+# 使用 tokenizer 初始化 DataCollator 对象
+imdb_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15)
+# 可以查看下效果
+samples = [imdb_chunks[i] for i in range(2)]
+# 去除掉其中的 word_ids，因为 collator 不接受这个特征
+for sample in samples:
+    _ = sample.pop("word_ids")
+res = imdb_collator(samples)
+# 查看 Mask 的效果
+tokenizer.decode(res['input_ids'][0])
+
+
 
 
 # %% ------------------- 训练 BERT 模型 ------------------
