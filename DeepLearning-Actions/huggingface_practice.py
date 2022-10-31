@@ -206,25 +206,33 @@ def __Train_tokenizer():
 path = r'.\datasets\huggingface\wikitext.py'
 # 查看该数据集下的配置，也就是有哪些子数据集可供使用
 get_dataset_config_names(path)
+# 选定子数据集
+# split = 'wikitext-2-raw-v1'
+split = 'wikitext-103-raw-v1'
 # 查看指定子数据集的split
-get_dataset_split_names(path, 'wikitext-2-raw-v1')
+get_dataset_split_names(path, split)
 # 加载指定子数据集（必须指定到子数据集名称）的Builder对象
-builder = load_dataset_builder(path, 'wikitext-2-raw-v1')
+builder = load_dataset_builder(path, split)
 # 加载数据集，上述的脚本会下载数据集，存放在缓存文件夹中
-data = load_dataset(path, 'wikitext-2-raw-v1')
+data = load_dataset(path, split)
 data_train = data['train']
+data_test = data['test']
+print(data)
+data_train[0]
 
 # 将数据集组织成生成器，每次返回一个batch的数据
 def get_training_corpus(text_data):
     for i in range(0, len(text_data), 1000):
-        yield text_data[i: i + 1000]["text"]
+        # yield text_data[i: i + 1000]["text"]
+        # 去除掉那些空白行
+        yield [text for text in text_data[i: i + 1000]["text"] if len(text) > 1]
 
 
 # %% ------------------- 训练 tokenizer ------------------
 # 这部分基本是参照huggingface的官方教程实现的
 # [Building a WordPiece tokenizer from scratch](https://huggingface.co/course/chapter6/8?fw=pt#building-a-wordpiece-tokenizer-from-scratch)
 # 一个 tokenizer 其实也是 pipeline，里面包含了多个步骤。
-# 1. 实例化一个 Tokenizer 类，使用的sub-word分词模型是 WordPiece
+# 1. 实例化一个 Tokenizer 类，使用的sub-word分词模型是 WordPiece, [UNK] 指定的是未知的token对应的符号
 tokenizer = Tokenizer(models.WordPiece(unk_token="[UNK]"))
 
 # 2. 规范化（Normalization）步骤：分词，去除大小写，词形还原等
@@ -239,7 +247,7 @@ tokenizer.pre_tokenizer = pre_tokenizers.BertPreTokenizer()
 
 # 4. 配置sub-word分词模型的训练器
 special_tokens = ["[UNK]", "[PAD]", "[CLS]", "[SEP]", "[MASK]"]
-trainer = trainers.WordPieceTrainer(vocab_size=25000, special_tokens=special_tokens)
+trainer = trainers.WordPieceTrainer(vocab_size=32000, special_tokens=special_tokens)
 
 # 5. 使用语料进行训练
 tokenizer.train_from_iterator(get_training_corpus(data_train), trainer=trainer)
@@ -256,9 +264,10 @@ tokenizer.post_processor = processors.TemplateProcessing(
 )
 
 # 7. 保存训练的 tokenizer
-tokenizer.save(r".\datasets\huggingface\wikitext-2-raw-v1_tokenizer.json")
+tokenizer_path = os.path.join(".\\datasets\\huggingface\\", f"{split}_tokenizer.json")
+tokenizer.save(tokenizer_path)
 # 读取
-tokenizer = Tokenizer.from_file(r".\datasets\huggingface\wikitext-2-raw-v1_tokenizer.json")
+tokenizer = Tokenizer.from_file(tokenizer_path)
 # 测试训练的 tokenizer
 single_sen = "Let's test my pre-tokenizer."
 pair_sen = "Let's test this tokenizer...", "on a pair of sentences."
@@ -272,20 +281,19 @@ print(pair_encoding.type_ids)
 print(pair_encoding.attention_mask)
 
 
-
 # ****************** 从头开始训练 BERT 模型 ****************
 def __Train_Bert():
     pass
 
 # %% ------------------- 训练 BERT 模型 ------------------
 # 1. 加载上面训练好的 tokenizer
-raw_tokenizer = Tokenizer.from_file(r".\datasets\huggingface\wikitext-2-raw-v1_tokenizer.json")
+raw_tokenizer = Tokenizer.from_file(tokenizer_path)
 # 封装成 PreTrainedTokenizerFast对象
 custom_tokenizer = PreTrainedTokenizerFast(tokenizer_object=raw_tokenizer)
 # print(custom_tokenizer.is_fast)
 
 # 2. 初始化 BERT 模型
-vocab_size = custom_tokenizer.get_vocab_size()
+vocab_size = custom_tokenizer.vocab_size
 custom_config = BertConfig(vocab_size=vocab_size)
 custom_bert = BertForPreTraining(custom_config)
 
