@@ -7,22 +7,32 @@ from torch.utils.data import DataLoader
 from datasets import load_dataset_builder, get_dataset_config_names, get_dataset_split_names, load_dataset
 from tokenizers import Tokenizer, normalizers, pre_tokenizers, models, processors, trainers
 from transformers import DataCollatorForLanguageModeling, DataCollatorForWholeWordMask, PreTrainedTokenizerFast
-from transformers import DistilBertConfig, DistilBertTokenizerFast, DistilBertForMaskedLM
-from transformers import BertConfig, BertTokenizer, BertTokenizerFast, BertModel, BertForMaskedLM, BertForPreTraining
+from transformers import BertConfig, BertTokenizerFast, BertModel, BertForMaskedLM, BertForNextSentencePrediction, BertForPreTraining
+from transformers import TextDatasetForNextSentencePrediction
 # 忽略警告信息
 # import warnings
 # warnings.filterwarnings('ignore')
 
+# CWD = r"D:\Project-Workspace\Python-Projects\DataAnalysis"
+CWD = r"C:\Users\Drivi\Python-Projects\DataAnalysis"
 
-# ****************** Fine-tune BERT 模型 ****************
-def __Fine_Tune():
+
+# %% ------------ 使用 IMDB 数据集来 Fine-tune ------------
+# data_name = 'imdb'
+data_name = os.path.join(CWD, 'datasets', 'huggingface', 'imdb.py')
+print(get_dataset_config_names(data_name))
+print(get_dataset_split_names(data_name))
+imdb = load_dataset(data_name, split='unsupervised')
+print(imdb)
+
+
+# ****************** 使用 Masked Language Model 来 fine-tune BERT 模型 ****************
+def __Fine_Tune_By_MLM():
     pass
 
 # %% ----------- 加载 Bert 模型 -----------------
-base_path = r"D:\Project-Workspace\Python-Projects\DataAnalysis\bert-pretrained-models"
-# 这里采用 Masked Language Model 进行 fine-tune
 # BERT-base模型
-model_path = os.path.join(base_path, 'bert-base-uncased')
+model_path = os.path.join(CWD, 'bert-pretrained-models', 'bert-base-uncased')
 tokenizer = BertTokenizerFast.from_pretrained(model_path)
 config = BertConfig.from_pretrained(model_path)
 # 需要手动设置输出 attentions 和 hidden_states
@@ -30,11 +40,6 @@ config = BertConfig.from_pretrained(model_path)
 # config.output_hidden_states = True
 model = BertModel(config)
 model_mlm = BertForMaskedLM(config)
-# Distil-Bert
-# model_path = os.path.join(base_path, 'distilbert-base-uncased')
-# tokenizer = DistilBertTokenizerFast.from_pretrained(model_path)
-# config = DistilBertConfig.from_pretrained(model_path)
-# model_mlm = DistilBertForMaskedLM(config)
 
 # 查看信息
 # print(model_mlm.num_parameters())
@@ -43,17 +48,10 @@ model_mlm = BertForMaskedLM(config)
 # print(tokenizer.all_special_ids)
 # print(tokenizer.is_fast)
 
-# %% ------------ 使用 IMDB 数据集来 Fine-tune ------------
-# data_name = 'imdb'
-data_name = r'.\datasets\huggingface\imdb.py'
-print(get_dataset_config_names(data_name))
-print(get_dataset_split_names(data_name))
-imdb = load_dataset(data_name, split='unsupervised')
-print(imdb)
 
 # %% --------------- 处理数据 -----------------------
 # 对于 Masked Language Model，在准备训练语料的时候，通常的做法是将 一个batch里 所有样本的文本段落拼在一起，然后按照固定长度分成 chunk，用这些
-# chunk 作为训练语料，在这个过程中，还需要对训练语料进行 随机 mask 处理
+# chunk 作为训练语料，在输入模型之前，还需要对训练语料进行 随机 mask 处理
 
 # 1. 首先使用 tokenizer 进行分词，在分词的过程中，还要新增一个 word_ids，记录下每个batch中，句子token的下标
 # examples = imdb['text'][0:5]
@@ -193,17 +191,41 @@ print(f"total training time is : {total_time}")
 # RTX 3060-12G, batch_size=60, chunk_size=128, 1个epoch耗时 1861.36 秒, loss=6.684980869293213
 
 
+# ****************** 使用 Next Sentenct Prediction 来 fine-tune BERT 模型 ****************
+def __Fine_Tune_By_NSP():
+    pass
+
+# %% -------------- 加载模型 ----------------
+model_path = os.path.join(CWD, 'bert-pretrained-models', 'bert-base-uncased')
+tokenizer = BertTokenizerFast.from_pretrained(model_path)
+config = BertConfig.from_pretrained(model_path)
+# 需要手动设置输出 attentions 和 hidden_states
+# config.output_attentions = True
+# config.output_hidden_states = True
+# model = BertModel(config)
+model_nsp = BertForNextSentencePrediction(config)
+
+
+# %% --------------  处理数据 -----------------
+# TODO 这里没有现成的数据可供使用，操作比较麻烦
+def nsp_tokenize(examples):
+    pass
+
+
+
+# %% ---------------  Fine-Tune 模型 ------------------
+
+
 
 # ***************** 基于 wikitext 语料，训练一个 Tokenizer *****************
-def __Train_tokenizer():
+def __Training_tokenizer():
     pass
 
 # %% ---------------- 加载数据集 -----------------------
 # 只使用数据集名称，会下载数据处理脚本，速度慢一些，后续各种查询元数据信息也会比较慢
 # path = 'wikitext'
 # 使用已经下载好的 数据集脚本 会快一些
-# path = r'D:\Project-Workspace\Python-Projects\DataAnalysis\datasets\huggingface\wikitext.py'
-path = r'.\datasets\huggingface\wikitext.py'
+path = os.path.join(CWD, 'datasets', 'huggingface', 'wikitext.py')
 # 查看该数据集下的配置，也就是有哪些子数据集可供使用
 get_dataset_config_names(path)
 # 选定子数据集
@@ -214,14 +236,15 @@ get_dataset_split_names(path, split)
 # 加载指定子数据集（必须指定到子数据集名称）的Builder对象
 builder = load_dataset_builder(path, split)
 # 加载数据集，上述的脚本会下载数据集，存放在缓存文件夹中
-data = load_dataset(path, split)
-data_train = data['train']
-data_test = data['test']
-print(data)
-data_train[0]
+wikitext = load_dataset(path, split)
+wikitext_train = wikitext['train']
+# wikitext_test = wikitext['test']
+print(wikitext)
+for i in range(5):
+    print(f'example {i}:\n', wikitext_train['text'][i])
 
 # 将数据集组织成生成器，每次返回一个batch的数据
-def get_training_corpus(text_data):
+def generate_training_corpus(text_data):
     for i in range(0, len(text_data), 1000):
         # yield text_data[i: i + 1000]["text"]
         # 去除掉那些空白行
@@ -245,18 +268,18 @@ tokenizer.pre_tokenizer = pre_tokenizers.BertPreTokenizer()
 # 或者手动进行精细化处理
 # tokenizer.pre_tokenizer = pre_tokenizers.Sequence([pre_tokenizers.WhitespaceSplit(), pre_tokenizers.Punctuation()])
 
-# 4. 配置sub-word分词模型的训练器
+# 4. 配置sub-word分词模型的训练器，指定其中用到的特殊token
 special_tokens = ["[UNK]", "[PAD]", "[CLS]", "[SEP]", "[MASK]"]
-trainer = trainers.WordPieceTrainer(vocab_size=32000, special_tokens=special_tokens)
+trainer = trainers.WordPieceTrainer(vocab_size=32000, special_tokens=special_tokens, show_progress=True)
 
 # 5. 使用语料进行训练
-tokenizer.train_from_iterator(get_training_corpus(data_train), trainer=trainer)
+tokenizer.train_from_iterator(generate_training_corpus(wikitext_train), trainer=trainer)
 
 # 6. 后处理（post-processing）流程：也就是在句子开头加上 [CLS]，句子中间和末尾加上 [SEP]
 # 首先获取 [CLS] 和 [SEP] 的 token_id
 cls_token_id = tokenizer.token_to_id("[CLS]")
 sep_token_id = tokenizer.token_to_id("[SEP]")
-# 然后增加后处理流程
+# 然后增加后处理流程， 主要是指定单个句子、句子对的处理模板，并且还要指定其中用到的特殊token
 tokenizer.post_processor = processors.TemplateProcessing(
     single=f"[CLS]:0 $A:0 [SEP]:0",
     pair=f"[CLS]:0 $A:0 [SEP]:0 $B:1 [SEP]:1",
@@ -264,7 +287,7 @@ tokenizer.post_processor = processors.TemplateProcessing(
 )
 
 # 7. 保存训练的 tokenizer
-tokenizer_path = os.path.join(".\\datasets\\huggingface\\", f"{split}_tokenizer.json")
+tokenizer_path = os.path.join(CWD, 'datasets', 'huggingface', f"{split}_tokenizer.json")
 tokenizer.save(tokenizer_path)
 # 读取
 tokenizer = Tokenizer.from_file(tokenizer_path)
@@ -281,81 +304,113 @@ print(pair_encoding.type_ids)
 print(pair_encoding.attention_mask)
 
 
-# ****************** 从头开始训练 BERT 模型 ****************
-def __Train_Bert():
+# ****************** 基于 wikitext 语料，从头开始训练 BERT 模型 ****************
+def __Training_Bert():
     pass
 
-# %% ------------------- 训练 BERT 模型 ------------------
+# %% ------------------- 封装 Tokenizer 对象 ------------------
 # 1. 加载上面训练好的 tokenizer
+tokenizer_path = os.path.join(CWD, 'datasets', 'huggingface', f"{split}_tokenizer.json")
 raw_tokenizer = Tokenizer.from_file(tokenizer_path)
-# 封装成 PreTrainedTokenizerFast对象
-custom_tokenizer = PreTrainedTokenizerFast(tokenizer_object=raw_tokenizer)
+# 注意，这个 tokenizer 是 tokenizers包中的 Tokenizer 类对象，不能直接被transformer直接使用
+print(type(raw_tokenizer))
+# 封装成 PreTrainedTokenizerFast对象，这里还需要设置特殊token的映射关系
+custom_tokenizer = PreTrainedTokenizerFast(
+    tokenizer_object=raw_tokenizer,
+    cls_token='[CLS]', unk_token='[UNK]', sep_token='[SEP]', pad_token='[PAD]', mask_token='[MASK]'
+)
 # print(custom_tokenizer.is_fast)
+# print(custom_tokenizer.unk_token, custom_tokenizer.cls_token, custom_tokenizer.sep_token, custom_tokenizer.pad_token, custom_tokenizer.mask_token)
+# print(custom_tokenizer.all_special_tokens)
+# print(custom_tokenizer.all_special_ids)
 
-# 2. 初始化 BERT 模型
-vocab_size = custom_tokenizer.vocab_size
-custom_config = BertConfig(vocab_size=vocab_size)
-custom_bert = BertForPreTraining(custom_config)
+# 对比一下官方的BERT分词器
+# model_path = os.path.join(CWD, 'bert-pretrained-models', 'bert-base-uncased')
+# bert_tokenizer = BertTokenizerFast.from_pretrained(model_path)
+# print(type(bert_tokenizer))
+# print(bert_tokenizer.unk_token, bert_tokenizer.cls_token, bert_tokenizer.sep_token, bert_tokenizer.pad_token, bert_tokenizer.mask_token)
+# print(bert_tokenizer.all_special_tokens)
+# print(bert_tokenizer.all_special_ids)
+
+# sentence = ["After stealing money from the bank vault", "the bank robber was seen fishing on the Mississippi river bank."]
+# custom_encoding = custom_tokenizer(*sentence, padding=True)
+# bert_encoding = bert_tokenizer(*sentence, padding=True)
+# print(custom_encoding)
+# print(bert_encoding)
+
+
+# %% ------------------- 处理数据 ------------------------
+# 这里处理成MLM的形式
+# 1. 使用分词器进行分词
+def tokenize(examples):
+    # 去掉空白行的样本
+    text_list = [text for text in examples['text'] if len(text) > 1]
+    # 分词处理
+    text_tokens = custom_tokenizer(text_list)
+    return text_tokens
+
+wikitext_tokenized = wikitext_train.map(tokenize, batched=True, remove_columns=['text'], load_from_cache_file=True)
+print(wikitext_tokenized)
+
+# 2. 分成大小一致的chunk
+chunk_size = 128
+def generate_chunks(examples):
+    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+    # 计算此 batch 的样本拼接后的总长度，list(examples.keys())[0] 就是 input_ids 这个key
+    total_length = len(concatenated_examples[list(examples.keys())[0]])
+    # 对于最后一个chunk，它的长度可能小于 chunk_size，这里直接丢弃
+    total_length = (total_length // chunk_size) * chunk_size
+    # 对拼接后的 token 序列按照 chunk_size 进行分割
+    # k 依次是 input_ids, attention_mask, word_ids —— 也就是依然是这 3 个特征
+    result = {
+        k: [t[i: i + chunk_size] for i in range(0, total_length, chunk_size)]
+        for k, t in concatenated_examples.items()
+    }
+    # Create a new labels column —— 这个 label 后面会作为 mask 词的预测标签
+    result["labels"] = result["input_ids"].copy()
+    return result
+
+wikitext_chunks = wikitext_tokenized.map(generate_chunks, batched=True, load_from_cache_file=True)
 
 # 3. 设置训练数据生成器
-data_collator = DataCollatorForLanguageModeling()
+wikitext_collator = DataCollatorForWholeWordMask(tokenizer=custom_tokenizer, mlm_probability=0.15)
+wikitext_dataloader = DataLoader(dataset=wikitext_chunks, batch_size=24, shuffle=True, collate_fn=wikitext_collator)
 
+# %% ------------------- 初始化模型 -----------------------
+# 初始化一个新的 BERT 模型
+custom_config = BertConfig(
+    vocab_size=custom_tokenizer.vocab_size, hidden_size=768, num_hidden_layers=12, num_attention_heads=8,
+    intermediate_size=2048,
+)
+# custom_bert = BertForPreTraining(custom_config)
+custom_bert = BertForMaskedLM(custom_config)
 
-
-# %% 加载 Bert的 配置文件，Tokenizer 和 预训练模型
-# base_path = r"/Users/danielzhang/Documents/Python-Projects/DataAnalysis/bert-pretrained-models"
-base_path = r"D:\Project-Workspace\Python-Projects\DataAnalysis\bert-pretrained-models"
-model_path = os.path.join(base_path, "bert-base-uncased")
-config = BertConfig.from_pretrained(pretrained_model_name_or_path=model_path)
-bert_basic = BertModel.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
-bert_train = BertForPreTraining.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
-# bert_cls = BertForSequenceClassification.from_pretrained(pretrained_model_name_or_path=model_path, local_files_only=True)
-# 有了上述的 config 对象之后，可以直接使用上述的 config 对象创建各个模型（但是不能用于tokenizer的实例化），比如
-# bert_basic = BertModel(config)
-# bert_train = BertForPreTraining(config)
-# bert_cls = BertForSequenceClassification(config)
-
-# %% 使用 BertTokenizer
-sentence = ["After stealing money from the bank vault",
-            "the bank robber was seen fishing on the Mississippi river bank."]
-inputs = tokenizer(sentence, padding=True, return_tensors='pt')
-# 可以看下处理后的句子还原之后是什么样
-# inputs_decode = tokenizer.decode(token_ids=inputs['input_ids'][0])
-print('input_ids.shape: ', inputs['input_ids'].shape)
-print('token_type_ids.shape: ', inputs['token_type_ids'].shape)
-print('attention_mask.shape: ', inputs['attention_mask'].shape)
-
-
-# %% 使用 BertModel
-# 将加载的预训练模型置于 evaluation 状态，这样会关闭其中的 dropout
-bert_basic.eval()
-with torch.no_grad():
-    # 可以直接将 tokenizer 得到的输出作为输入，只要使用拆包技巧就行
-    outputs = bert_basic(**inputs, output_hidden_states=True, output_attentions=True)
-
-# 两个句子: batch_size=2, 每个句子序列的长度 sequence_length=14,
-# 最后一层的 hidden_size=768 —— 这个由预训练模型的配置决定
-print(outputs.last_hidden_state.shape)
-# 对应于 [CLS] token 的 embedding，2 个句子，所以返回了两个
-print(outputs.pooler_output.shape)
-# 查看每一个隐藏层的状态
-print(len(outputs.hidden_states))
-# Embedding 层的 隐状态
-print(outputs.hidden_states[0].shape)
-# 第一个 self-attention 层的 隐状态
-print(outputs.hidden_states[1].shape)
-# 第一个 self-attention 层的 atttention shape
-# 2 个句子 batch_size=2, 12 个 heads, sequence_length=14, sequence_length=14
-print(outputs.attentions[0].shape)
-
-t = outputs.to_tuple()
-t0, t1, t2, t3 = outputs
-
-
-
-# %% 使用 BertForPreTraining
-outputs = bert_train(**inputs, output_hidden_states=True, output_attentions=True)
-
-
-
-# %% 使用 BertForSequenceClassification
+# %% ------------------ 训练模型 -----------------------
+# GPU 设置
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+custom_bert.cuda(device)
+# print(device)
+# 定义优化器
+optimizer = optim.SGD(params=custom_bert.parameters(), lr=0.1)
+# 进行训练
+num_train_epochs = 5
+loss = 0
+print(f"training on device: {device}")
+start_time = time()
+for epoch in range(1, num_train_epochs+1):
+    custom_bert.train()
+    for batch_num, batch in enumerate(wikitext_dataloader, start=1):
+        input_ids, labels = batch['input_ids'], batch['labels']
+        input_ids = input_ids.to(device)
+        labels = labels.to(device)
+        optimizer.zero_grad()
+        outputs = custom_bert(input_ids=input_ids, labels=labels)
+        loss = outputs.loss
+        if batch_num % 100 == 0:
+            print(f"training loss at batch '{batch_num}' of epoch '{epoch}' is: {loss}")
+        loss.backward()
+        optimizer.step()
+    print(f"training loss finally at epoch '{epoch}' is : {loss}")
+end_time = time()
+total_time = end_time - start_time
+print(f"total training time is : {total_time}")
