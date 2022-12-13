@@ -367,3 +367,25 @@ for task in pending:
 group = asyncio.gather(*pending, return_exceptions=True)
 loop.run_until_complete(group)
 loop.close()
+
+
+# ---------------------------------------------------------
+# 异步编程需要注意的使用事项
+async def fun():
+    result = {'result': 'test result'}
+    # 这里必须要加上 await
+    await asyncio.sleep(1)
+    return result
+
+async def main():
+    # 不加 await 调用fun 时，得到的是一个 协程对象，不是该函数的返回结果 ！！！！
+    # 下面这句会引发 RuntimeWarning: coroutine 'fun' was never awaited
+    res1 = fun()
+    print("res1.__class__: ", type(res1))
+    print("res1: ", res1)
+    # 只有 await + 调用fun 时，得到的才是函数的返回结果
+    res2 = await fun()
+    print("res2.__class__: ", type(res2))
+    print("res2: ", res2)
+
+asyncio.run(main())
