@@ -352,6 +352,9 @@ async def main_parallel():
     await task4
     print("---------------------")
     await task5
+    # 上面 task5 可以改为下面一句，但是这样的话，就会看到 task5 是最后执行的，并且执行顺序没有被中断，
+    # 不像上面调用 asyncio.create_task 那样在创建 Task 对象的时候就开始执行了
+    # await say_after(1, 'task5')
 
 asyncio.run(main_parallel())
 
