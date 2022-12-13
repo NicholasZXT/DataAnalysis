@@ -14,17 +14,29 @@ def hello_generator(first_print, second_print):
     # yield from 'ab'
     print(second_print)
 
-
+# 检查函数定义（没有调用之前）的对象
 print(hello_generator)
+print(type(hello_generator))
+# 不是 generator
 print(inspect.isgenerator(hello_generator))
+# 也不是 协程
 print(inspect.iscoroutine(hello_generator))
+# 而是生成器函数(generatorfunction)
 print(inspect.isgeneratorfunction(hello_generator))
+# 不是 协程函数(coroutinefunction)
 print(inspect.iscoroutinefunction(hello_generator))
+# 检查函数调用之后的对象
 t1 = hello_generator('first', 'second')
+# 调用之后，才是 generator
 print(t1)
+print(type(t1))
+# 此时才是 generator
 print(inspect.isgenerator(t1))
+# 但依旧不是协程
 print(inspect.iscoroutine(t1))
+# 检查调用状态
 print(inspect.getgeneratorstate(t1))
+# 生成器可以使用 next() 激活，也可以使用 send(None) 激活
 t1.send(None)
 print(inspect.getgeneratorstate(t1))
 next(t1)
@@ -37,13 +49,18 @@ async def hello_coroutine(first_print, second_print):
     time.sleep(1)
     print(second_print)
 
-
+# 检查协程定义
 print(hello_coroutine)
+# 未调用之前，是function，并且是 coroutinefunction 类型
+print(type(hello_coroutine))
 print(inspect.iscoroutine(hello_coroutine))
 print(inspect.iscoroutinefunction(hello_coroutine))
+# 调用之后，才是协程类型
 t2 = hello_coroutine('first', 'second')
 print(t2)
+print(type(t2))
 print(inspect.iscoroutine(t2))
+# 查看协程状态
 print(inspect.getcoroutinestate(t2))
 # 原生协程不可以使用 next 激活，可以调用 send(None) 激活
 next(t2)
@@ -60,17 +77,28 @@ async def hello_mix(first_print, second_print):
     print(second_print)
 
 print(hello_mix)
+# 类型仍然是 function
+print(type(hello_mix))
+# 不是协程
 print(inspect.iscoroutine(hello_mix))
+# 不是生成器
 print(inspect.isgenerator(hello_mix))
+# 不是异步生成器
 print(inspect.isasyncgen(hello_mix))
+# 是异步生成器函数
+print(inspect.isasyncgenfunction(hello_mix))
+# 不是下面两种类型的函数
 print(inspect.iscoroutinefunction(hello_mix))
 print(inspect.isgeneratorfunction(hello_mix))
-print(inspect.isasyncgenfunction(hello_mix))
+# 检查调用对象
 t3 = hello_mix('first', 'second')
 print(t3)
+# 类型是 async_generator
+print(type(t3))
+print(inspect.isasyncgen(t3))
+# 不是下面两种类型
 print(inspect.iscoroutine(t3))
 print(inspect.isgenerator(t3))
-print(inspect.isasyncgen(t3))
 # 没有可以检查异步生成器状态的方法
 print(inspect.getgeneratorstate(t3))
 print(inspect.getcoroutinestate(t3))
@@ -103,10 +131,13 @@ async def hello_await(first_print, second_print):
 
 
 print(hello_await)
+print(type(hello_await))
 print(inspect.iscoroutine(hello_await))
 print(inspect.iscoroutinefunction(hello_await))
+# 调用后，返回协程对象
 t4 = hello_await('first', 'second')
 print(t4)
+print(type(t4))
 print(inspect.iscoroutine(t4))
 print(inspect.getcoroutinestate(t4))
 t4.send(None)
@@ -116,12 +147,15 @@ asyncio.run(t4)
 
 
 # ======================= asyncio 的使用 ================================
-# asyncio 所实现的异步编程有3个核心内容：1. 事件循环；2.协程；3.对协程对象的封装: Future或者Task对象
-# 协程用于定义和封装需要执行代码，Task对象或者Future对象用于封装协程，驱动协程的执行，事件循环用于排定多个Task对象，在Task对象中转移控制权
+# asyncio 所实现的异步编程有3个核心内容：1. 事件循环；2.协程；3.对协程对象的封装: Task对象
+# 协程用于定义和封装需要执行代码，Task对象用于封装协程（它是Future对象的子类），驱动协程的执行，事件循环用于排定多个Task对象，在Task对象中转移控制权
 
 # 定义一个协程，其中 await 了其他的协程，注意，这里面没有使用 asyncio 提供的任何函数
 async def fun_1():
     print(f"fun_1 start")
+    # 使用 await 的地方，会在之后的异步函数执行开始之后，暂停当前函数的执行，等到其他异步函数执行完了，再继续执行——这和正常函数调用栈一样
+    # 不同的地方在于，异步的调用只能保证顺序为 fun_1 > hello_coroutine('c1', 'c2')  > hello_coroutine('c3', 'c4')
+    # 但是不能保证 hello_coroutine('c1', 'c2') 返回后马上继续执行 hello_coroutine('c3', 'c4')
     await hello_coroutine('c1', 'c2')
     await hello_coroutine('c3', 'c4')
     print(f"fun_1 end")
@@ -155,7 +189,7 @@ asyncio.run(f2)
 async def main1():
     """
     这里的异步执行结果和同步执行是一样的，具体原因如下：
-    此处没有向asyncio的事件循环里注册任何协程，所以事件循环里只有一个协程——通过asyncio.run(main1())提交的本协程，
+    此处没有向asyncio的事件循环里注册任何协程，所以事件循环里只有一个协程——通过asyncio.run(main1())提交的 main1 协程，
     运行到每个 await 处时，会将控制权转移给下一个协程 say_after，say_after协程本身不在asyncio的事件循环里，
     虽然 say_after 内部 await 了 asyncio.sleep()，将控制权交给了事件循环，但事件循环里处理时，找不到下一个可以执行的协程，
     仅有的 main1()协程需要等 await 返回结果，于是就等待1秒后继续执行 asyncio.sleep()，返回结果，执行完成 say_after，再继续执行 main1() 协程.
@@ -174,7 +208,8 @@ async def main2():
     此处展示的是 asyncio 的常规使用方式，有两个要点：
     1. 将每个协程先注册成事件循环里的Task对象
     2. 后续 await 对应的Task对象
-    之后使用 asyncio.run(main2()) 之后，就能看到 task1, task2 对应的协程是异步执行的了.
+    之后使用 asyncio.run(main2()) 之后，就能看到 task1, task2 对应的协程是异步执行的了，并且这里一定是 task1 和 task2 执行完毕后，
+    再执行 main2 的收尾工作.
     """
     print(f"started at {time.strftime('%X')}")
     # 使用 Task 包装协程，并使用 await —— 这是常规的使用方式
@@ -185,6 +220,7 @@ async def main2():
     print(f"middle at {time.strftime('%X')}.")
     await task2
     print(f"finished at {time.strftime('%X')}")
+
 
 # main2() 展示了 asyncio 里协程的常规用法，但有两个问题需要探究：
 # 1. 将协程注册成 Task 到底意味着什么
@@ -202,7 +238,7 @@ async def main3():
     但是 由于此时 main3() 协程已经执行完了，事件循环就退出了，即使此时 task1 和 task2 还处于执行过程中
     """
     print(f"started at {time.strftime('%X')}")
-    # 使用Task对象包装协程，但是没有 await
+    # 使用Task对象包装协程，但是没有 await，这里创建封装协程的Task的时候，就已经将该协程排进了事件循环里了
     task1 = asyncio.create_task(say_after(1, 'task1'))
     task2 = asyncio.create_task(say_after(2, 'task2'))
     print(f"middle at {time.strftime('%X')}.")
@@ -263,11 +299,61 @@ async def main5():
     print(f"finished at {time.strftime('%X')}")
 
 # 测试上述的 main 函数
-asyncio.run(main1())
-asyncio.run(main2())
-asyncio.run(main3())
-asyncio.run(main4())
-asyncio.run(main5())
+def run_main():
+    asyncio.run(main1())
+    asyncio.run(main2())
+    asyncio.run(main3())
+    asyncio.run(main4())
+    asyncio.run(main5())
+
+
+# -------------------------------------------------------------------
+# 下面的这个例子，用来展示 await 下，异步编程的执行逻辑和顺序编程的执行逻辑的区别
+# 创建两个子任务，其中分别运行一些协程
+async def sub1():
+    print(f"sub1 started at {time.strftime('%X')}.")
+    task1 = asyncio.create_task(say_after(1, 'task1'))
+    task3 = asyncio.create_task(say_after(2, 'task3'))
+    await task1
+    print(f"sub1 finished at {time.strftime('%X')}.")
+    # 注意，这里没有 await task3， 而是直接返回了
+    return task3
+
+async def sub2():
+    print(f"sub2 started at {time.strftime('%X')}.")
+    task2 = asyncio.create_task(say_after(2, 'task2'))
+    task4 = asyncio.create_task(say_after(1, 'task4'))
+    # 这里通过 await 将控制权交给另一个协程
+    await task2
+    print(f"sub2 finished at {time.strftime('%X')}.")
+    return task4
+
+# 使用这个main函数主要是为了并行调用这两个协程内部的操作，因为 asyncio.run() 只能接受一个入口函数
+async def main_parallel():
+    """
+    观察输出的顺序，会发现：
+    1. main_parallel 里，先后 await 了 sub1 和 sub2，那么就一定能保证在 sub1 和 sub2 执行完之后，再执行 main_parallel 的收尾工作
+    2. sub1 里，先后将 task1 和 task3 加入了事件循环，但是只 await task1，那么只能保证 task1 执行结束后再执行 sub1 的收尾工作，不能保证
+       task3 在 sub1 内部结束 —— 实际上，task3 的结束是在 sub2 开始之后
+    3. 异步编程的 await 最大的影响是改变了 **函数调用栈** 的情况 ------------------------------------ KEY
+       以 sub1 为例，通常的函数调用栈下，应当是 sub1入栈 -> task1入栈 -> task1出栈 -> task3入栈 -> task3 出栈 -> sub1出栈 这个顺序，
+       并且一定是 **连续的顺序**，但是在异步编程里，只能保证 [sub1入栈, task1入栈, task1出栈, sub1出栈] 这个大致顺序，不能保证连续执行，
+       也不保证 task1出栈 一定在 task3入栈 之前；而且由于没有 await task3，所以 task3 的出栈不一定在 sub1出栈之前.
+    4. sub2 的执行流程里，插入了 task3结束的部分，并且由于 sub2 也只是创建了 task4，没有 await task4，task4 的执行结束并不一定在 sub2
+        结束之前，要看 task4 的 asyncio.sleep(delay) 时间设置
+    5. 两个分隔线的打印顺序也不是预期的那样，分隔了 task3 和 task4 的打印结果，这也是因为 await 之前，sub1 和 sub2 就已经执行了，await
+       只是表示当前的协程必须要等 该协程完成才继续执行而已
+    """
+    task5 = asyncio.create_task(say_after(1, 'task5'))
+    task3 = await sub1()
+    task4 = await sub2()
+    await task3
+    print("---------------------")
+    await task4
+    print("---------------------")
+    await task5
+
+asyncio.run(main_parallel())
 
 
 # ---------- asyncio.run() 底层的操作 -------------
