@@ -61,6 +61,9 @@ def __Pytorch_Transformer():
 def __PyTorch_Transformer_IMDB():
     pass
 
+input_size = 96
+hidden_size = 48
+seq_length = 95
 class ImdbTransformer(nn.Module):
     def __init__(self, input_size, hidden_size, seq_length):
         super().__init__()
