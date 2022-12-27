@@ -13,26 +13,25 @@ from transformers import TextDatasetForNextSentencePrediction
 # import warnings
 # warnings.filterwarnings('ignore')
 
-# CWD = r"D:\Project-Workspace\Python-Projects\DataAnalysis"
-CWD = r"C:\Users\Drivi\Python-Projects\DataAnalysis"
+LOCAL_DATA_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets"
+LOCAL_MODELS_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\bert-pretrained-models"
 
-
-# %% ------------ 使用 IMDB 数据集来 Fine-tune ------------
+# %% ------------ 使用huggingface-hub上的 IMDB 数据集来 Fine-tune ------------
 # data_name = 'imdb'
-data_name = os.path.join(CWD, 'datasets', 'huggingface', 'imdb.py')
+data_name = os.path.join(LOCAL_DATA_PATH, 'huggingface', 'imdb.py')
 print(get_dataset_config_names(data_name))
 print(get_dataset_split_names(data_name))
 imdb = load_dataset(data_name, split='unsupervised')
 print(imdb)
 
 
-# ****************** 使用 Masked Language Model 来 fine-tune BERT 模型 ****************
-def __Fine_Tune_By_MLM():
+# ============== 使用 Masked Language Model 来 fine-tune BERT 模型 ==============
+def __Fine_tune_by_MLM():
     pass
 
-# %% ----------- 加载 Bert 模型 -----------------
+# %% ----------- Step 1: 加载 Bert 模型 -----------------
 # BERT-base模型
-model_path = os.path.join(CWD, 'bert-pretrained-models', 'bert-base-uncased')
+model_path = os.path.join(LOCAL_MODELS_PATH, 'bert-base-uncased')
 tokenizer = BertTokenizerFast.from_pretrained(model_path)
 config = BertConfig.from_pretrained(model_path)
 # 需要手动设置输出 attentions 和 hidden_states
@@ -49,11 +48,11 @@ model_mlm = BertForMaskedLM(config)
 # print(tokenizer.is_fast)
 
 
-# %% --------------- 处理数据 -----------------------
+# %% --------------- Step 2: 处理数据 -----------------------
 # 对于 Masked Language Model，在准备训练语料的时候，通常的做法是将 一个batch里 所有样本的文本段落拼在一起，然后按照固定长度分成 chunk，用这些
 # chunk 作为训练语料，在输入模型之前，还需要对训练语料进行 随机 mask 处理
 
-# 1. 首先使用 tokenizer 进行分词，在分词的过程中，还要新增一个 word_ids，记录下每个batch中，句子token的下标
+# (1) 首先使用 tokenizer 进行分词，在分词的过程中，还要新增一个 word_ids，记录下每个batch中，句子token的下标
 # examples = imdb['text'][0:5]
 # result = tokenizer(examples)
 # print(len(result["input_ids"]))
@@ -73,7 +72,7 @@ imdb_tokenized = imdb.map(tokenize_function, batched=True, remove_columns=["text
 # 可以看出，样本数量没变，但是 features 由 ['text', 'label'] --> ['input_ids', 'attention_mask', 'word_ids']
 # print(imdb_tokenized)
 
-# 2. 分词结束后，需要将 一个batch 里的所有样本拼接起来，然后按照固定长度(chunk_size)分割成 chunk
+# (2) 分词结束后，需要将 一个batch 里的所有样本拼接起来，然后按照固定长度(chunk_size)分割成 chunk
 chunk_size = 128
 # chunk_size = 16
 # 使用下面的函数完成操作
@@ -106,8 +105,7 @@ print(imdb_chunks)
 # print(imdb_chunks['labels'][0])
 # print(tokenizer.decode(imdb_chunks['labels'][0]))
 
-
-# 3. 对数据集进行分割 chunk 之后，还需要每个chunk中的 token 进行随机 mask，这一步是通过 DataCollatorForLanguageModeling 完成的
+# (3) 对数据集进行分割 chunk 之后，还需要每个chunk中的 token 进行随机 mask，这一步是通过 DataCollatorForLanguageModeling 完成的
 # 使用 tokenizer 初始化 DataCollator 对象，因为要使用 tokenizer 中的特殊token来进行mask
 # 下面这个只能 mask 分词后的 subword 对应的 token
 # lm_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15)
@@ -127,11 +125,11 @@ lm_collator = DataCollatorForWholeWordMask(tokenizer=tokenizer, mlm_probability=
 # labels 中，除了被 mask 的 token， 其他位置的 token 都被转成了 -100
 # print(res['labels'][0])
 
-# 4. 将上述的数据封装成 pytorch 的 DataLoader
+# (4) 将上述的数据封装成 pytorch 的 DataLoader
 imdb_dataloader = DataLoader(dataset=imdb_chunks, batch_size=16, shuffle=True, collate_fn=lm_collator)
 
 
-# %% ---------------- Fine-Tune 模型 ------------------------
+# %% ---------------- Step 3:  Fine-Tune 模型 ------------------------
 # 查看下MLM模型输出
 # test_batch_size = 4
 # sample = [imdb_chunks[i] for i in range(test_batch_size)]
@@ -191,12 +189,14 @@ print(f"total training time is : {total_time}")
 # RTX 3060-12G, batch_size=60, chunk_size=128, 1个epoch耗时 1861.36 秒, loss=6.684980869293213
 
 
-# ****************** 使用 Next Sentenct Prediction 来 fine-tune BERT 模型 ****************
-def __Fine_Tune_By_NSP():
+
+
+# ============== 使用 Next Sentence Prediction 来 fine-tune BERT 模型 ==============
+def __Fine_tune_by_NSP():
     pass
 
-# %% -------------- 加载模型 ----------------
-model_path = os.path.join(CWD, 'bert-pretrained-models', 'bert-base-uncased')
+# %% -------------- Step 1: 加载模型 ----------------
+model_path = os.path.join(LOCAL_MODELS_PATH, 'bert-base-uncased')
 tokenizer = BertTokenizerFast.from_pretrained(model_path)
 config = BertConfig.from_pretrained(model_path)
 # 需要手动设置输出 attentions 和 hidden_states
@@ -206,26 +206,25 @@ config = BertConfig.from_pretrained(model_path)
 model_nsp = BertForNextSentencePrediction(config)
 
 
-# %% --------------  处理数据 -----------------
+# %% -------------- Step 2: 处理数据 -----------------
 # TODO 这里没有现成的数据可供使用，操作比较麻烦
 def nsp_tokenize(examples):
     pass
 
+# %% --------------- Step 3: Fine-Tune 模型 ------------------
 
 
-# %% ---------------  Fine-Tune 模型 ------------------
 
 
-
-# ***************** 基于 wikitext 语料，训练一个 Tokenizer *****************
-def __Training_tokenizer():
+# ============== 基于 wikitext 语料，训练一个 Tokenizer ==============
+def __Training_tokenizer_on_wikitext():
     pass
 
 # %% ---------------- 加载数据集 -----------------------
 # 只使用数据集名称，会下载数据处理脚本，速度慢一些，后续各种查询元数据信息也会比较慢
 # path = 'wikitext'
 # 使用已经下载好的 数据集脚本 会快一些
-path = os.path.join(CWD, 'datasets', 'huggingface', 'wikitext.py')
+path = os.path.join(LOCAL_DATA_PATH, 'huggingface', 'wikitext.py')
 # 查看该数据集下的配置，也就是有哪些子数据集可供使用
 get_dataset_config_names(path)
 # 选定子数据集
@@ -287,7 +286,7 @@ tokenizer.post_processor = processors.TemplateProcessing(
 )
 
 # 7. 保存训练的 tokenizer
-tokenizer_path = os.path.join(CWD, 'datasets', 'huggingface', f"{split}_tokenizer.json")
+tokenizer_path = os.path.join(LOCAL_DATA_PATH, 'huggingface', f"{split}_tokenizer.json")
 tokenizer.save(tokenizer_path)
 # 读取
 tokenizer = Tokenizer.from_file(tokenizer_path)
@@ -304,13 +303,14 @@ print(pair_encoding.type_ids)
 print(pair_encoding.attention_mask)
 
 
-# ****************** 基于 wikitext 语料，从头开始训练 BERT 模型 ****************
-def __Training_Bert():
+
+# ============== 基于 wikitext 语料，从头开始训练 BERT 模型 ==============
+def __Training_bert_on_wikitext():
     pass
 
 # %% ------------------- 封装 Tokenizer 对象 ------------------
 # 1. 加载上面训练好的 tokenizer
-tokenizer_path = os.path.join(CWD, 'datasets', 'huggingface', f"{split}_tokenizer.json")
+tokenizer_path = os.path.join(LOCAL_DATA_PATH, 'huggingface', f"{split}_tokenizer.json")
 raw_tokenizer = Tokenizer.from_file(tokenizer_path)
 # 注意，这个 tokenizer 是 tokenizers包中的 Tokenizer 类对象，不能直接被transformer直接使用
 print(type(raw_tokenizer))

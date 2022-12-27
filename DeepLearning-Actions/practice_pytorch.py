@@ -1,80 +1,77 @@
 # packages import
+import os
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.datasets import load_files
 import spacy
-
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
 from torchvision import datasets, transforms as T
 
+LOCAL_DATA_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets"
+BATCH_SIZE = 10
 
 # %% ---------------- CNN练习 -------------------------
 def __CNN():
-    pass
-# 用于将tensor压平的匿名函数
-flatten = lambda t: torch.flatten(t)
+    # 用于将tensor压平的匿名函数
+    flatten = lambda t: torch.flatten(t)
+    data_path = os.path.join(LOCAL_DATA_PATH, r'PyTorch\MNIST')
+    # 上面得到的每张图像是 28x28 的矩阵，下面将每张图片进行了拉直，也就是转换成一个 28x28=784 的向量
+    mnist_train = datasets.MNIST(root=data_path, train=True, download=True,
+                                 transform=T.Compose([T.ToTensor(), T.Lambda(flatten)]))
+    mnist_test = datasets.MNIST(root=data_path, train=False, download=True,
+                                transform=T.Compose([T.ToTensor(), T.Lambda(flatten)]))
+    # 如果采用CNN网络，就不需要拉平这一步的变换
+    mnist_train = datasets.MNIST(root=data_path, train=True, download=True, transform=T.ToTensor())
+    mnist_test = datasets.MNIST(root=data_path, train=False, download=True, transform=T.ToTensor())
 
-# 上面得到的每张图像是 28x28 的矩阵，下面将每张图片进行了拉直，也就是转换成一个 28x28=784 的向量
-mnist_train = datasets.MNIST(root='./datasets/PyTorch/', train=True, download=True,
-                             transform=T.Compose([T.ToTensor(), T.Lambda(flatten)]))
-mnist_test = datasets.MNIST(root='./datasets/PyTorch/', train=False, download=True,
-                            transform=T.Compose([T.ToTensor(), T.Lambda(flatten)]))
-# 如果采用CNN网络，就不需要拉平这一步的变换
-mnist_train = datasets.MNIST(root='./datasets/PyTorch/', train=True, download=True, transform=T.ToTensor())
-mnist_test = datasets.MNIST(root='./datasets/PyTorch/', train=False, download=True, transform=T.ToTensor())
+    # t1 = mnist_train[0][0]
+    # t2 = mnist_train[0][1]
+    # d = mnist_train.data
+    # t3 = mnist_train.__getitem__(0)
 
-# t1 = mnist_train[0][0]
-# t2 = mnist_train[0][1]
-# d = mnist_train.data
-# t3 = mnist_train.__getitem__(0)
+    # 数据加载器
+    mnist_train_loader = DataLoader(mnist_train, batch_size=BATCH_SIZE)
+    dataiter = iter(mnist_train_loader)
+    batch_data, batch_label = next(dataiter)
+    print(batch_data.__class__, ', ', batch_data.shape)
 
-# 数据加载器
-BATCH_SIZE = 10
-mnist_train_loader = DataLoader(mnist_train, batch_size=BATCH_SIZE)
-dataiter = iter(mnist_train_loader)
-batch_data, batch_label = next(dataiter)
-print(batch_data.__class__, ', ', batch_data.shape)
+    # 卷积层使用
+    # 2张 4x4x3的图片，3 是通道数，这里将通道数提前了
+    imgs = np.arange(2*4*4*3, dtype=np.float32).reshape((2, 3, 4, 4))
+    imgs_tensor = torch.tensor(imgs)
 
-# 卷积层使用
-# 2张 4x4x3的图片，3 是通道数，这里将通道数提前了
-imgs = np.arange(2*4*4*3, dtype=np.float32).reshape((2, 3, 4, 4))
-imgs_tensor = torch.tensor(imgs)
+    # 卷积层
+    # 卷积核的形状为 2x2x3x2，其中3对应于in_channels, 2对应于out_channels, 2x2是kernel_size
+    # 这里步长stride=1，不做padding
+    conv = nn.Conv2d(in_channels=3, out_channels=2, kernel_size=(2, 2), stride=1, padding=0, bias=True, padding_mode='zeros')
+    res = conv(imgs_tensor)
 
-# 卷积层
-# 卷积核的形状为 2x2x3x2，其中3对应于in_channels, 2对应于out_channels, 2x2是kernel_size
-# 这里步长stride=1，不做padding
-conv = nn.Conv2d(in_channels=3, out_channels=2, kernel_size=(2, 2), stride=1, padding=0, bias=True, padding_mode='zeros')
-res = conv(imgs_tensor)
+    # 原始图片为 2 张 3通道的 4x4 图片
+    print(imgs_tensor.shape)
+    # 经过卷积层之后，变成了 2 张 2通道的 3x3 图片
+    print(res.shape)
 
-# 原始图片为 2 张 3通道的 4x4 图片
-print(imgs_tensor.shape)
-# 经过卷积层之后，变成了 2 张 2通道的 3x3 图片
-print(res.shape)
+    # 卷积函数，可以自定义卷积核
+    # 自定义的卷积核，包含2个过滤器，分别为 [[1,0], [1,0]], [[0,1],[0,1]]，三个通道都是一样的
+    kernel = torch.tensor(np.array([1, 1, 0, 0] * 3 + [0, 0, 1, 1] * 3, dtype=np.float32).reshape((2, 3, 2, 2), order='F'))
+    # 卷积核shape 为 2x3 x 2x2，2对应于输出的 channel——也就是两个过滤器,3对应于输入的channel,2x2是卷积的长宽
+    print(kernel.shape)
 
+    # 使用自定义卷积核的结果
+    res_2 = nn.functional.conv2d(input=imgs_tensor, weight=kernel, bias=None, stride=1, padding=0)
+    # 得到的结果为 2 x 2 x3x3, 2张 2通道的 3x3图片
+    print(res_2.shape)
 
-# 卷积函数，可以自定义卷积核
-# 自定义的卷积核，包含2个过滤器，分别为 [[1,0], [1,0]], [[0,1],[0,1]]，三个通道都是一样的
-kernel = torch.tensor(np.array([1, 1, 0, 0] * 3 + [0, 0, 1, 1] * 3, dtype=np.float32).reshape((2, 3, 2, 2), order='F'))
-# 卷积核shape 为 2x3 x 2x2，2对应于输出的 channel——也就是两个过滤器,3对应于输入的channel,2x2是卷积的长宽
-kernel.shape
-
-# 使用自定义卷积核的结果
-res_2 = nn.functional.conv2d(input=imgs_tensor, weight=kernel, bias=None, stride=1, padding=0)
-# 得到的结果为 2 x 2 x3x3, 2张 2通道的 3x3图片
-print(res_2.shape)
-
-
-# --------------- 池化层 ----------------
-# 池化窗口大小为 2x2， 步长=2
-pool = nn.MaxPool2d(kernel_size=(2, 2), stride=2, padding=0)
-# 原始的shape
-print(imgs_tensor.shape)
-res_3 = pool(imgs_tensor)
-print(res_3.shape)
+    # --------------- 池化层 ----------------
+    # 池化窗口大小为 2x2， 步长=2
+    pool = nn.MaxPool2d(kernel_size=(2, 2), stride=2, padding=0)
+    # 原始的shape
+    print(imgs_tensor.shape)
+    res_3 = pool(imgs_tensor)
+    print(res_3.shape)
 
 
 # %% -------------------- RNN练习拟合sin函数 ---------------------
@@ -151,7 +148,7 @@ print(train_X.shape, ', ', train_y.shape, ', ', test_X.shape, ', ', test_y.shape
 
 
 # %%  训练模型
-class RnnSin(nn.Module):
+class RnnSinModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.rnn = nn.RNN(input_size=1, hidden_size=5, num_layers=1, nonlinearity='relu', bias=False, batch_first=True)
@@ -165,33 +162,34 @@ class RnnSin(nn.Module):
         out = self.linear(rnn_out_flat)
         return out
 
-# 初始化模型
-sin_rnn = RnnSin()
-# 定义损失函数
-mse = nn.MSELoss()
-# 定义优化器
-optimizer = optim.SGD(params=sin_rnn.parameters(), lr=0.1)
+def RNN_train():
+    # 初始化模型
+    sin_rnn = RnnSinModel()
+    # 定义损失函数
+    mse = nn.MSELoss()
+    # 定义优化器
+    optimizer = optim.SGD(params=sin_rnn.parameters(), lr=0.1)
 
-for epoch in range(1, 31):
-    # 获取预测值
-    sin_pred = sin_rnn(train_X)
-    # sin_pred.shape
-    # 清空梯度
-    optimizer.zero_grad()
-    # 计算损失函数
-    loss = mse(sin_pred, train_y)
-    # 计算梯度
-    loss.backward()
-    # 使用优化器更新参数
-    optimizer.step()
-    # 新的MSE损失
-    sin_pred_new = sin_rnn(train_X)
-    train_loss = mse(sin_pred_new, train_y)
-    pred_y = sin_rnn(test_X)
-    test_loss = mse(pred_y, test_y)
-    # print(loss)
-    print("epoch {:2} ---- training MSE-Loss  is：{:.4f}".format(epoch, train_loss))
-    print("epoch {:2} ---- testing  MSE-Loss  is：{:.4f}".format(epoch, test_loss))
+    for epoch in range(1, 31):
+        # 获取预测值
+        sin_pred = sin_rnn(train_X)
+        # sin_pred.shape
+        # 清空梯度
+        optimizer.zero_grad()
+        # 计算损失函数
+        loss = mse(sin_pred, train_y)
+        # 计算梯度
+        loss.backward()
+        # 使用优化器更新参数
+        optimizer.step()
+        # 新的MSE损失
+        sin_pred_new = sin_rnn(train_X)
+        train_loss = mse(sin_pred_new, train_y)
+        pred_y = sin_rnn(test_X)
+        test_loss = mse(pred_y, test_y)
+        # print(loss)
+        print("epoch {:2} ---- training MSE-Loss  is：{:.4f}".format(epoch, train_loss))
+        print("epoch {:2} ---- testing  MSE-Loss  is：{:.4f}".format(epoch, test_loss))
 
 
 # %% ------------------IMDB数据集加载---------------------
@@ -254,7 +252,7 @@ class ImdbDataset(Dataset):
             return sen_vec[:seq_length, :]
         else:
             pad_len = int(seq_length-sen_vec.shape[0])
-            sen_vec_pad = np.pad(array=sen_vec, pad_width=((0,pad_len),(0,0)), mode='constant', constant_values=0)
+            sen_vec_pad = np.pad(array=sen_vec, pad_width=((0, pad_len), (0, 0)), mode='constant', constant_values=0)
             return sen_vec_pad
 
     def __len__(self):
@@ -264,17 +262,16 @@ class ImdbDataset(Dataset):
         return self.doc_vector[item, :, :], self.label[item]
 
 
-imdb_train = ImdbDataset(filepath='./datasets/aclImdb/train/', part=20)
-imdb_test = ImdbDataset(filepath='./datasets/aclImdb/test/', part=10)
+imdb_train = ImdbDataset(filepath=os.path.join(LOCAL_DATA_PATH, r'aclImdb/train'), part=20)
+imdb_test = ImdbDataset(filepath=os.path.join(LOCAL_DATA_PATH, r'aclImdb/test'), part=10)
 # doc_vector = imdb_train.doc_vector
 # doc_vector.shape
 # doc_label = imdb_train.label
 # doc_label.shape
 
 # 构建数据加载器
-batch_size = 5
-imdb_train_loader = DataLoader(dataset=imdb_train, batch_size=batch_size)
-imdb_test_loader = DataLoader(dataset=imdb_test, batch_size=batch_size)
+imdb_train_loader = DataLoader(dataset=imdb_train, batch_size=BATCH_SIZE)
+imdb_test_loader = DataLoader(dataset=imdb_test, batch_size=BATCH_SIZE)
 # imdb_train_loader = DataLoader(dataset=imdb_train, batch_size=batch_size, num_workers=4)
 # imdb_test_loader = DataLoader(dataset=imdb_test, batch_size=batch_size, num_workers=4)
 # # 检查使用
@@ -298,26 +295,27 @@ class ImdbLSTM(nn.Module):
         y_pred = self.linear(lstm_flatten)
         return y_pred
 
-# 初始化模型
-lstm_rnn = ImdbLSTM(input_size=96, hidden_size=48, seq_length=20, num_layers=1)
-# 定义损失函数
-crossEnt = nn.CrossEntropyLoss()
-# 定义优化器
-optimizer = optim.SGD(params=lstm_rnn.parameters(), lr=0.1)
-# 测试
-# out = lstm_rnn(X)
-# loss = crossEnt(out, y.long())
 
-# 开始迭代训练
-for epoch in range(1,5):
-    for batch_id, (X, y) in enumerate(imdb_train_loader):
-        y_pred = lstm_rnn(X)
-        optimizer.zero_grad()
-        loss = crossEnt(y_pred, y.long())
-        loss.backward()
-        optimizer.step()
+def Imbd_train():
+    # 初始化模型
+    lstm_rnn = ImdbLSTM(input_size=96, hidden_size=48, seq_length=20, num_layers=1)
+    # 定义损失函数
+    crossEnt = nn.CrossEntropyLoss()
+    # 定义优化器
+    optimizer = optim.SGD(params=lstm_rnn.parameters(), lr=0.1)
+    # 测试
+    # out = lstm_rnn(X)
+    # loss = crossEnt(out, y.long())
+    # 开始迭代训练
+    for epoch in range(1, 5):
+        train_loss = 1000.0
+        for batch_id, (X, y) in enumerate(imdb_train_loader):
+            y_pred = lstm_rnn(X)
+            optimizer.zero_grad()
+            loss = crossEnt(y_pred, y.long())
+            loss.backward()
+            optimizer.step()
 
-        y_pred_new = lstm_rnn(X)
-        train_loss = crossEnt(y_pred_new, y.long())
-
-    print("train_loss: {:.4f}".format(train_loss))
+            y_pred_new = lstm_rnn(X)
+            train_loss = crossEnt(y_pred_new, y.long())
+        print("train_loss: {:.4f}".format(train_loss))
