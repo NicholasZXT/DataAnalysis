@@ -12,8 +12,10 @@ from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 
 from practice_pytorch import imdb_train_loader
-LOCAL_DATA_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets"
-LOCAL_MODELS_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\bert-pretrained-models"
+# LOCAL_DATA_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets"
+# LOCAL_MODELS_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\bert-pretrained-models"
+LOCAL_DATA_PATH = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets"
+LOCAL_MODELS_PATH = r"C:\Users\Drivi\Python-Projects\DataAnalysis\bert-pretrained-models"
 
 # %% ----------- pytorch Transformer-MultiheadAttention ---------------
 def __Pytorch_MultiHeadAttention():
