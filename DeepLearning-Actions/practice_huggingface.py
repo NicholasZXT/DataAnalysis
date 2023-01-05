@@ -13,8 +13,10 @@ from transformers import TextDatasetForNextSentencePrediction
 # import warnings
 # warnings.filterwarnings('ignore')
 
-LOCAL_DATA_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets"
-LOCAL_MODELS_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\bert-pretrained-models"
+# LOCAL_DATA_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets"
+# LOCAL_MODELS_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\bert-pretrained-models"
+LOCAL_DATA_PATH = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets"
+LOCAL_MODELS_PATH = r"C:\Users\Drivi\Python-Projects\DataAnalysis\bert-pretrained-models"
 
 # %% ------------ 使用huggingface-hub上的 IMDB 数据集来 Fine-tune ------------
 # data_name = 'imdb'
