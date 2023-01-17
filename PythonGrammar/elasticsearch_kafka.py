@@ -229,13 +229,14 @@ class EsClient:
         # 处理缺失值，np.nan 无法写入ES
         df = df.where(pd.notnull(df), None)
         for i, row in df.iterrows():
-            if count % 5000 == 0:
-                print(f'import data count is {count}')
+            if count > 0 and count % 5000 == 0:
+                print(f'import data count is {count}...')
             count += 1
             source = row.to_dict()
             action = {
                 "_index": index_name,
-                "_type": '_doc',  # if self.es7 else 'medvol',
+                # ES7.0 以后不需要
+                # "_type": '_doc',  # if self.es7 else 'medvol',
                 '_source': source
             }
             if id:
@@ -256,7 +257,7 @@ class EsClient:
             try:
                 for res in helpers.parallel_bulk(self.es, actions, chunk_size=50, request_timeout=10000, thread_count=2):
                     # res 是一个 长度=2 的tuple，第一个元素是True或者False，表示是否导入成功
-                    if (success+1) % 10000 == 0:
+                    if success > 0 and success % 10000 == 0:
                         print("do_bulk running, success for {} records".format(success))
                     if res[0]:
                         success += 1
