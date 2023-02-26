@@ -13,3 +13,4 @@ dataset/
 /DeepLearning-Actions/TensorBoard-Logs/
 /DeepLearning-Actions/TensorBoard-Logs/*
 /Others/task_flow.py
+/local-datasets/
