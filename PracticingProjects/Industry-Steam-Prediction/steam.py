@@ -2,15 +2,14 @@ import os
 import numpy as np
 import pandas as pd
 from typing import List
-from time import sleep
 import matplotlib.pyplot as plt
 import seaborn as sns
 plt.style.use("ggplot")
 from sklearn.linear_model import LinearRegression
 
 # %% 数据加载
-# DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
-DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+# DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
 train_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_train.txt'), delimiter='\t', header=0)
 test_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_test.txt'), delimiter='\t', header=0)
 X = train_data.drop(columns=['target'])
@@ -28,6 +27,9 @@ test_data_desc = test_data.describe()
 # %% 单变量分析，检查每个特征的分布，是否有缺失值，是否为偏态分布
 # 这里使用seaborn绘图，需要将数据转成long-format，每5个变量一组绘图展示
 def X_split(df: pd.DataFrame, split_num: int = 5):
+    """
+    对df中的列，按照 split_num 一组，进行分隔，然后 wide-to-long，用于seaborn绘图
+    """
     col_num = df.shape[1]
     splits = col_num // split_num
     dfs = []
@@ -41,6 +43,9 @@ def X_split(df: pd.DataFrame, split_num: int = 5):
     return dfs
 
 def X_plot(dfs: List[pd.DataFrame]):
+    """
+    每个df绘制一个Figure
+    """
     num = len(dfs)
     figs = []
     for i in range(num):
@@ -55,8 +60,10 @@ def X_plot(dfs: List[pd.DataFrame]):
         # fig.clear()
     return figs
 
-# 着重检查某个变量的图形
 def X_single_check(df: pd.DataFrame, V: str, show=True):
+    """
+    着重检查某个变量的图形
+    """
     fig = plt.figure(figsize=(8.0, 6.0), dpi=120)
     ax1 = fig.add_subplot(211)
     sns.boxplot(data=df, x=V, ax=ax1)
@@ -66,17 +73,54 @@ def X_single_check(df: pd.DataFrame, V: str, show=True):
         fig.show()
     return fig
 
-dfs = X_split(X)
-figs = X_plot(dfs)
-# for循环在pycharm中只能展示出4张图，所以只能手动显示
+def X_subplot(df: pd.DataFrame, rows: int = 4, cols: int = 2):
+    """
+    每个变量一个子图，每个Figure绘制一个 rows x cols 的图
+    """
+    figsize = (16.0, 8.0)
+    col_num = df.shape[1]
+    col_num_per_fig = rows * cols
+    fig_num = col_num // col_num_per_fig
+    figs = []
+    for i in range(fig_num):
+        fig = plt.figure(num=i+1, figsize=figsize, dpi=120)
+        for j in range(col_num_per_fig):
+            feature_num = i * col_num_per_fig + j
+            feature = 'V' + str(feature_num)
+            print(f"drawing subplot [{i+1}] with shape '({rows}, {cols})' for feature '{feature}'.")
+            ax = fig.add_subplot(rows, cols, j+1)
+            sns.boxplot(data=df, x=feature, ax=ax)
+            ax.set_ylabel(feature, rotation=0)
+            ax.set_xlabel('')
+            # ax.xaxis.set_visible(False)
+        figs.append(fig)
+    cols_remain = col_num % col_num_per_fig
+    final_rows = int(np.ceil(cols_remain / cols))
+    final_fig = plt.figure(num=fig_num, figsize=figsize, dpi=120)
+    # print(f"col_num: {col_num}, cols_remain: {cols_remain}")
+    for j in range(cols_remain):
+        feature_num = col_num - cols_remain + j
+        feature = 'V' + str(feature_num)
+        print(f"drawing subplot [{fig_num+1}] with shape '({final_rows}, {cols})' for feature '{feature}'.")
+        ax = final_fig.add_subplot(final_rows, cols, j+1)
+        sns.boxplot(data=df, x=feature, ax=ax)
+        ax.set_ylabel(feature, rotation=0)
+        ax.set_xlabel('')
+        # ax.xaxis.set_visible(False)
+    figs.append(final_fig)
+    return figs
+
+# 下面这种多个变量放到同一个图形里的方式不太好，因为各个变量的量纲会相互影响
+# dfs = X_split(X, split_num=6)
+# figs = X_plot(dfs)
+# 改为采用每个变量一个子图的方式绘制，保留每个变量自己的量纲
+figs = X_subplot(df=X, rows=4, cols=2)
 figs[0].show()
 figs[1].show()
 figs[2].show()
 figs[3].show()
 figs[4].show()
-figs[5].show()
-figs[6].show()
-figs[7].show()
+# 着重检查某个变量
 fig_single = X_single_check(X, 'V9')
 # fig_single.show()
 # 检查结果
