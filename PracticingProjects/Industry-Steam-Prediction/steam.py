@@ -1,7 +1,8 @@
 import os
+from typing import List
 import numpy as np
 import pandas as pd
-from typing import List
+from scipy import stats
 import matplotlib.pyplot as plt
 import seaborn as sns
 plt.style.use("ggplot")
@@ -24,9 +25,10 @@ test_data_desc = test_data.describe()
 # 数据很工整，没有缺失值，特征都是连续型
 
 
-# %% 单变量分析，检查每个特征的分布，是否有缺失值，是否为偏态分布
+# *********** 单变量分析 *************
+# %% 检查每个特征的分布，使用IQR查看异常值情况
 # 这里使用seaborn绘图，需要将数据转成long-format，每5个变量一组绘图展示
-def X_split(df: pd.DataFrame, split_num: int = 5):
+def df_split(df: pd.DataFrame, split_num: int = 5):
     """
     对df中的列，按照 split_num 一组，进行分隔，然后 wide-to-long，用于seaborn绘图
     """
@@ -42,7 +44,7 @@ def X_split(df: pd.DataFrame, split_num: int = 5):
     dfs.append(df_part)
     return dfs
 
-def X_plot(dfs: List[pd.DataFrame]):
+def df_plot(dfs: List[pd.DataFrame]):
     """
     每个df绘制一个Figure
     """
@@ -60,7 +62,7 @@ def X_plot(dfs: List[pd.DataFrame]):
         # fig.clear()
     return figs
 
-def X_single_check(df: pd.DataFrame, V: str, show=True):
+def box_single_check(df: pd.DataFrame, V: str, show=True):
     """
     着重检查某个变量的图形
     """
@@ -73,7 +75,7 @@ def X_single_check(df: pd.DataFrame, V: str, show=True):
         fig.show()
     return fig
 
-def X_subplot(df: pd.DataFrame, rows: int = 4, cols: int = 2):
+def box_subplot(df: pd.DataFrame, rows: int = 4, cols: int = 2):
     """
     每个变量一个子图，每个Figure绘制一个 rows x cols 的图
     """
@@ -110,18 +112,19 @@ def X_subplot(df: pd.DataFrame, rows: int = 4, cols: int = 2):
     figs.append(final_fig)
     return figs
 
+# %% 绘制每个特征的箱线图，使用IQR过滤异常值
 # 下面这种多个变量放到同一个图形里的方式不太好，因为各个变量的量纲会相互影响
-# dfs = X_split(X, split_num=6)
-# figs = X_plot(dfs)
+# dfs = df_split(X, split_num=6)
+# figs = df_plot(dfs)
 # 改为采用每个变量一个子图的方式绘制，保留每个变量自己的量纲
-figs = X_subplot(df=X, rows=4, cols=2)
+figs = box_subplot(df=X, rows=4, cols=2)
 figs[0].show()
 figs[1].show()
 figs[2].show()
 figs[3].show()
 figs[4].show()
 # 着重检查某个变量
-fig_single = X_single_check(X, 'V9')
+fig_single = box_single_check(X, 'V9')
 # fig_single.show()
 # 检查结果
 # V9 的量纲范围比较大，有几个异常值需要剔除
@@ -129,7 +132,7 @@ fig_single = X_single_check(X, 'V9')
 # V23, V25, V30, V31, V33, V34, V35   的分布过于离散，超出 IQR 的样本比较多
 # V28, V29, V36, 也需要考虑
 
-#  使用IQR作为异常值判断准则，检查每个特征有多少个异常值
+# %% 使用IQR作为异常值判断准则，检查每个特征有多少个异常值
 # IQR 的阈值，默认1.5
 iqr_th = 3.0
 X_q1 = X.quantile(q=0.25)
@@ -152,3 +155,85 @@ print(X_delete_rows.sum())
 X_no_outlier = X.loc[~X_delete_rows, :]
 # 检查验证一遍
 # t = (X_no_outlier < X_iqr_min) | (X_no_outlier > X_iqr_max)
+
+
+# %% 绘制每个变量的直方图和Q-Q图，查看分布的偏度
+def skew_subplot(df, cols=4, w=6.4, h=4.8):
+    """
+    对每个特征绘制直方图和Q-Q图，以上、下两行的形式放在同一列，cols指定的是每一幅图中绘制的特征个数
+    """
+    figsize = (w, h)
+    col_num = df.shape[1]
+    fig_num = col_num // cols
+    figs = []
+    for i in range(fig_num):
+        fig = plt.figure(num=i+1, figsize=figsize)
+        for j in range(cols):
+            feature_num = i * cols + j
+            feature_name = 'V' + str(feature_num)
+            print(f"drawing subplot [{i + 1}] with shape '(2, {cols})' for feature '{feature_name}'.")
+            # 每个特征的直方图放在第一行
+            ax1 = fig.add_subplot(2, cols, j+1)
+            sns.histplot(x=df[feature_name], ax=ax1)
+            # 每个特征的Q-Q图放在第二行
+            ax2 = fig.add_subplot(2, cols, j+1+cols)
+            osm, osr = stats.probplot(df[feature_name], dist='norm', fit=False)
+            sns.scatterplot(x=osm, y=osr, ax=ax2)
+            ax1.set_title(feature_name)
+            ax1.set_xlabel('')
+            ax2.set_xlabel('')
+        fig.tight_layout()
+        figs.append(fig)
+    col_remain = col_num % cols
+    if col_remain == 0:
+        return figs
+    final_fig = plt.figure(num=fig_num+1, figsize=figsize)
+    for j in range(col_remain):
+        feature_num = fig_num * cols + j
+        feature_name = 'V' + str(feature_num)
+        print(f"drawing subplot [{fig_num + 1}] with shape '(2, {cols})' for feature '{feature_name}'.")
+        ax1 = final_fig.add_subplot(2, cols, j+1)
+        sns.histplot(x=df[feature_name], ax=ax1)
+        ax2 = final_fig.add_subplot(2, cols, j+1+cols)
+        osm, osr = stats.probplot(df[feature_name], dist='norm', fit=False)
+        sns.scatterplot(x=osm, y=osr, ax=ax2)
+        ax1.set_title(feature_name)
+        ax1.set_xlabel('')
+        ax2.set_xlabel('')
+    figs.append(final_fig)
+    return figs
+
+def skew_single_check(df, feature,  w=6.4, h=4.8, show=False):
+    """
+    绘制指定变量的直方图和Q-Q图
+    """
+    figsize = (w, h)
+    fig = plt.figure(num=40, figsize=figsize)
+    ax1 = fig.add_subplot(121)
+    sns.histplot(x=df[feature], ax=ax1)
+    ax2 = fig.add_subplot(122)
+    osm, osr = stats.probplot(df[feature], dist='norm', fit=False)
+    sns.scatterplot(x=osm, y=osr, ax=ax2)
+    fig.suptitle(feature)
+    if show:
+        fig.show()
+    return fig
+
+
+# %% 检查各个特征的直方图和Q-Q图
+# cols_used = ['V'+str(i) for i in range(10)]
+# figs = skew_subplot(X_no_outlier[cols_used], cols=5, w=25, h=10)
+figs = skew_subplot(X_no_outlier, cols=5, w=25, h=10)
+figs[0].show()
+figs[1].show()
+figs[2].show()
+figs[3].show()
+figs[4].show()
+figs[5].show()
+figs[6].show()
+figs[7].show()
+# 检查单个变量
+fig = skew_single_check(X_no_outlier, feature='V9', w=10, h=5, show=True)
+# 检查结果为：
+# V0, V1, V5, V6, V7, V11, V14, V16 偏离正态较严重，需要后续做变换处理
+# V9, V17, V22, V23, V24, V28, V35 要特别注意，似乎取值只有几个离散的值
