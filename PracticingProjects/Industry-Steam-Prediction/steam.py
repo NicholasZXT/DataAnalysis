@@ -9,8 +9,8 @@ plt.style.use("ggplot")
 from sklearn.linear_model import LinearRegression
 
 # %% 数据加载
-# DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
-DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+# DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
 train_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_train.txt'), delimiter='\t', header=0)
 test_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_test.txt'), delimiter='\t', header=0)
 X = train_data.drop(columns=['target'])
@@ -116,6 +116,7 @@ X_delete_rows = X_iqr_outlier.sum(axis=1) > 0
 print(X_delete_rows.sum())
 # 删除异常值的样本
 X_no_outlier = X.loc[~X_delete_rows, :]
+y_no_outlier = y.loc[~X_delete_rows]
 # 检查验证一遍
 # t = (X_no_outlier < X_iqr_min) | (X_no_outlier > X_iqr_max)
 
@@ -201,7 +202,7 @@ skew_figs[6].show()
 skew_figs[7].show()
 # 检查单个变量
 # skew_fig_single = skew_single_check(X, feature='V9', w=10, h=5, show=True)
-skew_fig_single = skew_single_check(X_no_outlier, feature='V34', w=10, h=5, show=True)
+skew_fig_single = skew_single_check(X_no_outlier, feature='V22', w=10, h=5, show=True)
 # 检查结果为：
 # V0, V1, V5, V6, V7, V8, V11, V14, V16, V18 偏离正态较严重，需要后续做变换处理
 # V9, V17, V22, V23, V24, V28, V35 要特别注意，似乎取值只有几个离散的值
@@ -209,14 +210,40 @@ skew_fig_single = skew_single_check(X_no_outlier, feature='V34', w=10, h=5, show
 
 
 # %% 对比训练数据和测试数据各个特征的分布情况，绘制KDE图
-fig = plt.figure()
-ax = fig.add_subplot(111)
-sns.kdeplot(x=X_no_outlier['V1'], ax=ax, color='yellow')
-sns.kdeplot(x=test_data['V1'], ax=ax, color='r')
-fig.show()
-
 def kde_subplot(train_df, test_df, rows=4, cols=4, w=6.4, h=4.8):
     figsize = (w, h)
     col_num = train_df.shape[1]
-    fig_num = col_num // cols
+    subplot_num = rows * cols
+    fig_num = col_num // subplot_num + 1
     figs = []
+    for i in range(fig_num):
+        fig = plt.figure(num='kde-'+str(i+1), figsize=figsize, clear=True, layout='tight')
+        for j in range(subplot_num):
+            feature_num = i * subplot_num + j
+            if feature_num >= col_num:
+                break
+            feature_name = 'V' + str(feature_num)
+            print(f"drawing subplot [{i + 1}] with shape '({rows}, {cols})' for feature '{feature_name}'.")
+            ax = fig.add_subplot(rows, cols, j+1)
+            sns.kdeplot(train_df, x=feature_name, color='red', label='train', ax=ax)
+            sns.kdeplot(test_df, x=feature_name, color='blue', label='test', ax=ax)
+            ax.legend()
+        figs.append(fig)
+    return figs
+
+# %% 分析KDE图
+kde_figs = kde_subplot(X_no_outlier, test_data, w=16, h=12)
+kde_figs[0].show()
+kde_figs[1].show()
+kde_figs[2].show()
+# 对比之下，可以看出：
+# V5, V6, V9, V11, V17, V22, V23 这几个变量，训练集和测试集的分布差异太大了，所以需要剔除掉，不能使用
+
+# %% 根据KDE的分析，从训练集和测试集中删除分布不一致的特征
+kde_deleted_features = ['V5', 'V6', 'V9', 'V11', 'V17', 'V22', 'V23']
+used_cols = [v for v in X_no_outlier.columns if v not in kde_deleted_features]
+X_kde_filter = X_no_outlier[used_cols].copy()
+X_test_kde_filter = test_data[used_cols].copy()
+
+
+# %% 计算训练集中剩余特征和目标变量的相关性，绘制相关性热力图
