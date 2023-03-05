@@ -6,7 +6,10 @@ from scipy import stats
 import matplotlib.pyplot as plt
 import seaborn as sns
 plt.style.use("ggplot")
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split, cross_val_score, learning_curve, validation_curve
+from sklearn.metrics import mean_squared_error
 
 # %% 数据加载
 DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
@@ -108,17 +111,17 @@ iqr_min_flag = X < X_iqr_min
 iqr_max_flag = X > X_iqr_max
 X_iqr_outlier = iqr_max_flag | iqr_min_flag
 # 得到每个特征的异常值数量
-X_col_outlier_num = X_iqr_outlier.sum(axis=0)
+col_outlier_num = X_iqr_outlier.sum(axis=0)
 # 可以看出 V9, V23, V34 的异常值（1.5阈值下）都比较多：835, 700, 488
 # 阈值增大到 1.8，V9, V23, V34 的异常值为：833, 678, 450
-X_delete_rows = X_iqr_outlier.sum(axis=1) > 0
+iqr_deleted_rows = X_iqr_outlier.sum(axis=1) > 0
 # 查看需要删除的样本数量，阈值3.0下，需要删除 771 个样本
-print(X_delete_rows.sum())
+print(iqr_deleted_rows.sum())
 # 删除异常值的样本
-X_no_outlier = X.loc[~X_delete_rows, :]
-y_no_outlier = y.loc[~X_delete_rows]
+X_filter_outlier = X.loc[~iqr_deleted_rows, :]
+y_filter_outlier = y.loc[~iqr_deleted_rows]
 # 检查验证一遍
-# t = (X_no_outlier < X_iqr_min) | (X_no_outlier > X_iqr_max)
+# t = (X_filter_outlier < X_iqr_min) | (X_filter_outlier > X_iqr_max)
 
 
 # %% 绘制每个特征的直方图和Q-Q图，查看分布的偏度
@@ -169,12 +172,13 @@ def skew_subplot(df, cols=4, w=6.4, h=4.8):
     figs.append(final_fig)
     return figs
 
-def skew_single_check(df, feature,  w=6.4, h=4.8, show=False):
+def skew_single_check(df, feature,  w=6.4, h=4.8, show=False, figlabel=None):
     """
     绘制指定变量的直方图和Q-Q图
     """
     figsize = (w, h)
-    fig = plt.figure(num=40, figsize=figsize)
+    figlabel = figlabel if figlabel else 'skew-single-'+feature
+    fig = plt.figure(num=figlabel, figsize=figsize, clear=True)
     ax1 = fig.add_subplot(121)
     sns.histplot(x=df[feature], ax=ax1)
     ax2 = fig.add_subplot(122)
@@ -190,8 +194,8 @@ def skew_single_check(df, feature,  w=6.4, h=4.8, show=False):
 # 使用没有删除异常值的数据绘图的话，也能发现有些特征偏离的比较厉害
 # skew_figs = skew_subplot(X, cols=5, w=25, h=10)
 # cols_used = ['V'+str(i) for i in range(10)]
-# skew_figs = skew_subplot(X_no_outlier[cols_used], cols=5, w=25, h=10)
-skew_figs = skew_subplot(X_no_outlier, cols=5, w=25, h=10)
+# skew_figs = skew_subplot(X_filter_outlier[cols_used], cols=5, w=25, h=10)
+skew_figs = skew_subplot(X_filter_outlier, cols=5, w=25, h=10)
 skew_figs[0].show()
 skew_figs[1].show()
 skew_figs[2].show()
@@ -202,11 +206,12 @@ skew_figs[6].show()
 skew_figs[7].show()
 # 检查单个变量
 # skew_fig_single = skew_single_check(X, feature='V9', w=10, h=5, show=True)
-skew_fig_single = skew_single_check(X_no_outlier, feature='V22', w=10, h=5, show=True)
+skew_fig_single = skew_single_check(X_filter_outlier, feature='V22', w=10, h=5, show=True)
 # 检查结果为：
 # V0, V1, V5, V6, V7, V8, V11, V14, V16, V18 偏离正态较严重，需要后续做变换处理
 # V9, V17, V22, V23, V24, V28, V35 要特别注意，似乎取值只有几个离散的值
 # V33, V34 这两个变量中间的值有跳变
+skew_cols = ['V0', 'V1', 'V5', 'V6', 'V7', 'V8', 'V11', 'V14', 'V16', 'V18']
 
 
 # %% 对比训练数据和测试数据各个特征的分布情况，绘制KDE图
@@ -232,18 +237,86 @@ def kde_subplot(train_df, test_df, rows=4, cols=4, w=6.4, h=4.8):
     return figs
 
 # %% 分析KDE图
-kde_figs = kde_subplot(X_no_outlier, test_data, w=16, h=12)
+kde_figs = kde_subplot(X_filter_outlier, test_data, w=16, h=12)
 kde_figs[0].show()
 kde_figs[1].show()
 kde_figs[2].show()
 # 对比之下，可以看出：
 # V5, V6, V9, V11, V17, V22, V23 这几个变量，训练集和测试集的分布差异太大了，所以需要剔除掉，不能使用
+# V14, V19, V21, V35 这几个变量也略有偏离
 
 # %% 根据KDE的分析，从训练集和测试集中删除分布不一致的特征
-kde_deleted_features = ['V5', 'V6', 'V9', 'V11', 'V17', 'V22', 'V23']
-used_cols = [v for v in X_no_outlier.columns if v not in kde_deleted_features]
-X_kde_filter = X_no_outlier[used_cols].copy()
-X_test_kde_filter = test_data[used_cols].copy()
-
+kde_deleted_cols = ['V5', 'V6', 'V9', 'V11', 'V17', 'V22', 'V23']
+kde_used_cols = [v for v in X_filter_outlier.columns if v not in kde_deleted_cols]
+X_kde_filter = X_filter_outlier[kde_used_cols].copy()
+X_test_kde_filter = test_data[kde_used_cols].copy()
 
 # %% 计算训练集中剩余特征和目标变量的相关性，绘制相关性热力图
+# 这里还绘制了各个特征之间的相关性
+corr_matrix = pd.concat([X_kde_filter, y_filter_outlier], axis=1).corr()
+fig_corr = plt.figure(figsize=(14, 12), layout='tight')
+ax = fig_corr.add_subplot(111)
+sns.heatmap(data=corr_matrix, ax=ax, cmap='crest')
+fig_corr.show()
+
+# %% 按照和目标变量的相关性来过滤特征
+# 相关性阈值
+corr_threshold = 0.5
+# 只取目标变量和各个特征的相关性这一列
+corr_cols = corr_matrix['target'].iloc[:-1]
+corr_cols_filter = corr_cols[corr_cols.abs() >= corr_threshold]
+corr_used_cols = list(corr_cols_filter.index)
+print('corr_used_cols: ', corr_used_cols)
+# 进行过滤
+X_corr_filter = X_kde_filter[corr_used_cols].copy()
+X_test_corr_filter = X_test_kde_filter[corr_used_cols].copy()
+
+# %% 进行Min-Max的缩放处理，缩放到 [1, 2] 区间
+min_max_scaler = MinMaxScaler(feature_range=(1, 2))
+min_max_scaler.fit(X_corr_filter)
+# min_max_scaler.data_min_
+# min_max_scaler.data_max_
+# min_max_scaler.data_range_
+X_scale = min_max_scaler.transform(X_corr_filter)
+X_scale = pd.DataFrame(X_scale, columns=X_corr_filter.columns)
+X_test_scale = min_max_scaler.transform(X_test_corr_filter)
+X_test_scale = pd.DataFrame(X_test_scale, columns=X_test_corr_filter.columns)
+# 观察一下缩放前后特征的kde分布，可以看出，min-max 缩放并没有改变分布
+# fig1 = skew_single_check(X_corr_filter, 'V0', figlabel='before')
+# fig2 = skew_single_check(X_scale, 'V0', figlabel='after')
+# fig1.show()
+# fig2.show()
+
+# %% 对偏态分布的特征做 Box-Cox 变换
+# 这里做 Box-Cox 变换之前必须要做 min-max 缩放，因为原始数据中有负值
+def box_cox_transform(df, cols):
+    df_transform = df.copy()
+    for col in cols:
+        col_value, maxlog = stats.boxcox(df[col])
+        df_transform[col] = col_value
+    return df_transform
+
+skew_cols_to_change = [col for col in skew_cols if col in X_scale.columns]
+X_boxcox = box_cox_transform(X_scale, skew_cols_to_change)
+X_test_box = box_cox_transform(X_test_scale, skew_cols_to_change)
+# 检查一下变换前后的变量分布
+fig1 = skew_single_check(X_corr_filter, 'V0', figlabel='before')
+fig2 = skew_single_check(X_boxcox, 'V0', figlabel='after')
+fig1.show()
+fig2.show()
+
+# %% 使用线性回归模型
+lr_naive = LinearRegression()
+lr_naive.fit(X_filter_outlier, y_filter_outlier)
+lr_naive_score = lr_naive.score(X_filter_outlier, y_filter_outlier)
+print('lr_naive_score: ', lr_naive_score)
+
+lr_corr = LinearRegression()
+lr_corr.fit(X_corr_filter, y_filter_outlier)
+lr_corr_score = lr_corr.score(X_corr_filter, y_filter_outlier)
+print('lr_corr_score: ', lr_corr_score)
+
+lr_box = LinearRegression()
+lr_box.fit(X_boxcox, y_filter_outlier)
+lr_box_score = lr_box.score(X_boxcox, y_filter_outlier)
+print('lr_box_score: ', lr_box_score)
