@@ -8,7 +8,7 @@ import seaborn as sns
 plt.style.use("ggplot")
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split, cross_val_score, learning_curve, validation_curve
+from sklearn.model_selection import train_test_split, KFold, cross_val_score, learning_curve, validation_curve
 from sklearn.metrics import mean_squared_error
 
 # %% 数据加载
@@ -27,8 +27,6 @@ test_data.info()
 test_data_desc = test_data.describe()
 # 数据很工整，没有缺失值，特征都是连续型
 
-
-# *********** 单变量分析 *************
 # %% 检查每个特征的分布，绘制每个特征的箱线图
 # 多个特征的箱线图放到同一个图形里的方式不太好，因为各个特征的量纲会相互影响，改为采用每个特征一个子图的方式绘制，保留每个特征自己的量纲
 def box_single_check(df: pd.DataFrame, V: str, show=True):
@@ -305,18 +303,38 @@ fig2 = skew_single_check(X_boxcox, 'V0', figlabel='after')
 fig1.show()
 fig2.show()
 
-# %% 使用线性回归模型
+# %% 使用线性回归模型作为基准模型
+random_state = 29
+kf = KFold(n_splits=5, shuffle=True, random_state=random_state)
+
 lr_naive = LinearRegression()
-lr_naive.fit(X_filter_outlier, y_filter_outlier)
-lr_naive_score = lr_naive.score(X_filter_outlier, y_filter_outlier)
-print('lr_naive_score: ', lr_naive_score)
+X_train, X_test, y_train, y_test = train_test_split(X_filter_outlier, y_filter_outlier, train_size=0.8, shuffle=True, random_state=random_state)
+lr_naive.fit(X_train, y_train)
+lr_naive_mse = mean_squared_error(y_test, lr_naive.predict(X_test))
+lr_naive_cv_score = cross_val_score(lr_naive, X_filter_outlier, y_filter_outlier, cv=kf)
+lr_naive_res = [lr_naive.score(X_train, y_train), lr_naive.score(X_test, y_test), lr_naive_mse,
+                lr_naive_cv_score.mean(), lr_naive_cv_score.std()]
 
 lr_corr = LinearRegression()
-lr_corr.fit(X_corr_filter, y_filter_outlier)
-lr_corr_score = lr_corr.score(X_corr_filter, y_filter_outlier)
-print('lr_corr_score: ', lr_corr_score)
+X_train, X_test, y_train, y_test = train_test_split(X_corr_filter, y_filter_outlier, train_size=0.8, shuffle=True, random_state=random_state)
+lr_corr.fit(X_train, y_train)
+lr_corr_mse = mean_squared_error(y_test, lr_corr.predict(X_test))
+lr_corr_cv_score = cross_val_score(lr_corr, X_corr_filter, y_filter_outlier, cv=kf)
+lr_corr_res = [lr_corr.score(X_train, y_train), lr_corr.score(X_test, y_test), lr_corr_mse,
+               lr_corr_cv_score.mean(), lr_corr_cv_score.std()]
 
 lr_box = LinearRegression()
-lr_box.fit(X_boxcox, y_filter_outlier)
-lr_box_score = lr_box.score(X_boxcox, y_filter_outlier)
-print('lr_box_score: ', lr_box_score)
+X_train, X_test, y_train, y_test = train_test_split(X_boxcox, y_filter_outlier, train_size=0.8, shuffle=True, random_state=random_state)
+lr_box.fit(X_train, y_train)
+lr_box_mse = mean_squared_error(y_test, lr_box.predict(X_test))
+lr_box_cv_score = cross_val_score(lr_box, X_boxcox, y_filter_outlier, cv=kf)
+lr_box_res = [lr_box.score(X_train, y_train), lr_box.score(X_test, y_test), lr_box_mse,
+              lr_box_cv_score.mean(), lr_box_cv_score.std()]
+
+score_cols = ['train_score', 'test_score', 'test_mse', 'cv_score_mean', 'cv_score_std']
+index = ['lr_naive', 'lr_corr', 'lr_box']
+lr_score_df = pd.DataFrame(data=[lr_naive_res, lr_corr_res, lr_box_res], columns=score_cols, index=index)
+print(lr_score_df)
+
+# 从结果来看，这一套特征工程下来，结果还不如只是做了异常值过滤的数据效果好
+# 但是也不能这么说，因为后面两个只用了9个特征，lr_naive 用了 38 个特征，
