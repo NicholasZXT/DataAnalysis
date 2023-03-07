@@ -9,11 +9,11 @@ plt.style.use("ggplot")
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split, KFold, cross_val_score, learning_curve, validation_curve
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error as MSE, make_scorer
 
 # %% 数据加载
-DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
-# DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+# DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
 train_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_train.txt'), delimiter='\t', header=0)
 test_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_test.txt'), delimiter='\t', header=0)
 X = train_data.drop(columns=['target'])
@@ -242,45 +242,30 @@ kde_figs[2].show()
 # 对比之下，可以看出：
 # V5, V6, V9, V11, V17, V22, V23 这几个变量，训练集和测试集的分布差异太大了，所以需要剔除掉，不能使用
 # V14, V19, V21, V35 这几个变量也略有偏离
-
-# %% 根据KDE的分析，从训练集和测试集中删除分布不一致的特征
 kde_deleted_cols = ['V5', 'V6', 'V9', 'V11', 'V17', 'V22', 'V23']
-kde_used_cols = [v for v in X_filter_outlier.columns if v not in kde_deleted_cols]
-X_kde_filter = X_filter_outlier[kde_used_cols].copy()
-X_test_kde_filter = test_data[kde_used_cols].copy()
 
-# %% 计算训练集中剩余特征和目标变量的相关性，绘制相关性热力图
+
+# %% 计算训练集中各个特征和目标变量的相关性，绘制相关性热力图
 # 这里还绘制了各个特征之间的相关性
-corr_matrix = pd.concat([X_kde_filter, y_filter_outlier], axis=1).corr()
+corr_matrix = pd.concat([X_filter_outlier, y_filter_outlier], axis=1).corr()
 fig_corr = plt.figure(figsize=(14, 12), layout='tight')
 ax = fig_corr.add_subplot(111)
 sns.heatmap(data=corr_matrix, ax=ax, cmap='crest')
-fig_corr.show()
+# fig_corr.show()
 
-# %% 按照和目标变量的相关性来过滤特征
-# 相关性阈值
-corr_threshold = 0.5
-# 只取目标变量和各个特征的相关性这一列
-corr_cols = corr_matrix['target'].iloc[:-1]
-corr_cols_filter = corr_cols[corr_cols.abs() >= corr_threshold]
-corr_used_cols = list(corr_cols_filter.index)
-print('corr_used_cols: ', corr_used_cols)
-# 进行过滤
-X_corr_filter = X_kde_filter[corr_used_cols].copy()
-X_test_corr_filter = X_test_kde_filter[corr_used_cols].copy()
 
 # %% 进行Min-Max的缩放处理，缩放到 [1, 2] 区间
 min_max_scaler = MinMaxScaler(feature_range=(1, 2))
-min_max_scaler.fit(X_corr_filter)
+min_max_scaler.fit(X_filter_outlier)
 # min_max_scaler.data_min_
 # min_max_scaler.data_max_
 # min_max_scaler.data_range_
-X_scale = min_max_scaler.transform(X_corr_filter)
-X_scale = pd.DataFrame(X_scale, columns=X_corr_filter.columns)
-X_test_scale = min_max_scaler.transform(X_test_corr_filter)
-X_test_scale = pd.DataFrame(X_test_scale, columns=X_test_corr_filter.columns)
+X_scale = min_max_scaler.transform(X_filter_outlier)
+X_scale = pd.DataFrame(X_scale, columns=X_filter_outlier.columns)
+X_test_scale = min_max_scaler.transform(test_data)
+X_test_scale = pd.DataFrame(X_test_scale, columns=test_data.columns)
 # 观察一下缩放前后特征的kde分布，可以看出，min-max 缩放并没有改变分布
-# fig1 = skew_single_check(X_corr_filter, 'V0', figlabel='before')
+# fig1 = skew_single_check(X_filter_outlier, 'V0', figlabel='before')
 # fig2 = skew_single_check(X_scale, 'V0', figlabel='after')
 # fig1.show()
 # fig2.show()
@@ -297,44 +282,70 @@ def box_cox_transform(df, cols):
 skew_cols_to_change = [col for col in skew_cols if col in X_scale.columns]
 X_boxcox = box_cox_transform(X_scale, skew_cols_to_change)
 X_test_box = box_cox_transform(X_test_scale, skew_cols_to_change)
-# 检查一下变换前后的变量分布
-fig1 = skew_single_check(X_corr_filter, 'V0', figlabel='before')
-fig2 = skew_single_check(X_boxcox, 'V0', figlabel='after')
-fig1.show()
-fig2.show()
+# 观察一下变换前后的变量分布
+# fig1 = skew_single_check(X_scale, 'V0', figlabel='before')
+# fig2 = skew_single_check(X_boxcox, 'V0', figlabel='after')
+# fig1.show()
+# fig2.show()
 
+# ***************** 特征选择 ******************
+# 特征选择放到最后再做，因为一般来说，特征选择都会降低模型的效果
+# %% 根据KDE的分析，从训练集和测试集中删除分布不一致的特征
+kde_used_cols = [v for v in X_boxcox.columns if v not in kde_deleted_cols]
+X_kde_filter = X_boxcox[kde_used_cols].copy()
+X_test_kde_filter = X_test_box[kde_used_cols].copy()
+
+# %% 按照和目标变量的相关性来过滤特征
+corr_threshold = 0.5
+# 只取目标变量和各个特征的相关性这一列
+corr_cols = corr_matrix['target'].iloc[:-1]
+corr_cols_filter = corr_cols[corr_cols.abs() >= corr_threshold]
+corr_used_cols = list(corr_cols_filter.index)
+print('corr_used_cols: ', corr_used_cols)
+X_corr_filter = X_boxcox[corr_used_cols].copy()
+X_test_corr_filter = X_test_box[corr_used_cols].copy()
+
+# %% 同时做特征的 kde过滤 和 相关性过滤
+kde_corr_used_cols = list(set(kde_used_cols) & set(corr_used_cols))
+print('kde_corr_used_cols: ', kde_corr_used_cols)
+X_cols_filter = X_boxcox[kde_corr_used_cols].copy()
+X_test_cols_filter = X_test_box[kde_corr_used_cols].copy()
+
+# ********************* 模型训练 *************************
 # %% 使用线性回归模型作为基准模型
 random_state = 29
 kf = KFold(n_splits=5, shuffle=True, random_state=random_state)
-
-lr_naive = LinearRegression()
-X_train, X_test, y_train, y_test = train_test_split(X_filter_outlier, y_filter_outlier, train_size=0.8, shuffle=True, random_state=random_state)
-lr_naive.fit(X_train, y_train)
-lr_naive_mse = mean_squared_error(y_test, lr_naive.predict(X_test))
-lr_naive_cv_score = cross_val_score(lr_naive, X_filter_outlier, y_filter_outlier, cv=kf)
-lr_naive_res = [lr_naive.score(X_train, y_train), lr_naive.score(X_test, y_test), lr_naive_mse,
-                lr_naive_cv_score.mean(), lr_naive_cv_score.std()]
-
-lr_corr = LinearRegression()
-X_train, X_test, y_train, y_test = train_test_split(X_corr_filter, y_filter_outlier, train_size=0.8, shuffle=True, random_state=random_state)
-lr_corr.fit(X_train, y_train)
-lr_corr_mse = mean_squared_error(y_test, lr_corr.predict(X_test))
-lr_corr_cv_score = cross_val_score(lr_corr, X_corr_filter, y_filter_outlier, cv=kf)
-lr_corr_res = [lr_corr.score(X_train, y_train), lr_corr.score(X_test, y_test), lr_corr_mse,
-               lr_corr_cv_score.mean(), lr_corr_cv_score.std()]
-
-lr_box = LinearRegression()
-X_train, X_test, y_train, y_test = train_test_split(X_boxcox, y_filter_outlier, train_size=0.8, shuffle=True, random_state=random_state)
-lr_box.fit(X_train, y_train)
-lr_box_mse = mean_squared_error(y_test, lr_box.predict(X_test))
-lr_box_cv_score = cross_val_score(lr_box, X_boxcox, y_filter_outlier, cv=kf)
-lr_box_res = [lr_box.score(X_train, y_train), lr_box.score(X_test, y_test), lr_box_mse,
-              lr_box_cv_score.mean(), lr_box_cv_score.std()]
-
-score_cols = ['train_score', 'test_score', 'test_mse', 'cv_score_mean', 'cv_score_std']
-index = ['lr_naive', 'lr_corr', 'lr_box']
-lr_score_df = pd.DataFrame(data=[lr_naive_res, lr_corr_res, lr_box_res], columns=score_cols, index=index)
-print(lr_score_df)
-
-# 从结果来看，这一套特征工程下来，结果还不如只是做了异常值过滤的数据效果好
-# 但是也不能这么说，因为后面两个只用了9个特征，lr_naive 用了 38 个特征，
+train_split_args = {'train_size': 0.8, 'shuffle': True, 'random_state': random_state}
+mse_scorer = make_scorer(MSE)
+def lr_model_compute(X, y):
+    lr = LinearRegression()
+    X_train, X_test, y_train, y_test = train_test_split(X, y, **train_split_args)
+    lr.fit(X_train, y_train)
+    # sklearn的LinearRegression的score方法，默认返回的是 R^2
+    cv_score = cross_val_score(lr, X, y, cv=kf)
+    # 再计算一下 MSE 这个指标
+    cv_mse = cross_val_score(lr, X, y, cv=kf, scoring=mse_scorer)
+    res_infos = ['train_score', 'test_score', 'cv_score_mean', 'cv_score_std', 'train_mse', 'test_mse', 'cv_mse_mean', 'cv_mse_std']
+    res = [lr.score(X_train, y_train), lr.score(X_test, y_test), cv_score.mean(), cv_score.std(),
+           MSE(y_train, lr.predict(X_train)), MSE(y_test, lr.predict(X_test)), cv_mse.mean(), cv_mse.std()]
+    return lr, res_infos, res
+# 先使用 只做了异常值过滤 的数据进行建模
+lr_naive, res_infos, lr_naive_res = lr_model_compute(X_filter_outlier, y_filter_outlier)
+# 使用经过 异常值过滤 + 特征缩放 + Box-Cox变换 的数据进行建模
+lr_boxcox, _, lr_boxcox_res = lr_model_compute(X_boxcox, y_filter_outlier)
+# 使用经过 异常值过滤 + 特征缩放 + Box-Cox变换 + kde特征过滤 的数据进行建模
+lr_kde, _, lr_kde_res = lr_model_compute(X_kde_filter, y_filter_outlier)
+# 使用经过 异常值过滤 + 特征缩放 + Box-Cox变换 + 相关性特征过滤 的数据进行建模
+lr_corr, _, lr_corr_res = lr_model_compute(X_corr_filter, y_filter_outlier)
+# 使用经过 异常值过滤 + 特征缩放 + Box-Cox变换 + kde特征过滤 + 相关性特征过滤 的数据进行建模
+lr_filter, _, lr_filter_res = lr_model_compute(X_cols_filter, y_filter_outlier)
+index = ['lr_naive', 'lr_boxcox', 'lr_kde', 'lr_corr', 'lr_filter']
+lr_res = [lr_naive_res, lr_boxcox_res, lr_kde_res, lr_corr_res, lr_filter_res]
+lr_res_df = pd.DataFrame(data=lr_res, columns=res_infos, index=index)
+print(lr_res_df)
+# 从结果来看，从 异常值过滤 --> (特征缩放 + Box-Cox变换) --> {kde特征过滤, 相关性特征过滤} 这一套特征工程下来，不论是 R^2 还是 MSE
+# 准确性都是逐渐降低的，这并不奇怪，因为特征选择就是这样。
+# lr_naive --> lr_boxcox 的准确性略有下降，暂不清楚为啥
+# lr_boxcox --> lr_kde 的准确性基本没有下降，说明 kde 过滤掉的特征是无关紧要的
+# lr_boxcox --> lr_corr 的准确性下降了一些，说明相关性过滤掉的特征里，有部分是有用的
+# lr_corr 约等于 lr_filter 的准确度，再次说明 kde 过滤的特征确实是无关紧要的
