@@ -12,8 +12,8 @@ from sklearn.model_selection import train_test_split, KFold, cross_val_score, le
 from sklearn.metrics import mean_squared_error as MSE, make_scorer
 
 # %% 数据加载
-# DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
-DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+# DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
 train_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_train.txt'), delimiter='\t', header=0)
 test_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_test.txt'), delimiter='\t', header=0)
 X = train_data.drop(columns=['target'])
@@ -349,3 +349,46 @@ print(lr_res_df)
 # lr_boxcox --> lr_kde 的准确性基本没有下降，说明 kde 过滤掉的特征是无关紧要的
 # lr_boxcox --> lr_corr 的准确性下降了一些，说明相关性过滤掉的特征里，有部分是有用的
 # lr_corr 约等于 lr_filter 的准确度，再次说明 kde 过滤的特征确实是无关紧要的
+
+# %% 绘制线性基准模型的残差图
+y_pred_naive = lr_naive.predict(X_filter_outlier)
+y_err_naive = y_filter_outlier - y_pred_naive
+y_pred_box = lr_boxcox.predict(X_boxcox)
+y_err_box = y_filter_outlier - y_pred_box
+y_pred_filter = lr_filter.predict(X_cols_filter)
+y_err_filter = y_filter_outlier - y_pred_filter
+# 绘图
+fig = plt.figure(figsize=(16, 12), layout='tight')
+ax = fig.add_subplot(2, 2, 1)
+sns.scatterplot(x=y_pred_naive, y=y_err_naive, ax=ax)
+ax.set_title('lr_naive residual plot')
+ax.set_xlabel('fitted value')
+ax.set_ylabel('residual')
+ax = fig.add_subplot(2, 2, 2)
+sns.scatterplot(x=y_pred_box, y=y_err_box, ax=ax)
+ax.set_title('lr_boxcox residual plot')
+ax.set_xlabel('fitted value')
+ax.set_ylabel('residual')
+ax = fig.add_subplot(2, 2, 3)
+sns.scatterplot(x=y_pred_filter, y=y_err_filter, ax=ax)
+ax.set_title('lr_filter residual plot')
+ax.set_xlabel('fitted value')
+ax.set_ylabel('residual')
+fig.suptitle('residual plots for linear regression models')
+fig.show()
+# 残差图上可以看出：1.数据中存在线性关系（残差图没有明显的趋势关系）；2.误差项似乎并不等方差（分布并不等宽）；3.存在个别异常值
+
+# %% 绘制线性基准模型的验证曲线和学习曲线
+
+# %% 使用线性基准模型进行预测，查看效果
+y_test_pred_naive = lr_naive.predict(test_data)
+y_test_pred_box = lr_boxcox.predict(X_test_box)
+y_test_pred_filter = lr_filter.predict(X_test_cols_filter)
+y_test_pred_df = pd.DataFrame({'lr_naive': y_test_pred_naive, 'lr_boxcox': y_test_pred_box, 'lr_filter': y_test_pred_filter})
+y_test_pred_df[['lr_naive']].to_csv('steam_predict_lr_naive.txt', header=False, index=False)
+y_test_pred_df[['lr_boxcox']].to_csv('steam_predict_lr_boxcox.txt', header=False, index=False)
+y_test_pred_df[['lr_filter']].to_csv('steam_predict_lr_filter.txt', header=False, index=False)
+# 天池测试集结果
+# lr_naive: 2.8813,  lr_filter: 0.4673
+# 这里可以看出，虽然在训练集上 lr_naive 和 lr_filter 上看不出差别，甚至 lr_naive 要好一点，但是在测试集上的泛化性能差异很大
+# 说明这里估计泛化误差的方式有问题？？
