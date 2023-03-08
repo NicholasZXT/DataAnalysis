@@ -14,33 +14,34 @@ def hello_generator(first_print, second_print):
     # yield from 'ab'
     print(second_print)
 
-# 检查函数定义（没有调用之前）的对象
-print(hello_generator)
-print(type(hello_generator))
-# 不是 generator
-print(inspect.isgenerator(hello_generator))
-# 也不是 协程
-print(inspect.iscoroutine(hello_generator))
-# 而是生成器函数(generatorfunction)
-print(inspect.isgeneratorfunction(hello_generator))
-# 不是 协程函数(coroutinefunction)
-print(inspect.iscoroutinefunction(hello_generator))
-# 检查函数调用之后的对象
-t1 = hello_generator('first', 'second')
-# 调用之后，才是 generator
-print(t1)
-print(type(t1))
-# 此时才是 generator
-print(inspect.isgenerator(t1))
-# 但依旧不是协程
-print(inspect.iscoroutine(t1))
-# 检查调用状态
-print(inspect.getgeneratorstate(t1))
-# 生成器可以使用 next() 激活，也可以使用 send(None) 激活
-t1.send(None)
-print(inspect.getgeneratorstate(t1))
-next(t1)
-print(inspect.getgeneratorstate(t1))
+def hello_gengerator_check():
+    # 检查函数定义（没有调用之前）的对象
+    print(hello_generator)
+    print(type(hello_generator))
+    # 不是 generator
+    print(inspect.isgenerator(hello_generator))
+    # 也不是 协程
+    print(inspect.iscoroutine(hello_generator))
+    # 而是生成器函数(generatorfunction)
+    print(inspect.isgeneratorfunction(hello_generator))
+    # 不是 协程函数(coroutinefunction)
+    print(inspect.iscoroutinefunction(hello_generator))
+    # 检查函数调用之后的对象
+    t1 = hello_generator('first', 'second')
+    # 调用之后，才是 generator
+    print(t1)
+    print(type(t1))
+    # 此时才是 generator
+    print(inspect.isgenerator(t1))
+    # 但依旧不是协程
+    print(inspect.iscoroutine(t1))
+    # 检查调用状态
+    print(inspect.getgeneratorstate(t1))
+    # 生成器可以使用 next() 激活，也可以使用 send(None) 激活
+    t1.send(None)
+    print(inspect.getgeneratorstate(t1))
+    next(t1)
+    print(inspect.getgeneratorstate(t1))
 
 
 # 原生协程的定义，只需要用 async 即可，await不是必须的
@@ -49,22 +50,24 @@ async def hello_coroutine(first_print, second_print):
     time.sleep(1)
     print(second_print)
 
-# 检查协程定义
-print(hello_coroutine)
-# 未调用之前，是function，并且是 coroutinefunction 类型
-print(type(hello_coroutine))
-print(inspect.iscoroutine(hello_coroutine))
-print(inspect.iscoroutinefunction(hello_coroutine))
-# 调用之后，才是协程类型
-t2 = hello_coroutine('first', 'second')
-print(t2)
-print(type(t2))
-print(inspect.iscoroutine(t2))
-# 查看协程状态
-print(inspect.getcoroutinestate(t2))
-# 原生协程不可以使用 next 激活，可以调用 send(None) 激活
-next(t2)
-t2.send(None)
+
+def hello_coroutine_check():
+    # 检查协程定义
+    print(hello_coroutine)
+    # 未调用之前，是function，并且是 coroutinefunction 类型
+    print(type(hello_coroutine))
+    print(inspect.iscoroutine(hello_coroutine))
+    print(inspect.iscoroutinefunction(hello_coroutine))
+    # 调用之后，才是协程类型
+    t2 = hello_coroutine('first', 'second')
+    print(t2)
+    print(type(t2))
+    print(inspect.iscoroutine(t2))
+    # 查看协程状态
+    print(inspect.getcoroutinestate(t2))
+    # 原生协程不可以使用 next 激活，可以调用 send(None) 激活
+    next(t2)
+    t2.send(None)
 
 
 # async + yield 定义的不是协程，而是 async_generator：异步生成器
@@ -76,36 +79,38 @@ async def hello_mix(first_print, second_print):
     # yield from 'abc'
     print(second_print)
 
-print(hello_mix)
-# 类型仍然是 function
-print(type(hello_mix))
-# 不是协程
-print(inspect.iscoroutine(hello_mix))
-# 不是生成器
-print(inspect.isgenerator(hello_mix))
-# 不是异步生成器
-print(inspect.isasyncgen(hello_mix))
-# 是异步生成器函数
-print(inspect.isasyncgenfunction(hello_mix))
-# 不是下面两种类型的函数
-print(inspect.iscoroutinefunction(hello_mix))
-print(inspect.isgeneratorfunction(hello_mix))
-# 检查调用对象
-t3 = hello_mix('first', 'second')
-print(t3)
-# 类型是 async_generator
-print(type(t3))
-print(inspect.isasyncgen(t3))
-# 不是下面两种类型
-print(inspect.iscoroutine(t3))
-print(inspect.isgenerator(t3))
-# 没有可以检查异步生成器状态的方法
-print(inspect.getgeneratorstate(t3))
-print(inspect.getcoroutinestate(t3))
-# 异步生成器不可以使用 next 激活，也不可以用 .send(None) 激活
-next(t3)
-t3.send(None)
-# 这个东西不是很常用
+
+def hello_mix_check():
+    print(hello_mix)
+    # 类型仍然是 function
+    print(type(hello_mix))
+    # 不是协程
+    print(inspect.iscoroutine(hello_mix))
+    # 不是生成器
+    print(inspect.isgenerator(hello_mix))
+    # 不是异步生成器
+    print(inspect.isasyncgen(hello_mix))
+    # 是异步生成器函数
+    print(inspect.isasyncgenfunction(hello_mix))
+    # 不是下面两种类型的函数
+    print(inspect.iscoroutinefunction(hello_mix))
+    print(inspect.isgeneratorfunction(hello_mix))
+    # 检查调用对象
+    t3 = hello_mix('first', 'second')
+    print(t3)
+    # 类型是 async_generator
+    print(type(t3))
+    print(inspect.isasyncgen(t3))
+    # 不是下面两种类型
+    print(inspect.iscoroutine(t3))
+    print(inspect.isgenerator(t3))
+    # 没有可以检查异步生成器状态的方法
+    print(inspect.getgeneratorstate(t3))
+    print(inspect.getcoroutinestate(t3))
+    # 异步生成器不可以使用 next 激活，也不可以用 .send(None) 激活
+    next(t3)
+    t3.send(None)
+    # 这个东西不是很常用
 
 
 # 带有 await 的协程
@@ -129,21 +134,21 @@ async def hello_await(first_print, second_print):
     # await hello_await('a1', 'a2')
     print(second_print)
 
-
-print(hello_await)
-print(type(hello_await))
-print(inspect.iscoroutine(hello_await))
-print(inspect.iscoroutinefunction(hello_await))
-# 调用后，返回协程对象
-t4 = hello_await('first', 'second')
-print(t4)
-print(type(t4))
-print(inspect.iscoroutine(t4))
-print(inspect.getcoroutinestate(t4))
-t4.send(None)
-# 如果协程里使用了 asyncio.sleep(), 那就只能通过 asyncio 里的事件循环来驱动此协程，不能通过 .send(None) 来驱动
-t4 = hello_await('first', 'second')
-asyncio.run(t4)
+def hello_await_check():
+    print(hello_await)
+    print(type(hello_await))
+    print(inspect.iscoroutine(hello_await))
+    print(inspect.iscoroutinefunction(hello_await))
+    # 调用后，返回协程对象
+    t4 = hello_await('first', 'second')
+    print(t4)
+    print(type(t4))
+    print(inspect.iscoroutine(t4))
+    print(inspect.getcoroutinestate(t4))
+    t4.send(None)
+    # 如果协程里使用了 asyncio.sleep(), 那就只能通过 asyncio 里的事件循环来驱动此协程，不能通过 .send(None) 来驱动
+    t4 = hello_await('first', 'second')
+    asyncio.run(t4)
 
 
 # ======================= asyncio 的使用 ================================
@@ -209,7 +214,8 @@ async def main2():
     1. 将每个协程先注册成事件循环里的Task对象
     2. 后续 await 对应的Task对象
     之后使用 asyncio.run(main2()) 之后，就能看到 task1, task2 对应的协程是异步执行的了，并且这里一定是 task1 和 task2 执行完毕后，
-    再执行 main2 的收尾工作.
+    再执行 main2 的收尾工作 —— 因为 main2 里 分别 await 了 task1, task2，但是 task1 和 task2 之间并没有 await 的关系，所以 task1
+    和 task2 是异步并行执行的
     """
     print(f"started at {time.strftime('%X')}")
     # 使用 Task 包装协程，并使用 await —— 这是常规的使用方式
@@ -341,8 +347,8 @@ async def main_parallel():
        也不保证 task1出栈 一定在 task3入栈 之前；而且由于没有 await task3，所以 task3 的出栈不一定在 sub1出栈之前.
     4. sub2 的执行流程里，插入了 task3结束的部分，并且由于 sub2 也只是创建了 task4，没有 await task4，task4 的执行结束并不一定在 sub2
         结束之前，要看 task4 的 asyncio.sleep(delay) 时间设置
-    5. 两个分隔线的打印顺序也不是预期的那样，分隔了 task3 和 task4 的打印结果，这也是因为 await 之前，sub1 和 sub2 就已经执行了，await
-       只是表示当前的协程必须要等 该协程完成才继续执行而已
+    5. 两个分隔线的打印顺序也不是预期的那样，分隔了 task3 和 task4 的打印结果，这也是因为 await 之前，sub1 里的 task3 和 sub2 里的 task4
+       已经执行了，并且在 main_parallel 里的 await task3 之前就执行完了 —— 这说明多个 await 之间（包括他们之间平级的代码）是平行的关系
     """
     task5 = asyncio.create_task(say_after(1, 'task5'))
     task3 = await sub1()
