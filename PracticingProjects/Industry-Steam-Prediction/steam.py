@@ -12,8 +12,8 @@ from sklearn.model_selection import train_test_split, KFold, cross_val_score, le
 from sklearn.metrics import mean_squared_error as MSE, make_scorer
 
 # %% 数据加载
-DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
-# DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+# DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
+DATA_DIR = r"C:\Users\Drivi\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
 train_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_train.txt'), delimiter='\t', header=0)
 test_data = pd.read_csv(os.path.join(DATA_DIR, 'zhengqi_test.txt'), delimiter='\t', header=0)
 X = train_data.drop(columns=['target'])
@@ -375,10 +375,26 @@ ax.set_title('lr_filter residual plot')
 ax.set_xlabel('fitted value')
 ax.set_ylabel('residual')
 fig.suptitle('residual plots for linear regression models')
-fig.show()
+# fig.show()
 # 残差图上可以看出：1.数据中存在线性关系（残差图没有明显的趋势关系）；2.误差项似乎并不等方差（分布并不等宽）；3.存在个别异常值
 
 # %% 绘制线性基准模型的验证曲线和学习曲线
+# 对于LR来说，没有超参数，所以不需要绘制验证曲线，这里只绘制学习曲线
+train_sizes = np.linspace(0.1, 1, 10)
+lr_curve_args = {'train_sizes': train_sizes, 'shuffle': True, 'random_state': random_state, 'cv': kf, 'scoring': mse_scorer}
+train_size_abs, train_scores, test_scores = learning_curve(lr_filter, X_cols_filter, y_filter_outlier, **lr_curve_args)
+train_scores_mean = train_scores.mean(axis=1)
+test_scores_mean = test_scores.mean(axis=1)
+# 绘图
+fig_lr = plt.figure()
+ax = fig_lr.add_subplot(111)
+sns.lineplot(x=train_size_abs, y=train_scores_mean, ax=ax, color='blue', label='train_scores_mean')
+sns.lineplot(x=train_size_abs, y=test_scores_mean, ax=ax, color='red', label='test_scores_mean')
+ax.legend()
+# fig_lr.suptitle("learning curve for linear regression")
+ax.set_title("Learning curve for linear regression")
+fig_lr.show()
+# 这个学习曲线差不多能看出，对于线性模型来说，已经是极限了，再增加样本也提高不了多少了
 
 # %% 使用线性基准模型进行预测，查看效果
 y_test_pred_naive = lr_naive.predict(test_data)
@@ -392,3 +408,5 @@ y_test_pred_df[['lr_filter']].to_csv('steam_predict_lr_filter.txt', header=False
 # lr_naive: 2.8813,  lr_filter: 0.4673
 # 这里可以看出，虽然在训练集上 lr_naive 和 lr_filter 上看不出差别，甚至 lr_naive 要好一点，但是在测试集上的泛化性能差异很大
 # 说明这里估计泛化误差的方式有问题？？
+# 应该不是泛化误差的估计方式有问题，而是因为这里的训练集（被划分的train和test都属于这个训练集）中，部分特征的分布和待预测的测试集中差异很大——就
+# 像kde图展示的那样，导致 lr_naive 在待预测数据上的泛化性能与训练时的表现差异很大，而 lr_filter 由于过滤掉了这些特征，所以受到的影响没有那么大
