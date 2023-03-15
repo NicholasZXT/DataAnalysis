@@ -8,8 +8,11 @@ import seaborn as sns
 plt.style.use("ggplot")
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split, KFold, cross_val_score, learning_curve, validation_curve
+from sklearn.model_selection import train_test_split, KFold, cross_val_score, learning_curve, validation_curve, GridSearchCV
 from sklearn.metrics import mean_squared_error as MSE, make_scorer
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor, GradientBoostingRegressor, StackingRegressor
+from xgboost import DMatrix, train as xgb_train, cv as xbg_cv, XGBRegressor
 
 # %% 数据加载
 # DATA_DIR = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\工业蒸汽量预测"
@@ -248,9 +251,9 @@ kde_deleted_cols = ['V5', 'V6', 'V9', 'V11', 'V17', 'V22', 'V23']
 # %% 计算训练集中各个特征和目标变量的相关性，绘制相关性热力图
 # 这里还绘制了各个特征之间的相关性
 corr_matrix = pd.concat([X_filter_outlier, y_filter_outlier], axis=1).corr()
-fig_corr = plt.figure(figsize=(14, 12), layout='tight')
-ax = fig_corr.add_subplot(111)
-sns.heatmap(data=corr_matrix, ax=ax, cmap='crest')
+# fig_corr = plt.figure(figsize=(14, 12), layout='tight')
+# ax = fig_corr.add_subplot(111)
+# sns.heatmap(data=corr_matrix, ax=ax, cmap='crest')
 # fig_corr.show()
 
 
@@ -290,6 +293,7 @@ X_test_box = box_cox_transform(X_test_scale, skew_cols_to_change)
 
 # ***************** 特征选择 ******************
 # 特征选择放到最后再做，因为一般来说，特征选择都会降低模型的效果
+# ------------ 基于 min-max 缩放 + Box-Cox 变换之后的 特征选择
 # %% 根据KDE的分析，从训练集和测试集中删除分布不一致的特征
 kde_used_cols = [v for v in X_boxcox.columns if v not in kde_deleted_cols]
 X_kde_filter = X_boxcox[kde_used_cols].copy()
@@ -311,12 +315,18 @@ print('kde_corr_used_cols: ', kde_corr_used_cols)
 X_cols_filter = X_boxcox[kde_corr_used_cols].copy()
 X_test_cols_filter = X_test_box[kde_corr_used_cols].copy()
 
+# %% ------------ 不做 缩放+变换的 数据的特征选择：适用于树模型 --------------
+X_cols_filter_no_box = X_filter_outlier[kde_corr_used_cols].copy()
+X_test_cols_filter_no_box = test_data[kde_corr_used_cols].copy()
+
 # ********************* 模型训练 *************************
-# %% 使用线性回归模型作为基准模型
+# %% ----------- 数据划分参数 --------------
 random_state = 29
 kf = KFold(n_splits=5, shuffle=True, random_state=random_state)
 train_split_args = {'train_size': 0.8, 'shuffle': True, 'random_state': random_state}
 mse_scorer = make_scorer(MSE)
+
+# %% ------------- 使用线性回归模型作为基准模型 ----------------------
 def lr_model_compute(X, y):
     lr = LinearRegression()
     X_train, X_test, y_train, y_test = train_test_split(X, y, **train_split_args)
@@ -410,3 +420,74 @@ y_test_pred_df[['lr_filter']].to_csv('steam_predict_lr_filter.txt', header=False
 # 说明这里估计泛化误差的方式有问题？？
 # 应该不是泛化误差的估计方式有问题，而是因为这里的训练集（被划分的train和test都属于这个训练集）中，部分特征的分布和待预测的测试集中差异很大——就
 # 像kde图展示的那样，导致 lr_naive 在待预测数据上的泛化性能与训练时的表现差异很大，而 lr_filter 由于过滤掉了这些特征，所以受到的影响没有那么大
+
+# %% ------------- 决策树模型和随机森林模型 -------------------
+# 直接上网格搜索
+# 划分 训练+验证集 和 测试集，树模型使用的是没有经过变换的数据，因为没有必要
+X_trainval, X_test, y_trainval, y_test = train_test_split(X_cols_filter_no_box, y_filter_outlier, **train_split_args)
+# 模型的基本参数还是要设定的
+dtr = DecisionTreeRegressor(criterion='squared_error', splitter='best', random_state=29, max_features=1.0)
+# 设定要搜索的超参数区间
+# 这里的参数组合共有 3*3*3*3 = 81 种，因此 最后的 .cv_results 里会有81行
+dtr_param_grid = {
+    'max_depth': [4, 6, 8],
+    'min_samples_split': [20, 40, 60],
+    'min_samples_leaf': [5, 10, 15],
+    # 'min_impurity_decrease': [1, 2, 3]
+}
+# 网格搜索对象, return_train_score=True 会返回训练集上的 score
+dtr_gridsearch = GridSearchCV(dtr, param_grid=dtr_param_grid, scoring=mse_scorer, cv=kf, return_train_score=True)
+# dtr_gridsearch = GridSearchCV(dtr, param_grid=dtr_param_grid, scoring=mse_scorer, cv=kf)
+dtr_gridsearch.fit(X_trainval, y_trainval)
+dtr_grid_result = pd.DataFrame(dtr_gridsearch.cv_results_)
+print(dtr_gridsearch.best_score_)
+print(dtr_gridsearch.best_params_)
+print(dtr_gridsearch.best_estimator_)
+# 获取最佳的模型
+dtr_best = dtr_gridsearch.best_estimator_
+y_dtr_pred = dtr_best.predict(X_test)
+dtr_best_err = MSE(y_test, y_dtr_pred)
+print('dtr_best_err: ', dtr_best_err)
+# 0.16623600567684033
+
+# %% ------------- 随机森林模型 -------------------
+rf = RandomForestRegressor(criterion='squared_error', random_state=random_state)
+rf_param_grid = {
+    'n_estimators': [30, 40, 50],
+    'max_features': [0.7, 0.8, 0.9],
+    'max_depth': [4, 6, 8],
+    'min_samples_split': [20, 40, 60],
+    'min_samples_leaf': [5, 10, 15]
+}
+rf_gridsearch = GridSearchCV(rf, param_grid=rf_param_grid, cv=kf, scoring=mse_scorer)
+rf_gridsearch.fit(X_trainval, y_trainval)
+rf_grid_result = pd.DataFrame(rf_gridsearch.cv_results_)
+# 最佳模型
+rf_best = rf_gridsearch.best_estimator_
+print('rf_gridsearch.best_score_: ', rf_gridsearch.best_score_)
+y_rf_pred = rf_best.predict(X_test)
+rf_best_err = MSE(y_test, y_rf_pred)
+print('rf_best_err: ', rf_best_err)
+# 0.14021970808240686
+
+# %% ---------------- GBDT 模型 ----------------------
+gbdt = GradientBoostingRegressor(loss='squared_error', criterion='squared_error', random_state=random_state)
+gbdt_param_grid = {
+    'n_estimators': [30, 40, 50],
+    'subsample': [0.8, 0.9],
+    'max_features': [0.7, 0.8, 0.9],
+    'max_depth': [4, 6, 8],
+    'min_samples_split': [20, 40, 60],
+    'min_samples_leaf': [5, 10, 15]
+}
+gbdt_gridsearch = GridSearchCV(gbdt, param_grid=gbdt_param_grid, cv=kf, scoring=mse_scorer)
+gbdt_gridsearch.fit(X_trainval, y_trainval)
+gbdt_grid_result = pd.DataFrame(gbdt_gridsearch.cv_results_)
+# 最佳模型
+gbdt_best = gbdt_gridsearch.best_estimator_
+print('gbdt_gridsearch.best_score_: ', gbdt_gridsearch.best_score_)
+y_gbdt_pred = gbdt_best.predict(X_test)
+gbdt_best_err = MSE(y_test, y_gbdt_pred)
+print('gbdt_best_err: ', gbdt_best_err)
+
+# %% -------------------- XGBoost -------------------------
