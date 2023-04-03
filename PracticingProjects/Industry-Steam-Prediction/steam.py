@@ -324,16 +324,18 @@ X_test_cols_filter_no_box = test_data[kde_corr_used_cols].copy()
 random_state = 29
 kf = KFold(n_splits=5, shuffle=True, random_state=random_state)
 train_split_args = {'train_size': 0.8, 'shuffle': True, 'random_state': random_state}
-mse_scorer = make_scorer(MSE)
+# 这里MSE是越小越好，而 scorer 是认为值越高，模型越好，所以构造 scorer 的时候，需要设置对应的参数——实际上内部也就是乘以-1反转一个符号
+mse_scorer = make_scorer(MSE, greater_is_better=False)
+# mse_scorer = make_scorer(MSE)   # 用这个会导致下面的GridSearchCV 拿到的best其实是最差的那个！！！
 
 # %% ------------- 使用线性回归模型作为基准模型 ----------------------
 def lr_model_compute(X, y):
     lr = LinearRegression()
     X_train, X_test, y_train, y_test = train_test_split(X, y, **train_split_args)
     lr.fit(X_train, y_train)
-    # sklearn的LinearRegression的score方法，默认返回的是 R^2
+    # sklearn的LinearRegression的score方法，默认返回的是 R^2，R^2是越高越好
     cv_score = cross_val_score(lr, X, y, cv=kf)
-    # 再计算一下 MSE 这个指标
+    # 再计算一下 MSE 这个指标，这个是越低越好
     cv_mse = cross_val_score(lr, X, y, cv=kf, scoring=mse_scorer)
     res_infos = ['train_score', 'test_score', 'cv_score_mean', 'cv_score_std', 'train_mse', 'test_mse', 'cv_mse_mean', 'cv_mse_std']
     res = [lr.score(X_train, y_train), lr.score(X_test, y_test), cv_score.mean(), cv_score.std(),
@@ -421,10 +423,13 @@ y_test_pred_df[['lr_filter']].to_csv('steam_predict_lr_filter.txt', header=False
 # 应该不是泛化误差的估计方式有问题，而是因为这里的训练集（被划分的train和test都属于这个训练集）中，部分特征的分布和待预测的测试集中差异很大——就
 # 像kde图展示的那样，导致 lr_naive 在待预测数据上的泛化性能与训练时的表现差异很大，而 lr_filter 由于过滤掉了这些特征，所以受到的影响没有那么大
 
-# %% ------------- 决策树模型和随机森林模型 -------------------
-# 直接上网格搜索
-# 划分 训练+验证集 和 测试集，树模型使用的是没有经过变换的数据，因为没有必要
+
+# %% ------------------- 训练树模型 --------------------------
+# 划分 训练+验证集 和 测试集，供树模型使用，树模型使用的是没有经过变换的数据，不需要做特征缩放和尺度变换
 X_trainval, X_test, y_trainval, y_test = train_test_split(X_cols_filter_no_box, y_filter_outlier, **train_split_args)
+
+# %% ------------- 决策树模型 -------------------
+# 直接上网格搜索
 # 模型的基本参数还是要设定的
 dtr = DecisionTreeRegressor(criterion='squared_error', splitter='best', random_state=29, max_features=1.0)
 # 设定要搜索的超参数区间
@@ -436,19 +441,21 @@ dtr_param_grid = {
     # 'min_impurity_decrease': [1, 2, 3]
 }
 # 网格搜索对象, return_train_score=True 会返回训练集上的 score
-dtr_gridsearch = GridSearchCV(dtr, param_grid=dtr_param_grid, scoring=mse_scorer, cv=kf, return_train_score=True)
-# dtr_gridsearch = GridSearchCV(dtr, param_grid=dtr_param_grid, scoring=mse_scorer, cv=kf)
+# dtr_gridsearch = GridSearchCV(dtr, param_grid=dtr_param_grid, scoring=mse_scorer, cv=kf, return_train_score=True)
+dtr_gridsearch = GridSearchCV(dtr, param_grid=dtr_param_grid, scoring=mse_scorer, cv=kf)
 dtr_gridsearch.fit(X_trainval, y_trainval)
 dtr_grid_result = pd.DataFrame(dtr_gridsearch.cv_results_)
-print(dtr_gridsearch.best_score_)
-print(dtr_gridsearch.best_params_)
-print(dtr_gridsearch.best_estimator_)
+# print(dtr_gridsearch.best_params_)
+# print(dtr_gridsearch.best_estimator_)
+print('dtr_gridsearch.best_score_: ', dtr_gridsearch.best_score_)
+# dtr_gridsearch.best_score_:  -0.16148550862171068
 # 获取最佳的模型
 dtr_best = dtr_gridsearch.best_estimator_
 y_dtr_pred = dtr_best.predict(X_test)
 dtr_best_err = MSE(y_test, y_dtr_pred)
 print('dtr_best_err: ', dtr_best_err)
-# 0.16623600567684033
+# 0.16623600567684033  # 这个是构造 mse_scorer 时没有反转的结果，实际上得到的是最差的模型
+# dtr_best_err:  0.15146598143898354  # 这个才是反转后，正确的最佳模型效果
 
 # %% ------------- 随机森林模型 -------------------
 rf = RandomForestRegressor(criterion='squared_error', random_state=random_state)
@@ -462,13 +469,15 @@ rf_param_grid = {
 rf_gridsearch = GridSearchCV(rf, param_grid=rf_param_grid, cv=kf, scoring=mse_scorer)
 rf_gridsearch.fit(X_trainval, y_trainval)
 rf_grid_result = pd.DataFrame(rf_gridsearch.cv_results_)
+print('rf_gridsearch.best_score_: ', rf_gridsearch.best_score_)
+# rf_gridsearch.best_score_:  -0.13113126002494507
 # 最佳模型
 rf_best = rf_gridsearch.best_estimator_
-print('rf_gridsearch.best_score_: ', rf_gridsearch.best_score_)
 y_rf_pred = rf_best.predict(X_test)
 rf_best_err = MSE(y_test, y_rf_pred)
 print('rf_best_err: ', rf_best_err)
-# 0.14021970808240686
+# 0.14021970808240686  # 错误结果，实际是最差的参数组合得到的模型
+# rf_best_err:  0.1275671021800174
 
 # %% ---------------- GBDT 模型 ----------------------
 gbdt = GradientBoostingRegressor(loss='squared_error', criterion='squared_error', random_state=random_state)
@@ -483,11 +492,79 @@ gbdt_param_grid = {
 gbdt_gridsearch = GridSearchCV(gbdt, param_grid=gbdt_param_grid, cv=kf, scoring=mse_scorer)
 gbdt_gridsearch.fit(X_trainval, y_trainval)
 gbdt_grid_result = pd.DataFrame(gbdt_gridsearch.cv_results_)
+print('gbdt_gridsearch.best_score_: ', gbdt_gridsearch.best_score_)
+# gbdt_gridsearch.best_score_:  -0.12891420385049318
 # 最佳模型
 gbdt_best = gbdt_gridsearch.best_estimator_
-print('gbdt_gridsearch.best_score_: ', gbdt_gridsearch.best_score_)
 y_gbdt_pred = gbdt_best.predict(X_test)
 gbdt_best_err = MSE(y_test, y_gbdt_pred)
 print('gbdt_best_err: ', gbdt_best_err)
+# gbdt_best_err:  0.13398586676158014  # 错误结果
+# gbdt_best_err:  0.12829631842152095
 
 # %% -------------------- XGBoost -------------------------
+# %% 使用 sklearn 接口，方便进行网格搜索
+xgb_param_grid = {
+    'n_estimators': [30, 40, 50],
+    'max_depth': [4, 6, 8],
+    'colsample_bytree': [0.8, 0.9, 1.0],
+}
+xgbr = XGBRegressor(
+    booster='gbtree',
+    objective='reg:squarederror',
+    learning_rate=0.3,
+    tree_method='exact',
+    gamma=0,
+    reg_alpha=0,
+    reg_lambda=1,
+    subsample=1,
+    base_score=0.5
+)
+xgb_gridsearch = GridSearchCV(xgbr, param_grid=xgb_param_grid, cv=kf, scoring=mse_scorer)
+xgb_gridsearch.fit(X_trainval, y_trainval)
+xgb_grid_result = pd.DataFrame(xgb_gridsearch.cv_results_)
+print('xgb_gridsearch.best_score_: ', xgb_gridsearch.best_score_)
+# xgb_gridsearch.best_score_:  -0.1407881867670907
+# 最佳模型
+xgb_best = xgb_gridsearch.best_estimator_
+y_xgb_pred = xgb_best.predict(X_test)
+xgb_test_error = MSE(y_test, y_xgb_pred)
+print('xgb_test_error: ', xgb_test_error)
+# xgb_test_error:  0.13102386768383154
+
+# %% 使用原生接口，但是不好进行网格搜索
+xgb_params = {
+    'booster': 'gbtree',
+    'objective': 'reg:squarederror',
+    'eta': 0.3,
+    'gamma': 0,
+    'max_depth': 6,
+    'lambda': 1,
+    'alpha': 0,
+    'subsample': 1,
+    'tree_method': 'auto',
+    'base_score': 0.5,
+    'eval_metric': ['rmse']
+}
+num_round = 20
+dtrain = DMatrix(data=X_trainval, label=y_trainval, feature_names=X_trainval.columns)
+dtest = DMatrix(data=X_test, label=y_test, feature_names=X_test.columns)
+xgb_bst = xgb_train(params=xgb_params, dtrain=dtrain, num_boost_round=num_round)
+y_xgb_pred = xgb_bst.predict(dtest)
+xgb_test_error = MSE(y_test, y_xgb_pred)
+print('xgb_test_error: ', xgb_test_error)
+xgb_bst.attributes()
+
+# %% ----------- 各类树模型预测效果检验 ------------------
+y_test_pred_rf = rf_best.predict(X_test_cols_filter_no_box)
+y_test_pred_gbdt = gbdt_best.predict(X_test_cols_filter_no_box)
+y_test_pred_xgb = xgb_best.predict(X_test_cols_filter_no_box)
+y_test_tree_pred_df = pd.DataFrame({'rf': y_test_pred_rf, 'gbdt': y_test_pred_gbdt, 'xgb': y_test_pred_xgb})
+y_test_tree_pred_df.to_csv('steam_predict_tree.txt', header=False, index=False)
+y_test_tree_pred_df[['rf']].to_csv('steam_predict_rf.txt', header=False, index=False)
+y_test_tree_pred_df[['gbdt']].to_csv('steam_predict_gbdt.txt', header=False, index=False)
+y_test_tree_pred_df[['xgb']].to_csv('steam_predict_xgb.txt', header=False, index=False)
+# 天池测试集结果
+# RF: 0.1801
+# GBDT: 0.1852
+# XGBoost: 0.2064
