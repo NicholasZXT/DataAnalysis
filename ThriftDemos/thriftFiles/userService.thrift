@@ -11,7 +11,7 @@ include "exception.thrift"
 service UserService {
 
   //Hello
-  void hello(),
+  string hello(),
 
   //获取用户列表
   list<user.User> listUser(),
