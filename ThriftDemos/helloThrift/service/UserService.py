@@ -62,7 +62,7 @@ class Client(Iface):
 
     def hello(self):
         self.send_hello()
-        self.recv_hello()
+        return self.recv_hello()
 
     def send_hello(self):
         self._oprot.writeMessageBegin('hello', TMessageType.CALL, self._seqid)
@@ -82,7 +82,9 @@ class Client(Iface):
         result = hello_result()
         result.read(iprot)
         iprot.readMessageEnd()
-        return
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "hello failed: unknown result")
 
     def listUser(self):
         self.send_listUser()
@@ -273,7 +275,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = hello_result()
         try:
-            self._handler.hello()
+            result.success = self._handler.hello()
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -458,7 +460,15 @@ hello_args.thrift_spec = (
 
 
 class hello_result(object):
+    """
+    Attributes:
+     - success
 
+    """
+
+
+    def __init__(self, success=None,):
+        self.success = success
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -469,6 +479,11 @@ class hello_result(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
+            if fid == 0:
+                if ftype == TType.STRING:
+                    self.success = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -479,6 +494,10 @@ class hello_result(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('hello_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.STRING, 0)
+            oprot.writeString(self.success.encode('utf-8') if sys.version_info[0] == 2 else self.success)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -497,6 +516,7 @@ class hello_result(object):
         return not (self == other)
 all_structs.append(hello_result)
 hello_result.thrift_spec = (
+    (0, TType.STRING, 'success', 'UTF8', None, ),  # 0
 )
 
 
