@@ -21,7 +21,7 @@ def main():
 
     # 执行业务方法
     print("------ hello -------")
-    client.hello()
+    print(client.hello())
     print("------ listUser -------")
     users = client.listUser()
     for user in users:
@@ -46,6 +46,10 @@ def main():
     print("------ deleteByUserId -------")
     user = client.deleteByUserId(u4.userId)
     print(user)
+    try:
+        user = client.deleteByUserId(u4.userId)
+    except UserNotFoundException as e:
+        print(e)
     try:
         user = client.deleteByUserId(105)
     except UserNotFoundException as e:

@@ -57,6 +57,8 @@ class UserServiceHandler:
         if userId in self.user_ids:
             userName = self.user_ids[userId]
             user = self.users[userName]
+            self.user_ids.pop(userId)
+            self.users.pop(userName)
             print(f"user [{userId}:{userName} was deleted.")
             return user
         else:
