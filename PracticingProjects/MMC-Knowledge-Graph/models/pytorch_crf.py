@@ -104,10 +104,13 @@ class CRF(nn.Module):
             tags = tags.transpose(0, 1)
             mask = mask.transpose(0, 1)
 
+        # 这里计算的是tags定义的真实路径取完对数的分数，实际上就是真实路径的 emission + transition 分数之和
         # shape: (batch_size,)
         numerator = self._compute_score(emissions, tags, mask)
+        # 这里是通过动态规划计算所有可能路径的分数之和，再取对数
         # shape: (batch_size,)
         denominator = self._compute_normalizer(emissions, mask)
+        # 这里计算的是 log{ exp(S_real) / SUM_i[ exp(S_i) ] }，得到的是 真实路径分数 / 所有可能路径分数 ，值越大越好
         # shape: (batch_size,)
         llh = numerator - denominator
 
