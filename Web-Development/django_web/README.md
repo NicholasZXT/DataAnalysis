@@ -1,3 +1,0 @@
-这是Django的练手项目文件夹。
-由于django_web这个项目文件夹在Web-Development文件夹目录之下，配置的时候，
-需要在pycharm里设置django_web为SourcesRoot，然后才能识别到其中的app。
