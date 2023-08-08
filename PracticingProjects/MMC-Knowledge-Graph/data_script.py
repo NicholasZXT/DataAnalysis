@@ -3,19 +3,22 @@ import json
 from typing import List
 from collections import Counter
 from sklearn.model_selection import train_test_split
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, default_collate
 from datasets import GeneratorBasedBuilder, Version, BuilderConfig, DatasetInfo, Features, Value, DownloadManager, \
     SplitGenerator, Split
 
 DATA_PATH = r"C:\Users\Drivi\Documents\技术书籍\datasets\瑞金MMC知识图谱构建\0521_new_format"
 # MMC 数据集实体类型
 ENTITIES_TYPE = ['Disease', 'Class', 'Reason', 'Pathogenesis', 'Symptom', 'Test', 'Test_Items', 'Test_Value', 'Drug',
-            'Frequency', 'Amount', 'Method', 'Treatment', 'Operation', 'ADE', 'Anatomy', 'Level', 'Duration']
+                 'Frequency', 'Amount', 'Method', 'Treatment', 'Operation', 'ADE', 'Anatomy', 'Level', 'Duration']
 # MMC 数据集实体关系类型
 ENTITIES_RELATIONS = []
 
 
 class MmcVocabulary:
+    """
+    构建MMC语料库的词表，实现 字到词表索引 的 双向映射
+    """
     def __init__(self):
         self._word2id = dict()
         # 两个特殊的字符
@@ -32,14 +35,14 @@ class MmcVocabulary:
             self._word2id[word] = idx
             self._id2word.append(word)
 
-    def word2id(self, word: str):
+    def word2idx(self, word: str):
         # 没找到就返回 UNK 的 id
         return self._word2id.get(word, 1)
 
-    def id2word(self, idx):
-        return self._word2id[idx]
+    def idx2word(self, idx):
+        return self._id2word[idx]
         # if 0 <= idx < len(self._id2word):
-        #     return self._word2id[idx]
+        #     return self._id2word[idx]
         # else:
         #     raise IndexError(f"index out of range: {idx}")
 
@@ -50,11 +53,12 @@ class MmcVocabulary:
         """
         if not os.path.exists(data_path):
             raise FileNotFoundError(f"not found data path: {data_path}")
-        files = os.listdir(DATA_PATH)
+        files = os.listdir(data_path)
         counter = Counter()
         vocab = cls()
         for file in files:
-            file_path = os.path.join(DATA_PATH, file)
+            file_path = os.path.join(data_path, file)
+            print(f"processing file: {file_path}")
             with open(file_path, mode='r', encoding='utf-8') as f:
                 doc = json.load(f)
                 for para in doc['paragraphs']:
@@ -71,23 +75,23 @@ class MmcVocabulary:
         {'O': 0, 'B-LOC': 1, 'I-LOC': 2, 'E-LOC': 3, 'S-LOC': 4, 'B-PER': 5, 'I-PER': 6', 'E-PER': 7, 'S-PER': 8}
         """
         index = 0
-        marks = ['B-', 'I-', 'E-', 'S-']
         tag_to_index = {'O': index}
         index_to_tag = {index: 'O'}
+        marks = ['B-', 'I-', 'E-', 'S-']
         for entity in entities:
             for mark in marks:
                 item = mark + entity
+                index += 1
                 tag_to_index[item] = index
                 index_to_tag[index] = item
-                index += 1
         return tag_to_index, index_to_tag
 
 
 # 适用于BiLSTM+CRF的数据集
 class MmcDatasetV1(Dataset):
-    def __init__(self, data_dir):
-        self.vocab = MmcVocabulary.generate_vocabulary(DATA_PATH)
-        self.tag2idx, self.idx2tag = MmcVocabulary.generate_entities_bioes_tag(entities=ENTITIES_TYPE)
+    def __init__(self, data_dir, entites_type):
+        self.vocab = MmcVocabulary.generate_vocabulary(data_dir)
+        self.tag2idx, self.idx2tag = MmcVocabulary.generate_entities_bioes_tag(entities=entites_type)
 
     def __getitem__(self, item):
         pass
@@ -157,22 +161,29 @@ class MmcDataset(GeneratorBasedBuilder):
         pass
 
 
-
 if __name__ == '__main__':
-    # entities = ['LOC', 'PERSON', 'TIME']
-    # ent2idx, idx2ent = generate_entities_bioes_map(entities)
-
-    os.path.exists(DATA_PATH)
-    files = os.listdir(DATA_PATH)
-    train_val, test = train_test_split(files, train_size=0.8, random_state=32, shuffle=True)
-    train, validation = train_test_split(files, train_size=0.8, random_state=32, shuffle=True)
-    data_jsons = []
-    for file in test:
-        file = '1.json'
-        file_path = os.path.join(DATA_PATH, file)
-        with open(file_path, mode='r', encoding='utf-8') as f:
-            doc = json.load(f)
-            data_jsons.append(doc)
+    # os.path.exists(DATA_PATH)
+    # files = os.listdir(DATA_PATH)
+    # train_val, test = train_test_split(files, train_size=0.8, random_state=32, shuffle=True)
+    # train, validation = train_test_split(files, train_size=0.8, random_state=32, shuffle=True)
+    # data_jsons = []
+    # for file in test:
+    #     file = '1.json'
+    #     file_path = os.path.join(DATA_PATH, file)
+    #     with open(file_path, mode='r', encoding='utf-8') as f:
+    #         doc = json.load(f)
+    #         data_jsons.append(doc)
 
     vocab = MmcVocabulary.generate_vocabulary(DATA_PATH)
+    vocab.idx2word(0)
+    vocab.idx2word(1)
+    vocab.idx2word(2)
+    vocab.word2idx('UNK')
+    vocab.word2idx('PAD')
+    vocab.word2idx('糖')
+
+    entities = ['LOC', 'PERSON']
+    ent2idx, idx2ent = MmcVocabulary.generate_entities_bioes_tag(entities)
+    print(ent2idx)
+    print(idx2ent)
 
