@@ -31,16 +31,4 @@ class BiLstmCRF(Module):
 
 
 if __name__ == '__main__':
-    batch_size, seq_length, num_tags = 2, 3, 5
-    crf_model = CRF(num_tags=num_tags, batch_first=True)
-    emissions = torch.randn(batch_size, seq_length, num_tags)
-    tags = torch.tensor([[0, 2, 3], [1, 4, 1]], dtype=torch.long)
-    # 这个得到的是每个 batch 的 真实路径的概率
-    log_out = crf_model(emissions=emissions, tags=tags, reduction='none')
-    # 这里做了 sum
-    log_out_sum = crf_model(emissions=emissions, tags=tags, reduction='sum')
-
-    # 使用维特比算法进行预测
-    emissions_pred = torch.randn(1, seq_length, num_tags)
-    # 得到序列中每个token的预测label序列
-    tags_pred = crf_model.decode(emissions_pred)
+    pass
