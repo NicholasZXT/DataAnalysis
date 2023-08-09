@@ -2,18 +2,22 @@ import os
 import json
 from typing import List
 from collections import Counter
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader, default_collate
 from datasets import GeneratorBasedBuilder, Version, BuilderConfig, DatasetInfo, Features, Value, DownloadManager, \
     SplitGenerator, Split
 
-DATA_PATH = r"C:\Users\Drivi\Documents\技术书籍\datasets\瑞金MMC知识图谱构建\0521_new_format"
-OUT_PATH = r"C:\Users\Drivi\Documents\技术书籍\datasets\瑞金MMC知识图谱构建\process"
+# DATA_PATH = r"C:\Users\Drivi\Documents\技术书籍\datasets\瑞金MMC知识图谱构建\0521_new_format"
+# OUT_PATH = r"C:\Users\Drivi\Documents\技术书籍\datasets\瑞金MMC知识图谱构建\process"
+DATA_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\MMC知识图谱构建\0521_new_format"
+OUT_PATH = r"D:\Project-Workspace\Python-Projects\DataAnalysis\local-datasets\MMC知识图谱构建\process"
+
 # MMC 数据集实体类型
-ENTITIES_TYPE = ['Disease', 'Class', 'Reason', 'Pathogenesis', 'Symptom', 'Test', 'Test_Items', 'Test_Value', 'Drug',
+ENTITY_TYPES = ['Disease', 'Class', 'Reason', 'Pathogenesis', 'Symptom', 'Test', 'Test_Items', 'Test_Value', 'Drug',
                  'Frequency', 'Amount', 'Method', 'Treatment', 'Operation', 'ADE', 'Anatomy', 'Level', 'Duration']
 # MMC 数据集实体关系类型
-ENTITIES_RELATIONS = []
+ENTITY_RELATIONS = []
 
 
 def sentence_extract(data_path, out_path):
@@ -45,12 +49,12 @@ def sentence_extract(data_path, out_path):
 
 class EntityTagMap:
     """
-    根据实体类型列表，构建 BIOS 的实体标记 tag，并进行对应的转换
+    根据实体类型列表，构建 BIOES 的实体标记 tag，并进行对应的转换
     """
     marks = {'begin': 'B-', 'middle': 'I-', 'end': 'E-', 'single': 'S-'}
 
-    def __init__(self, entity_types):
-        self.entity_types = entity_types
+    def __init__(self, entity_types: List[str]):
+        self.entity_types = set(entity_types)
         # 非实体对应的tag
         self._id2tag = ['O']
         self._tag2id = {'O': 0}
@@ -68,14 +72,14 @@ class EntityTagMap:
     def generate_entities_bioes_tag(cls, entity_types: List[str]):
         """
         根据传入的实体类别，构建 BIOES 标注方式的实体索引字典。
-        比如传入为 [LOC, PER]，构建一个BIO标注序列的实体索引字典为：
+        比如传入为 [LOC, PER]，构建一个 BIOES 标注序列的实体索引字典为：
         {'O': 0, 'B-LOC': 1, 'I-LOC': 2, 'E-LOC': 3, 'S-LOC': 4, 'B-PER': 5, 'I-PER': 6', 'E-PER': 7, 'S-PER': 8}
         """
         entity_map = cls(entity_types=entity_types)
         # marks = ['B-', 'I-', 'E-', 'S-']
         marks = entity_map.marks.values()
         index = 1  # 0 留给了初始化时的非实体tag
-        for entity in entities:
+        for entity in entity_types:
             for mark in marks:
                 tag = mark + entity
                 entity_map.update(index, tag)
@@ -90,10 +94,10 @@ class EntityTagMap:
 
     def get_entity_tag(self, entity: str, category: str):
         """
-        根据传入的实体，和实体的标记位置 {begin, middle, end, single}，返回实体的 tag 和 index
+        根据传入的实体类型，和实体的标记位置 {begin, middle, end, single}，返回实体类型的 tag 和 index
         """
         if entity not in self.entity_types:
-            raise ValueError(f"entity '{entity}' is not valid")
+            raise ValueError(f"entity type '{entity}' is not valid")
         if category not in self.marks:
             raise ValueError(f"cagetory value must in {self.marks.keys()}")
         mark = self.marks[category]
@@ -106,7 +110,6 @@ class EntityTagMap:
         id2tags = {idx: self._id2tag[idx] for idx in range(len(self._id2tag))}
         out = f"""{{\n'id2tags': {str(id2tags)}, \n'tags2id': {str(self._tag2id)}\n}}"""
         return str(out)
-
 
 
 class MmcVocabulary:
@@ -164,9 +167,9 @@ class MmcVocabulary:
 
 # 适用于BiLSTM+CRF的数据集
 class MmcDatasetV1(Dataset):
-    def __init__(self, data_dir, vocab: MmcVocabulary, entites_type):
+    def __init__(self, data_dir, vocab: MmcVocabulary, entity_types):
         self.vocab = vocab
-        self.tag2idx, self.idx2tag = EntityTagMap.generate_entities_bioes_tag(entities=entites_type)
+        self.entity_map = EntityTagMap.generate_entities_bioes_tag(entity_types=entity_types)
         if not os.path.exists(data_dir):
             raise FileNotFoundError(f"data_dir '{data_dir}' not found")
         self.base_dir = data_dir
@@ -178,7 +181,55 @@ class MmcDatasetV1(Dataset):
     def __getitem__(self, index):
         file = self._files[index]
         file_path = os.path.join(self.base_dir, file)
+        with open(file_path, mode='r') as f:
+            sentence_info = json.load(f)
+        # 对单个句子进行处理，根据实体信息，将句子转换成实体类型的 BIOES 标记序列
+        sent_tags, sent_tags_idx = self.process_sentence_info(sentence_info)
+        return sent_tags, sent_tags_idx
 
+    def process_sentence_info(self, sentence_info: dict):
+        sent = sentence_info['sentence']
+        sent_tags = ['O' for _ in sent]
+        sent_entities = sentence_info['entities']
+        # sent_entities_df = pd.DataFrame(sent_entities)
+        # start_idx 是实体开始的索引（包含），end_idx 是实体结束的索引（不包含）
+        # 会出现实体嵌套、实体交叉的情况  --------------------- KEY
+        # 对所有实体按照 start_idx 升序，end_idx 降序排列，然后检查前后的实体是否有交叉、嵌套的情况
+        sent_entities = sorted(sent_entities, key=lambda item: (item['start_idx'], -item['end_idx']))
+        sent_entities[0]['valid'] = True  # 第一个实体标记为有效
+        self.label_sent_with_valid_entity(sent_tags, sent_entities[0], self.entity_map)
+        prev_end = sent_entities[0]['end_idx']  # 前一个有效实体的结束索引
+        # 从第二个实体开始遍历检查
+        for i in range(1, len(sent_entities)):
+            pre_entity = sent_entities[i - 1]
+            cur_entity = sent_entities[i]
+            # 当前实体的 start 在 上一个实体的 end 之前，或者在 上一个有效实体的 end 之前，则丢弃当前实体
+            if cur_entity['start_idx'] < pre_entity['end_idx'] or cur_entity['start_idx'] < prev_end:
+                cur_entity['valid'] = False
+            else:
+                # 当前实体没有和前面的实体交叉或者重叠，有效
+                cur_entity['valid'] = True
+                # 对 sent_tags 进行标记
+                self.label_sent_with_valid_entity(sent_tags, cur_entity, self.entity_map)
+                prev_end = cur_entity['end_idx']
+        sent_tags_idx = [entity_map.tag2idx(tag) for tag in sent_tags]
+        return sent_tags, sent_tags_idx
+
+    @staticmethod
+    def label_sent_with_valid_entity(sent_tags: List[str], entity_item: dict, entity_map: EntityTagMap):
+        """根据有效的实体 entity_item，对 sent_tags 进行标记"""
+        entity = entity_item['entity_type']   # 实体类型
+        start_idx = entity_item['start_idx']  # 实体包含开始的索引
+        end_idx = entity_item['end_idx']      # 但不包含结束的索引
+        if start_idx >= end_idx:
+            pass
+        elif start_idx == end_idx - 1:
+            sent_tags[start_idx] = entity_map.get_entity_tag(entity, 'single')
+        else:
+            sent_tags[start_idx] = entity_map.get_entity_tag(entity, 'begin')
+            for i in range(start_idx+1, end_idx):
+                sent_tags[i] = entity_map.get_entity_tag(entity, 'middle')
+            sent_tags[end_idx-1] = entity_map.get_entity_tag(entity, 'end')
 
 
 
@@ -244,18 +295,6 @@ class MmcDataset(GeneratorBasedBuilder):
 
 
 if __name__ == '__main__':
-    # os.path.exists(DATA_PATH)
-    # files = os.listdir(DATA_PATH)
-    # train_val, test = train_test_split(files, train_size=0.8, random_state=32, shuffle=True)
-    # train, validation = train_test_split(files, train_size=0.8, random_state=32, shuffle=True)
-    # data_jsons = []
-    # for file in test:
-    #     file = '1.json'
-    #     file_path = os.path.join(DATA_PATH, file)
-    #     with open(file_path, mode='r', encoding='utf-8') as f:
-    #         doc = json.load(f)
-    #         data_jsons.append(doc)
-
     vocab = MmcVocabulary.generate_vocabulary(DATA_PATH)
     vocab.idx2word(0)
     vocab.idx2word(1)
@@ -266,24 +305,40 @@ if __name__ == '__main__':
 
     entities = ['LOC', 'PERSON']
     # entity_map = EntityTagMap.generate_entities_bioes_tag(entities)
-    entity_map = EntityTagMap.generate_entities_bioes_tag(ENTITIES_TYPE)
+    entity_map = EntityTagMap.generate_entities_bioes_tag(ENTITY_TYPES)
     # print(entity_map)
 
     sentence_extract(DATA_PATH, OUT_PATH)
 
     file = os.path.join(OUT_PATH, '1-0-0.json')
     with open(file) as f:
-        sample = json.load(f)
-    sent = sample['sentence']
-    sent_entities = sample['entities']
+        sentence_info = json.load(f)
+    sent = sentence_info['sentence']
     sent_tags = ['O' for _ in sent]
-    for item in entities:
-        start_idx = item['star_idx']
-        end_idx = item['end_idx']
-        entity = item['entity_type']
-        if start_idx == end_idx:
-            sent_tags[start_idx] = entity_map.get_entity_tag(entity, 'single')
+    sent_entities = sentence_info['entities']
+    # sent_entities_df = pd.DataFrame(sent_entities)
+    # start_idx 是实体开始的索引（包含），end_idx 是实体结束的索引（不包含）
+    # 会出现实体嵌套、实体交叉的情况  --------------------- KEY
+    # 对所有实体按照 start_idx 升序，end_idx 降序排列，然后检查前后的实体是否有交叉、嵌套的情况
+    sent_entities = sorted(sent_entities, key=lambda item: (item['start_idx'], -item['end_idx']))
+    sent_entities[0]['valid'] = True  # 第一个实体标记为有效
+    MmcDatasetV1.label_sent_with_valid_entity(sent_tags, sent_entities[0], entity_map)
+    prev_end = sent_entities[0]['end_idx']  # 前一个有效实体的结束索引
+    # 从第二个实体开始遍历检查
+    for i in range(1, len(sent_entities)):
+        pre_entity = sent_entities[i-1]
+        cur_entity = sent_entities[i]
+        # 当前实体的 start 在 上一个实体的 end 之前，或者在 上一个有效实体的 end 之前，则丢弃当前实体
+        if cur_entity['start_idx'] < pre_entity['end_idx'] or cur_entity['start_idx'] < prev_end:
+            cur_entity['valid'] = False
         else:
-            for i in range(start=start_idx, stop=end_idx+1):
-                pass
+            # 当前实体没有和前面的实体交叉或者重叠，有效
+            cur_entity['valid'] = True
+            # 对 sent_tags 进行标记
+            MmcDatasetV1.label_sent_with_valid_entity(sent_tags, cur_entity, entity_map)
+            prev_end = cur_entity['end_idx']
+    sent_tags_idx = [entity_map.tag2idx(tag) for tag in sent_tags]
+
+
+
 
