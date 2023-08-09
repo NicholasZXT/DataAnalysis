@@ -341,3 +341,21 @@ class CRF(nn.Module):
             best_tags_list.append(best_tags)
 
         return best_tags_list
+
+
+if __name__ == '__main__':
+    batch_size, seq_length, num_tags = 2, 3, 5
+    crf_model = CRF(num_tags=num_tags, batch_first=True)
+    # 随机生成一个传入的 emissions
+    emissions = torch.randn(batch_size, seq_length, num_tags)
+    # 每一行是 序列中 各个位置的标签（以标签的序号表示）
+    tags = torch.tensor([[0, 2, 3], [1, 4, 1]], dtype=torch.long)
+    # 这个得到的是每个 batch 里 各个序列 的 真实路径的概率
+    log_out = crf_model(emissions=emissions, tags=tags, reduction='none')
+    # 这里对一个 batch 中的 所有样本 做了 sum
+    log_out_sum = crf_model(emissions=emissions, tags=tags, reduction='sum')
+
+    # 使用维特比算法进行预测
+    emissions_pred = torch.randn(1, seq_length, num_tags)
+    # 得到序列中 每个token 的 预测label
+    tags_pred = crf_model.decode(emissions_pred)
