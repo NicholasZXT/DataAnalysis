@@ -4,12 +4,13 @@ from configparser import ConfigParser
 import yaml
 import json
 import logging
+import logging.config  # 必须要有这一句导入，因为 config 不在 logging 的 __init__.py 下
 import psutil
 import getopt
 import argparse
 import zipfile
 
-PWD = os.path.basename()
+# PWD = os.path.basename()
 
 def OS_Practice():
     # ================== 系统资源监控 ============================
@@ -80,7 +81,7 @@ def Logging_Practice():
     print("------------ 默认根日志器-----------------")
     # 日志格式
     # LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
-    LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
+    LOG_FORMAT = "[%(levelname)s][%(asctime)s] %(message)s"
     # 日期格式
     # DATE_FORMAT = "%Y-%m-%d %H:%M:%S %p"
     DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -89,7 +90,6 @@ def Logging_Practice():
     logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT, datefmt=DATE_FORMAT)
     # 输出到文件
     # logging.basicConfig(filename='my.log', level=logging.DEBUG, format=LOG_FORMAT, datefmt=DATE_FORMAT)
-
     # 记录各种级别的日志
     logging.debug("This is a debug log.")
     logging.info("This is a info log.")
@@ -100,20 +100,17 @@ def Logging_Practice():
     # 手动设置
     print("------------手动配置日志------------------")
     # create logger
-    logger = logging.getLogger(__name__)
+    # logger = logging.getLogger(__name__)  # 此时__name__ 一般是 __main__
+    logger = logging.getLogger('Custom')
     logger.setLevel(logging.DEBUG)
-
     # create console handler and set level to debug
     # 这个多设置了一个 handler 之后，由于这个 handler 也是输出到控制台的，所以同一条日志信息会被打印两次
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
-
     # create formatter
     formatter = logging.Formatter(fmt='%(asctime)s  %(name)s  %(levelname)s : %(message)s', datefmt=DATE_FORMAT)
-
     # add formatter to ch
     ch.setFormatter(formatter)
-
     # add ch to logger
     logger.addHandler(ch)
 
@@ -123,6 +120,31 @@ def Logging_Practice():
     logger.warning('warn message')
     logger.error('error message')
     logger.critical('critical message')
+
+    # -------------------------------------------------------------------------------------------------------
+    # 从文件读取日志配置，有两种方式：
+    # 1. 使用 logging.config.fileConfig 从 .ini 格式读取，解析工作依赖于 configparser
+    # 2. 使用 logging.config.dictConfig 从 python字典 读取——这个API比较新（Python3.2开始），推荐使用这个
+    print("------------INI文件配置------------------")
+    # 从 .ini 文件读取
+    # 由于 .ini 文件中有中文，在python 3.10 之前，需要手动设置 configParser 解码方式
+    cp = ConfigParser()
+    cp.read('config_logging.ini', encoding="utf-8")
+    logging.config.fileConfig(fname=cp)
+    # encoding 是 python 3.10 之后新增的参数
+    # logging.config.fileConfig('config_logging.ini', encoding='utf-8')
+    # create logger
+    simple_logger = logging.getLogger('simpleExample')
+    # 'application' code
+    simple_logger.debug('debug message')
+    simple_logger.info('info message')
+    simple_logger.warning('warn message')
+    simple_logger.error('error message')
+    simple_logger.critical('critical message')
+
+    print("------------dict文件配置------------------")
+    # 对于字典配置来说，可以有更加自由的处理方式，比如读取 yaml 文件为字典，然后传入，不过有点麻烦
+    # logging.config.dictConfig()
 
 
 # ===================命令行参数解析================================
@@ -179,6 +201,7 @@ def Args_Parse():
     args_a_res = parser.parse_args(args_a)
     args_b_res = parser.parse_args(args_b)
 
+
 # ========= 使用 zipfile 读取压缩文件 ===========
 def Zipfile_Practice():
     path = r"D:\Desktop\光伏专项\冀北光伏\yc_meter_archives.zip"
@@ -210,6 +233,8 @@ if __name__ == "__main__":
     args = sys.argv
     # print("name: ", args[0])
     # print("args: ", args)
+
+    Logging_Practice()
 
     # t = os.environ.get("es", "localhost:19200")
 
