@@ -358,7 +358,7 @@ class EsClient:
 def __Kafka_Practice():
     pass
 
-bootstrap_servers=['kafka-1:19091', 'kafka-2:19092', 'kafka-3:19093']
+bootstrap_servers = ['kafka-1:19091', 'kafka-2:19092', 'kafka-3:19093']
 # --------------- 生产者 ----------------
 producer = KafkaProducer(bootstrap_servers=bootstrap_servers)
 # 消费者配置列表
@@ -427,6 +427,7 @@ consumer.seek_to_beginning()
 consumer = KafkaConsumer('my-topic', bootstrap_servers=bootstrap_servers, auto_offset_reset='earliest')
 # 有两种消费方式
 # 第 1 种，没有获取到消息时会阻塞
+# 可以在上面的参数里设置 consumer_timeout_ms=2000 参数，表示等待 2s 后没有消费到数据就停止，跳出阻塞
 for message in consumer:
     # message 直接就是 kafka.consumer.fetcher.ConsumerRecord 类实例
     print("message.class: ", type(message))
@@ -444,3 +445,37 @@ record = v1[0]
 
 # 关闭消费者——这个方法重复调用也不会引发异常
 consumer.close()
+
+
+def kafka_export(topic, out_dir):
+    consumer = KafkaConsumer(topic, bootstrap_servers=bootstrap_servers, auto_offset_reset='earliest', consumer_timeout_ms=2000)
+    total = 0
+    cols = []
+    if not os.path.exists(out_dir):
+        print(f"out_dir '{out_dir}' not exist, please check !")
+        raise FileNotFoundError(f"out_dir '{out_dir}' not exist, please check !")
+    out_file = os.path.join(out_dir, topic+'.tsv')
+    with open(out_file, mode='w', encoding='utf-8') as file:
+        for message in consumer:
+            # message 直接就是 kafka.consumer.fetcher.ConsumerRecord 类实例
+            # print("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition, message.offset, message.key, message.value.decode()))
+            value = message.value.decode()
+            data = json.loads(value)
+            print(data)
+            if len(cols) == 0:
+                cols = list(data.keys())
+                for col in cols:
+                    file.write(col + '\t')
+                file.write('end_col\n')
+            for col in cols:
+                file.write(str(data.get(col, '')) + '\t')
+            file.write('end\n')
+            total += 1
+    consumer.close()
+    print(f"export total: {total}")
+
+topic = 'my-topic'
+kafka_export(topic, os.getcwd())
+# 读取方式
+# df = pd.read_csv(os.path.join(os.getcwd(), topic+'.tsv'), delimiter='\t', header=0, na_values='None')
+# print(df.head(3))
