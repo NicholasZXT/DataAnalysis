@@ -1,5 +1,8 @@
 # coding:utf8
 from torch import nn
+"""
+下面两个是DCGAN的生成器和判别器
+"""
 
 
 class NetG(nn.Module):
@@ -11,7 +14,7 @@ class NetG(nn.Module):
         ngf = opt.ngf  # 生成器feature map数
         self.main = nn.Sequential(
             # 输入是一个nz维度的噪声，我们可以认为它是一个1*1*nz的feature map
-            nn.ConvTranspose2d(in_channels=opt.nz, out_channels=ngf * 8, kernel_size=4, stride=1, padding=0, bias=False),
+            nn.ConvTranspose2d(in_channels=opt.nz, out_channels=ngf*8, kernel_size=4, stride=1, padding=0, bias=False),
             nn.BatchNorm2d(ngf * 8),
             nn.ReLU(True),
             # 上一步的输出形状：(ngf*8) x 4 x 4
