@@ -15,7 +15,7 @@ class Visualizer:
 
     def __init__(self, env='default', **kwargs):
         import visdom
-        self.vis = visdom.Visdom(env=env, use_incoming_socket=False,**kwargs)
+        self.vis = visdom.Visdom(env=env, use_incoming_socket=False, **kwargs)
 
         # 画的第几个数，相当于横座标
         # 保存（’loss',23） 即loss的第23个点
@@ -26,7 +26,7 @@ class Visualizer:
         """
         修改visdom的配置
         """
-        self.vis = visdom.Visdom(env=env,use_incoming_socket=False, **kwargs)
+        self.vis = visdom.Visdom(env=env, use_incoming_socket=False, **kwargs)
         return self
 
     def plot_many(self, d):
@@ -71,14 +71,12 @@ class Visualizer:
         一个batch的图片转成一个网格图，i.e. input（36，64，64）
         会变成 6*6 的网格图，每个格子大小64*64
         """
-        self.img(name, tv.utils.make_grid(
-            input_3d.cpu()[0].unsqueeze(1).clamp(max=1, min=0)))
+        self.img(name, tv.utils.make_grid(input_3d.cpu()[0].unsqueeze(1).clamp(max=1, min=0)))
 
     def log(self, info, win='log_text'):
         """
         self.log({'loss':1,'lr':0.0001})
         """
-
         self.log_text += ('[{time}] {info} <br>'.format(
             time=time.strftime('%m%d_%H%M%S'),
             info=info))
