@@ -255,4 +255,5 @@ if __name__ == '__main__':
     end = datetime.now()
     print(f"*********** end training at {end.strftime('%Y-%m-%d %H:%M:%S')} ***********")
     print(f"training time in seconds: {(end-start).seconds}")
-    # RTX 2070S: epoch 200, batch_size 256*3, 耗时约 3h 10m
+    # RTX 2070-Super: epoch 200, batch_size 256*3, 耗时约 5940 s
+    # RTX 3060-12G: epoch 200, batch_size 256*3, 耗时约 4439 s
