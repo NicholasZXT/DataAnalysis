@@ -10,7 +10,7 @@ import pandas as pd
 from elasticsearch.exceptions import ConflictError, RequestError
 from elasticsearch import helpers, Elasticsearch, RequestError
 
-from kafka import KafkaClient, KafkaProducer, KafkaConsumer
+from kafka import KafkaClient, KafkaProducer, KafkaConsumer, TopicPartition
 from kafka.errors import KafkaTimeoutError
 
 
@@ -479,3 +479,29 @@ kafka_export(topic, os.getcwd())
 # 读取方式
 # df = pd.read_csv(os.path.join(os.getcwd(), topic+'.tsv'), delimiter='\t', header=0, na_values='None')
 # print(df.head(3))
+
+def count_topic_records(bootstrap_servers, topic: str):
+    """
+    统计指定topic下，所有partition里的数据记录总数
+    """
+    consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers)
+    # 获取指定topic的所有partition id
+    partition_ids = list(consumer.partitions_for_topic(topic))
+    # 构造TopicPartition对象
+    partitions = [TopicPartition(topic, par_id) for par_id in partition_ids]
+    offset_begin = consumer.beginning_offsets(partitions=partitions)
+    offset_end = consumer.end_offsets(partitions=partitions)
+    # offset_begin或offset_end是一个dict，key是TopicPartition对象，value是offset
+    total = 0
+    for par in partitions:
+        par_begin = offset_begin[par]
+        par_end = offset_end[par]
+        par_record_num = par_end - par_begin
+        total += par_record_num
+        print(f"topic '{topic}' partition@[{par.partition}]: offset_start={par_begin}, offset_end={par_end}, record_num={par_record_num}.")
+    print(f"total records in topic '{topic}' of {len(partitions)} partitions: {total}.")
+    return total
+
+bootstrap_servers = ['hadoop101:9092', 'hadoop102:9092', 'hadoop103:9092']
+topic = 'my-topic'
+count_topic_records(bootstrap_servers, topic)
