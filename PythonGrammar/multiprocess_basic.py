@@ -193,6 +193,7 @@ def worker(level, msg):
     # 这种方式不必使用 join 等待，返回的结果就是直接是函数的返回结果
     # with Pool(3) as pool:
     #     res = pool.apply(worker, ('process', 'worker-1'))
+    #     # 返回值就是 worker方法 的返回值
     #     print("worker-1 is done, res is :", res)
     #     res = pool.apply(worker, ('process', 'worker-2'))
     #     print("worker-2 is done, res is :", res)
@@ -202,21 +203,37 @@ def worker(level, msg):
     # 使用 apply_async 进行异步调用，返回的 res 是一个 pool.ApplyResult 对象
     # 必须要 使用 join 方法开启任务
     # pool = Pool(3)
-    # res = pool.apply_async(worker, ('process', 'worker-1'))
-    # print("worker-1 is done, res is: ", res)
-    # res = pool.apply_async(worker, ('process', 'worker-2'))
-    # print("worker-2 is done, res is: ", res)
-    # res = pool.apply_async(worker, ('process', 'worker-3'))
-    # print("worker-3 is done, res is: ", res)
+    # res1 = pool.apply_async(worker, ('process', 'worker-1'))
+    # print("worker-1 is done, res is: ", res1)
+    # res2 = pool.apply_async(worker, ('process', 'worker-2'))
+    # print("worker-2 is done, res is: ", res2)
+    # res3 = pool.apply_async(worker, ('process', 'worker-3'))
+    # print("worker-3 is done, res is: ", res3)
+    # print(f"res1.__class__: {type(res1)}")
+    # # 判断是否执行完成，它不会抛出异常
+    # print(f"res1.ready(): {res1.ready()}")
+    # # 但是下面的这个方法会抛出 ValueError 异常
+    # # print(f"res1.successful(): {res1.successful()}")
     # print("----start----")
-    # pool.close()  # 关闭进程池，关闭后po不再接收新的请求
-    # pool.join()  # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
+    # pool.close()  # 关闭进程池，关闭后po不再接收新的请求 —— 必须要在 .join() 前调用此方法
+    # pool.join()   # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
     # print("-----end-----")
+    # # 在执行完成后检查则不会抛出异常
+    # print(f"res1.successful(): {res1.successful()}")
+    # # wait() 会等待结果执行完成，可以设置 timeout 参数，它不会返回任何值
+    # print(f"res1.wait(): {res1.wait()}")
+    # # get() 用于获取结果，可以设置 timeout 参数
+    # print(f"res1.get(): {res1.get()}")
 
-    # 使用 map 方法一次提交多个进程，使用进程池中的所有进程并行执行某个函数 ----- 不好用
+    # 使用 map/starmap 方法一次提交多个进程，使用进程池中的所有进程并行执行某个函数 ----- 不太好用
+    # map 只能给函数传一个参数，starmap 可以传入多个参数
     # pool = Pool(3)
-    # pool.map(worker, [('process', 'worker-1')])
-    # # pool.map(worker, [('process', 'worker-1'), ('process', 'worker-2'), ('process', 'worker-3')])
+    # # 这里由于 worker 有两个参数，所以要使用 starmap
+    # # res = pool.starmap(worker, [('process', 'worker-1')])
+    # res = pool.starmap(worker, [('process', 'worker-1'), ('process', 'worker-2'), ('process', 'worker-3')])
+    # # 上面的方法会阻塞，直到进程池执行完毕
+    # # 返回的 res 是一个 list，其中的值就是 worker 的返回值
+    # print(res)
     # print("----start----")
     # pool.close()  # 关闭进程池，关闭后po不再接收新的请求
     # pool.join()  # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
