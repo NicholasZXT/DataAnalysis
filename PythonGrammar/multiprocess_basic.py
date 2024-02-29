@@ -12,6 +12,11 @@ from multiprocessing import Process, Pool, Semaphore, Condition, current_process
 from multiprocessing import Queue as MQueue
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
+# Python里的多线程并发编程相比Java要简单很多，没有synchronize，volatile等关键字，主要原因（针对CPython实现）如下：
+# 1. Python里面大部分的单次操作/方法都是原子性的，这里的原子性准确来说是该操作对应的是Python字节码的一行，再加上GIL的存在，所以不太需要 synchronize
+# 2. Python里的读写操作，都是从主内存里读取的，同样也加上GIL的存在，所以多线程里不会出现CPU缓存不一致的情况，也就不需要 volatile 关键字
+# 待解决的一个疑问是：Python里的多线程，是否会从头到尾都只使用CPU的同一个Core？ 我个人感觉答案应该是否
+
 # =================== 基本的线程使用 ============================
 # 方法一，传入线程里要执行的函数
 def my_fun(num):
@@ -300,6 +305,7 @@ def increment_without_lock():
     global shared_resource_without_lock
     for i in range(COUNT):
         print("increment without lock: ", shared_resource_without_lock)
+        # += 这个操作不是原子性的
         shared_resource_without_lock += 1
         sleep(0.1)
 
@@ -319,6 +325,7 @@ def decrement_without_lock():
     # t4 = threading.Thread(target=decrement_without_lock)
     # t1.start(), t2.start(), t1.join(), t2.join()
     # print("------------shared_resource_with_lock: ", shared_resource_with_lock, "-----------")
+    # 下面的这个无锁冲突演示，实践中不那么容易成功
     # t3.start(), t4.start(), t3.join(), t4.join()
     # print("------------shared_resource_with_no_lock: ", shared_resource_without_lock, "-----------")
 
