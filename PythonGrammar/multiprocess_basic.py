@@ -190,6 +190,14 @@ def worker(level, msg):
     print("{} of {} sleep for {:.4f} second.".format(level, msg, sleep_time))
     return sleep_time
 
+def show(msg):
+    print("msg '{}' starting, process id is: {}.".format(msg, os.getpid()))
+    # random.random()随机生成0~1之间的浮点数
+    sleep_time = random.random()*5
+    sleep(sleep_time)
+    # print("msg '{}' sleep for {:.4f} second.".format(msg, sleep_time))
+    # return sleep_time
+    return msg
 
 # if __name__ == "__main__":
     # -------- Pool 的使用------------------
@@ -243,6 +251,13 @@ def worker(level, msg):
     # pool.close()  # 关闭进程池，关闭后po不再接收新的请求
     # pool.join()  # 等待po中所有子进程执行完成，再执行下面的代码,可以设置超时时间join(timeout=)
     # print("-----end-----")
+
+    # Pool.map 方法有一个 chunksize 参数，指定一次传一批数据到子进程了，而不是每次传一条
+    # pool = Pool(2)
+    # # res = pool.map(show, [1, 2, 3, 4, 5, 6, 7, 8])
+    # res = pool.map(show, [1, 2, 3, 4, 5, 6, 7, 8], chunksize=4)
+    # # 返回的结果顺序并不会乱
+    # print(res)
 
     # --------- 使用  concurrent.futures ---------------------
     # 线程池

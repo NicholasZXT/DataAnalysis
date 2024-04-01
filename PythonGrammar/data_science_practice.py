@@ -13,15 +13,16 @@ def Numpy_Practice():
     rng = np.random.RandomState(0)
 
     # 测试数组占据的内存大小
-    a1 = rng.rand(1000, 1000)
+    # 下面产生的是 float64 数组，每个 float64 占用 8个Byte
+    a1 = rng.rand(1024, 1024)    # 理论上是占用 8MB
+    a11 = a1.astype(np.float32)  # 转成 32位，理论占用 4MB
     a2 = rng.rand(10000, 1000)
     a3 = rng.rand(10000, 10000)
     a4 = rng.rand(20000, 10000)
     a5 = rng.rand(20000, 20000)
-    a11 = a1.astype(np.float32)
     # __sizeof__() 返回的单位是 Byte, 转成 MB
-    a1.__sizeof__()/(1024*1024)   # 7.63 MB, 100 0000 个 float 数
-    a11.__sizeof__()/(1024*1024)
+    a1.__sizeof__()/(1024*1024)   # 约 8MB, 1024 * 1024 个 float64 数
+    a11.__sizeof__()/(1024*1024)  # 约 4MB, 1024 * 1024 个 float32 数
     a2.__sizeof__()/(1024*1024)   # 76.3 MB, 1000 0000 个 float 数
     a3.__sizeof__()/(1024*1024)   # 762.94 MB, 1 0000 0000 个
     a4.__sizeof__()/(1024*1024)   # 1525.88 MB, 2 0000 0000 个
