@@ -112,12 +112,31 @@ def show_self_df(value):
 # print("-"*16)
 # ========================================================================
 
+"""
+下面这段在 if __name__ == '__main__' 之前开启进程池的代码，只能在 fork 模式下执行；
+spawn模式下，不论是Windows还是Linux，都会报错。
+"""
+# mp.set_start_method('spawn')
+# print("*" * 8 + " main code: pid[{}] run pool.map ".format(os.getpid()) + "*" * 8 + "\n")
+# pool = Pool(2)
+# res = pool.map(show_df, df_list)
+# print(res)
+# # 再开一次进程池
+# print("\n" + "+" * 8 + " main code: pid[{}] run pool.map again ".format(os.getpid()) + "+" * 8 + "\n")
+# pool = Pool(2)
+# res = pool.map(show_df, df_list)
+# print(res)
+
 print("before main code....")
 
 if __name__ == '__main__':
-    # mp.set_start_method('spawn')
-    # mp.set_start_method('forkserver')
-    print("start main code....")
+    # process_mode = 'spawn'
+    # process_mode = 'fork'  # Windows下没有这个模式
+    # process_mode = 'forkserver'
+    # mp.set_start_method(process_mode)
+
+    print("start main code ....")
+    # print("start main code with mode {} ....".format(process_mode))
 
     """
     如果在 if __name__ == '__main__' **之后** 产生测试数据，根据平台会有如下情况：
@@ -141,6 +160,12 @@ if __name__ == '__main__':
     # 主要使用下面的方式进行研究
     print("*"*8 + " main code: pid[{}] run pool.map ".format(os.getpid()) + "*"*8 + "\n")
     # 查看 Pool 类的实现，可以发现，下面这句执行完之后，子进程就已经启动了，并且使用了一个 queue.SimpleQueue() 来存放后续 map 放入的任务
+    pool = Pool(2)
+    res = pool.map(show_df, df_list)
+    print(res)
+
+    # 研究下再开一次进程池的影响，可以发现，不论是 spawn 还是 fork 模式，上面 __name__ 之后的进程池代码不会被二次执行
+    print("\n" + "+"*8 + " main code: pid[{}] run pool.map again ".format(os.getpid()) + "+"*8 + "\n")
     pool = Pool(2)
     res = pool.map(show_df, df_list)
     print(res)
