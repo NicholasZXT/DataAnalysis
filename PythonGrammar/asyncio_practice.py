@@ -7,68 +7,120 @@ import asyncio
 # =============== 使用 asyncio 的前置准备 =========================
 # 使用 asyncio 之前需要了解的一些内容
 
-# 生成器 不是协程
+# 下面使用 yield 定义的是一个 生成器函数，不是生成器，也不是协程
 def hello_generator(first_print, second_print):
     print(first_print)
-    yield
+    # 只要在函数里使用了 yield关键字，就是生成器函数，而且可以使用多次yield
+    yield "hello_generator yield"
     # yield from 'ab'
     print(second_print)
+    # 从 Python 3.3 开始，生成器函数末尾可以使用 return ，但是这个返回值实际上是放在抛出的 StopIteration 异常对象的 value 属性里
+    return "hello_generator result"
 
 def hello_gengerator_check():
     # 检查函数定义（没有调用之前）的对象
     print(hello_generator)
+    # <function hello_generator at 0x0000029A69DD0CA0>
     print(type(hello_generator))
+    # <class 'function'>
     # 不是 generator
-    print(inspect.isgenerator(hello_generator))
+    print(inspect.isgenerator(hello_generator))  # False
     # 也不是 协程
-    print(inspect.iscoroutine(hello_generator))
-    # 而是生成器函数(generatorfunction)
-    print(inspect.isgeneratorfunction(hello_generator))
+    print(inspect.iscoroutine(hello_generator))  # False
+    # 而是 生成器函数(generatorfunction)
+    print(inspect.isgeneratorfunction(hello_generator))  # True
     # 不是 协程函数(coroutinefunction)
-    print(inspect.iscoroutinefunction(hello_generator))
-    # 检查函数调用之后的对象
+    print(inspect.iscoroutinefunction(hello_generator))  # False
+
+    # 检查函数调用之后的对象：调用生成器函数，会返回一个生成器对象
     t1 = hello_generator('first', 'second')
-    # 调用之后，才是 generator
+    # 调用之后，返回一个 generator
     print(t1)
+    # <generator object hello_generator at 0x0000029A69DD4AC0>
     print(type(t1))
+    # <class 'generator'>
     # 此时才是 generator
-    print(inspect.isgenerator(t1))
+    print(inspect.isgenerator(t1))  # True
     # 但依旧不是协程
-    print(inspect.iscoroutine(t1))
+    print(inspect.iscoroutine(t1))  # False
+
     # 检查调用状态
     print(inspect.getgeneratorstate(t1))
+    # GEN_CREATED
     # 生成器可以使用 next() 激活，也可以使用 send(None) 激活
-    t1.send(None)
+    r = t1.send(None)
+    # r 是 yield 后面交出的 "hello_generator yield"
+    print(r)
     print(inspect.getgeneratorstate(t1))
-    next(t1)
+    # GEN_SUSPENDED
+    # 再次调用，会抛出 StopIteration 异常，并且 r 拿不到任何值
+    # r = next(t1)
+    # 除非自己处理该异常
+    try:
+        next(t1)  # 这里不会返回任何值，因为抛了异常
+    except StopIteration as e:
+        # hello_generator 的返回值是放在抛出的异常对象里
+        r = e.value
+    print(r)
     print(inspect.getgeneratorstate(t1))
+    # GEN_CLOSED
 
+    # 可以使用 for 循环来自动处理 迭代 和 StopIteration 异常，但是要注意，for循环获取的项目里，并不包含 return 后的返回值
+    t2 = hello_generator('first', 'second')
+    for item in t2:
+        # 不会打印最后返回的 "hello_generator result"
+        print(item)
+
+# --------------------------------------------------------------
 
 # 原生协程的定义，只需要用 async 即可，await不是必须的
 async def hello_coroutine(first_print, second_print):
     print(first_print)
     time.sleep(1)
     print(second_print)
-
+    # 协程的返回值有两种方式可以拿到：
+    # 1. 使用 await 关键字调用协程，等待返回结果，这是常用方式
+    # 2. 使用 StopIteration 异常获取，不常用
+    return "hello_coroutine"
 
 def hello_coroutine_check():
     # 检查协程定义
-    print(hello_coroutine)
     # 未调用之前，是function，并且是 coroutinefunction 类型
+    print(hello_coroutine)
+    # <function hello_coroutine at 0x0000029A6738CCA0>
     print(type(hello_coroutine))
-    print(inspect.iscoroutine(hello_coroutine))
-    print(inspect.iscoroutinefunction(hello_coroutine))
-    # 调用之后，才是协程类型
+    # <class 'function'>
+    # 不是协程
+    print(inspect.iscoroutine(hello_coroutine))  # False
+    # 是协程函数
+    print(inspect.iscoroutinefunction(hello_coroutine))  # True
+
+    # 检查调用
+    # 调用之后，才是协程类型，注意，t2 是协程对象，不是 hello_coroutine 的返回值
     t2 = hello_coroutine('first', 'second')
     print(t2)
+    # <coroutine object hello_coroutine at 0x0000029A69D82040>
     print(type(t2))
-    print(inspect.iscoroutine(t2))
+    # <class 'coroutine'>
+    print(inspect.iscoroutine(t2))  # True
     # 查看协程状态
     print(inspect.getcoroutinestate(t2))
-    # 原生协程不可以使用 next 激活，可以调用 send(None) 激活
-    next(t2)
-    t2.send(None)
+    # CORO_CREATED
 
+    # 原生协程不可以使用 next 激活
+    # next(t2)  # 抛异常 TypeError: 'coroutine' object is not an iterator
+    # 可以调用 send(None) 激活，不过下面会抛 StopIteration: hello_coroutine 异常
+    # r = t2.send(None)
+    # t2.close()
+    # 和生成器函数一样，可以在 StopIteration 异常的 value 属性里获取协程返回值
+    try:
+        t2.send(None)
+    except StopIteration as e:
+        r = e.value
+    print(r)
+
+
+# --------------------------------------------------------------
 
 # async + yield 定义的不是协程，而是 async_generator：异步生成器
 # async + yield from 会抛出语法错误
@@ -78,6 +130,8 @@ async def hello_mix(first_print, second_print):
     # async 里不能使用yield from
     # yield from 'abc'
     print(second_print)
+    # 异步生成器不能有返回值
+    # return "hello_mix"
 
 
 def hello_mix_check():
@@ -112,6 +166,7 @@ def hello_mix_check():
     t3.send(None)
     # 这个东西不是很常用
 
+# --------------------------------------------------------------
 
 # 带有 await 的协程
 # await 表示交出CPU的控制权：
@@ -366,7 +421,7 @@ asyncio.run(main_parallel())
 
 
 # ---------- asyncio.run() 底层的操作 -------------
-# asyncio.run(main2()) 对应的底层操作如下（在交互式里无法运行）
+# asyncio.run(main2()) 对应的底层操作如下（在交互式里无法运行，除非使用IPython）
 loop = asyncio.get_event_loop()
 task = loop.create_task(main2())
 loop.run_until_complete(task)
