@@ -79,7 +79,7 @@ async def hello_coroutine(first_print, second_print):
     time.sleep(1)
     print(second_print)
     # 协程的返回值有两种方式可以拿到：
-    # 1. 使用 await 关键字调用协程，等待返回结果，这是常用方式
+    # 1. 使用 await 关键字调用协程，等待返回结果，这是常用方式 —— 这一点要特别关注
     # 2. 使用 StopIteration 异常获取，不常用
     return "hello_coroutine"
 
@@ -96,7 +96,8 @@ def hello_coroutine_check():
     print(inspect.iscoroutinefunction(hello_coroutine))  # True
 
     # 检查调用
-    # 调用之后，才是协程类型，注意，t2 是协程对象，不是 hello_coroutine 的返回值
+    # “调用”之后，返回的是协程类型，注意，返回的 t2 是协程对象，不是 hello_coroutine 的返回值 ----------------- KEY
+    # 实际上，下面这种方式并不是真正调用协程函数，它只是创建了一个协程对象，必须放在下面的 await 关键字后面才是对协程函数的调用！！！
     t2 = hello_coroutine('first', 'second')
     print(t2)
     # <coroutine object hello_coroutine at 0x0000029A69D82040>
@@ -170,13 +171,15 @@ def hello_mix_check():
 
 # 带有 await 的协程
 # await 表示交出CPU的控制权：
-# 如果后面跟的是自定义的协程，那就是将执行权交给后面的协程；
-# 如果后面跟的是asyncio里的对象，那么就是将执行权交给asyncio的事件循环，由事件循环来将控制权交到下一个协程里
+# 1. 如果后面跟的是自定义的协程，那就是将执行权交给后面的协程；
+# 2. 如果后面跟的是asyncio里的对象，那么就是将执行权交给asyncio的事件循环，由事件循环来将控制权交到下一个协程里
+# 还有一个关键点：只有 await 关键词才能触发对协程的调用（还有对应的异常），拿到协程的返回值（包括异常） ------------------ KEY
 async def hello_await(first_print, second_print):
     print(first_print)
-    # await 后面的对象必须是 awaitable 的
-    # 协程是 awaitable 对象
-    await hello_coroutine('c1', 'c2')
+    # await 后面的对象必须是 awaitable 的 —— 协程是 awaitable 对象
+    res = await hello_coroutine('c1', 'c2')
+    # hello_coroutine('c1', 'c2') 返回一个协程对象，await 关键字会调用这个协程对象并等待结果，最终拿到协程的返回值赋值给res ------- KEY
+    print("res: ", res)
 
     # 如果使用 asyncio 的sleep() 方法，那就不能单独使用这个协程，必须要通过 asyncio 里的事件循环来驱动此协程
     # await asyncio.sleep(1)
@@ -211,21 +214,22 @@ def hello_await_check():
 # 协程用于定义和封装需要执行代码，Task对象用于封装协程（它是Future对象的子类），驱动协程的执行，事件循环用于排定多个Task对象，在Task对象中转移控制权
 
 # 定义一个协程，其中 await 了其他的协程，注意，这里面没有使用 asyncio 提供的任何函数
-async def fun_1():
-    print(f"fun_1 start")
+async def hello_asyncio():
+    print(f"hello_asyncio start")
     # 使用 await 的地方，会在之后的异步函数执行开始之后，暂停当前函数的执行，等到其他异步函数执行完了，再继续执行——这和正常函数调用栈一样
     # 不同的地方在于，异步的调用只能保证顺序为 fun_1 > hello_coroutine('c1', 'c2')  > hello_coroutine('c3', 'c4')
     # 但是不能保证 hello_coroutine('c1', 'c2') 返回后马上继续执行 hello_coroutine('c3', 'c4')
     await hello_coroutine('c1', 'c2')
     await hello_coroutine('c3', 'c4')
-    print(f"fun_1 end")
+    print(f"hello_asyncio end")
 
-f1 = fun_1()
-print(inspect.iscoroutine(f1))
-# 自己手动执行激活协程，不过由于没有异常处理，最后返回的时候会抛出 StopIteration 异常
-f1.send(None)
-# 将该协程交给 asyncio 提供的事件循环执行，asyncio.run()会提供所需的事件循环+协程驱动+异常处理
-asyncio.run(f1)
+def hello_asyncio_run():
+    f1 = hello_asyncio()
+    print(inspect.iscoroutine(f1))
+    # 自己手动执行激活协程，不过由于没有异常处理，最后返回的时候会抛出 StopIteration 异常
+    f1.send(None)
+    # 将该协程交给 asyncio 提供的事件循环执行，asyncio.run()会提供所需的事件循环+协程驱动+异常处理
+    asyncio.run(f1)
 
 
 # ------- 下面开始使用 asyncio 提供的一系列API 运行协程 --------
@@ -239,10 +243,12 @@ async def say_after(delay, what):
     await asyncio.sleep(delay)
     print(f"{what} ==> at {time.strftime('%X')}.")
 
-f2 = say_after(1, 'nothing')
-# 由于使用了 asyncio.sleep()，所以不能自己执行该协程，只能通过 asyncio 里的事件驱动来执行
-# f2.send(None)  # 这个会报错
-asyncio.run(f2)
+
+def say_after_run():
+    f2 = say_after(1, 'nothing')
+    # 由于使用了 asyncio.sleep()，所以不能自己执行该协程，只能通过 asyncio 里的事件驱动来执行
+    # f2.send(None)  # 这个会报错
+    asyncio.run(f2)
 
 
 # 下面的 5 个 main 函数，展示了asyncio基于事件循环的一些运行差异
@@ -255,6 +261,9 @@ async def main1():
     仅有的 main1()协程需要等 await 返回结果，于是就等待1秒后继续执行 asyncio.sleep()，返回结果，执行完成 say_after，再继续执行 main1() 协程.
     遇到第 2 个 sayafter 协程时，重复上面的步骤，整个过程虽然是异步，但是结果显示和同步执行是一样的。
     """
+    # 如果不使用 await，下面这句会抛出 RuntimeWarning: coroutine 'say_after' was never awaited
+    # 理由就如之前所述，下面这样“调用”对于协程来说，并不是真正的调用执行，它只是返回一个协程对象，并不会执行其中的代码，只有在 await 后面才是真正的调用执行
+    # say_after(3, 'No await')
     print(f"started at {time.strftime('%X')}.")
     # 这里通过 await 将控制权交给另一个协程
     await say_after(1, 'task1')
@@ -424,6 +433,7 @@ asyncio.run(main_parallel())
 # asyncio.run(main2()) 对应的底层操作如下（在交互式里无法运行，除非使用IPython）
 loop = asyncio.get_event_loop()
 task = loop.create_task(main2())
+# 上面两句也是 asyncio.create_task() 内部的操作
 loop.run_until_complete(task)
 pending = asyncio.all_tasks(loop=loop)
 for task in pending:
