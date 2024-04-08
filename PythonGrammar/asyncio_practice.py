@@ -243,14 +243,68 @@ async def say_after(delay, what):
     await asyncio.sleep(delay)
     print(f"{what} ==> at {time.strftime('%X')}.")
 
-
 def say_after_run():
     f2 = say_after(1, 'nothing')
     # 由于使用了 asyncio.sleep()，所以不能自己执行该协程，只能通过 asyncio 里的事件驱动来执行
     # f2.send(None)  # 这个会报错
     asyncio.run(f2)
 
+# --------------------------
+# 要想更清楚的了解 await 后面跟普通协程，和跟 asyncio提供的协程的区别，可以看下面的用例
+def show_current_tasks():
+    """获取当前事件循环里未完成的Task，并打印出来"""
+    tasks = [t.get_name() for t in asyncio.all_tasks()]
+    print("running tasks in loop: ", tasks)
 
+async def say_after_minus(delay, what):
+    """递归调用函数"""
+    # 此函数里没有调用 asyncio 的任何协程，所以不会将CPU控制权交还给 asyncio提供的事件循环
+    print(f"{what} <== at {time.strftime('%X')}.")
+    if delay > 1:
+        # 每次递归，delay-1，然后 await 下一次递归的协程
+        next_delay = delay - 1
+        await say_after_minus(next_delay, "Task-sleep-"+str(next_delay))
+    else:
+        # 直到 delay=1 时，打印当前事件循环里的所有Task，检查前面几次递归的 say_after_minus 是否出现在事件循环里 ----- KEY
+        show_current_tasks()
+    print(f"{what} ==> at {time.strftime('%X')}.")
+
+async def entry():
+    # 用 entry 再进行一次封装，看看这个 entry 会不会被放到事件循环里
+    await say_after_minus(4, 'Task-sleep-4')
+
+async def main_loop_check():
+    # 首先直接创建两个Task，它们肯定会被放入事件循环里
+    t1 = asyncio.create_task(say_after(4, "t1"), name='t1')
+    t2 = asyncio.create_task(say_after(4, "t2"), name='t2')
+    # 然后 await 自定义协程，在最里层的递归返回处，获取当前事件循环里的所有Task
+    await entry()
+    # 下面的两个 await 可以不用写，不写的话，t1, t2可能执行不完
+    await t1
+    await t2
+
+# asyncio.run(main_loop_check())
+
+# 上面的调试结果如下：
+# Task-sleep-4 <== at 11:33:36.
+# Task-sleep-3 <== at 11:33:36.
+# Task-sleep-2 <== at 11:33:36.
+# Task-sleep-1 <== at 11:33:36.
+# running tasks in loop:  ['Task-1', 't1', 't2']
+# Task-sleep-1 ==> at 11:33:36.
+# Task-sleep-2 ==> at 11:33:36.
+# Task-sleep-3 ==> at 11:33:36.
+# Task-sleep-4 ==> at 11:33:36.
+# t1 <== at 11:33:36.
+# t2 <== at 11:33:36.
+# t1 ==> at 11:33:40.
+# t2 ==> at 11:33:40.
+# 可以看出，在递归返回处，获取事件循环里所有Task时，只拿到了3个Task，其中Task-1应该是 main_loop_check()，
+# 并没有显示 entry(), say_after_minus() 的多次递归，说明这些自定义协程并没有放入事件循环里，
+# await 将CPU控制权交给了这些自定义协程，没有交给asyncio的事件循环
+
+
+# -----------------------------------------------------------------------------------
 # 下面的 5 个 main 函数，展示了asyncio基于事件循环的一些运行差异
 async def main1():
     """
@@ -376,6 +430,7 @@ def run_main():
     asyncio.run(main4())
     asyncio.run(main5())
 
+# run_main()
 
 # -------------------------------------------------------------------
 # 下面的这个例子，用来展示 await 下，异步编程的执行逻辑和顺序编程的执行逻辑的区别
@@ -426,40 +481,41 @@ async def main_parallel():
     # 不像上面调用 asyncio.create_task 那样在创建 Task 对象的时候就开始执行了
     # await say_after(1, 'task5')
 
-asyncio.run(main_parallel())
+# asyncio.run(main_parallel())
 
 
 # ---------- asyncio.run() 底层的操作 -------------
-# asyncio.run(main2()) 对应的底层操作如下（在交互式里无法运行，除非使用IPython）
-loop = asyncio.get_event_loop()
-task = loop.create_task(main2())
-# 上面两句也是 asyncio.create_task() 内部的操作
-loop.run_until_complete(task)
-pending = asyncio.all_tasks(loop=loop)
-for task in pending:
-    task.cancel()
-group = asyncio.gather(*pending, return_exceptions=True)
-loop.run_until_complete(group)
-loop.close()
+def asyncio_deep():
+    # asyncio.run(main2()) 对应的底层操作如下（在交互式里无法运行，除非使用IPython）
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(main2())
+    # 上面两句也是 asyncio.create_task() 内部的操作
+    loop.run_until_complete(task)
+    pending = asyncio.all_tasks(loop=loop)
+    for task in pending:
+        task.cancel()
+    group = asyncio.gather(*pending, return_exceptions=True)
+    loop.run_until_complete(group)
+    loop.close()
 
 
 # ---------------------------------------------------------
 # 异步编程需要注意的使用事项
-async def fun():
+async def fun_return():
     result = {'result': 'test result'}
     # 这里必须要加上 await
     await asyncio.sleep(1)
     return result
 
-async def main():
+async def fun_return_check():
     # 不加 await 调用fun 时，得到的是一个 协程对象，不是该函数的返回结果 ！！！！
     # 下面这句会引发 RuntimeWarning: coroutine 'fun' was never awaited
-    res1 = fun()
+    res1 = fun_return()
     print("res1.__class__: ", type(res1))
     print("res1: ", res1)
     # 只有 await + 调用fun 时，得到的才是函数的返回结果
-    res2 = await fun()
+    res2 = await fun_return()
     print("res2.__class__: ", type(res2))
     print("res2: ", res2)
 
-asyncio.run(main())
+# asyncio.run(fun_return_check())
