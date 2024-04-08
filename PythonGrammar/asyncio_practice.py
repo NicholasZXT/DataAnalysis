@@ -251,6 +251,7 @@ def say_after_run():
 
 # --------------------------
 # 要想更清楚的了解 await 后面跟普通协程，和跟 asyncio提供的协程的区别，可以看下面的用例
+# 重点是：直接 await 一个协程，并没有将它放到事件循环里进行执行 ------------------------- KEY
 def show_current_tasks():
     """获取当前事件循环里未完成的Task，并打印出来"""
     tasks = [t.get_name() for t in asyncio.all_tasks()]
@@ -302,6 +303,34 @@ async def main_loop_check():
 # 可以看出，在递归返回处，获取事件循环里所有Task时，只拿到了3个Task，其中Task-1应该是 main_loop_check()，
 # 并没有显示 entry(), say_after_minus() 的多次递归，说明这些自定义协程并没有放入事件循环里，
 # await 将CPU控制权交给了这些自定义协程，没有交给asyncio的事件循环
+
+async def main_loop_check_v2():
+    t1 = asyncio.create_task(say_after(4, "t1"), name='t1')
+    t2 = asyncio.create_task(say_after(4, "t2"), name='t2')
+    # t2 = asyncio.create_task(say_after(5, "t2"), name='t2')
+    # 调整下 await 的顺序
+    await t1
+    await entry()
+    await t2
+
+# asyncio.run(main_loop_check_v2())
+# 运行结果如下
+# t1 <== at 11:54:40.
+# t2 <== at 11:54:40.
+# t1 ==> at 11:54:44.
+# t2 ==> at 11:54:44.
+# Task-sleep-4 <== at 11:54:44.
+# Task-sleep-3 <== at 11:54:44.
+# Task-sleep-2 <== at 11:54:44.
+# Task-sleep-1 <== at 11:54:44.
+# running tasks in loop:  ['Task-1']
+# Task-sleep-1 ==> at 11:54:44.
+# Task-sleep-2 ==> at 11:54:44.
+# Task-sleep-3 ==> at 11:54:44.
+# Task-sleep-4 ==> at 11:54:44.
+# 如果调整了 await 的顺序，则会发现，await t1 之后，t2也执行完了，所以拿到的task只有一个；
+# 可能的猜想：await t1 时，CPU控制权交还给事件循环，它执行到 t1里的 await 之后，转而去执行事件循环里的t2，等到 t2 的await，转向执行 t1
+# 剩余部分（此时 t2 可能执行完，也可能没执行完），然后控制权交到 entry() 这个自定义协程，等这个自定义协程执行完。
 
 
 # -----------------------------------------------------------------------------------
