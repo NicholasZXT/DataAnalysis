@@ -505,3 +505,136 @@ def count_topic_records(bootstrap_servers, topic: str):
 bootstrap_servers = ['hadoop101:9092', 'hadoop102:9092', 'hadoop103:9092']
 topic = 'my-topic'
 count_topic_records(bootstrap_servers, topic)
+
+
+def now_time():
+    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def topic_summary(consumer: KafkaConsumer, topic: str, timeout: int=0):
+    # topic = 'tyc_dishonest_person_integrated_circuit'
+    # 获取指定topic的所有partition id
+    partition_ids = list(consumer.partitions_for_topic(topic))
+    # 构造TopicPartition对象
+    partitions = [TopicPartition(topic, par_id) for par_id in partition_ids]
+    offset_start = consumer.beginning_offsets(partitions=partitions)
+    offset_end = consumer.end_offsets(partitions=partitions)
+    # offset_begin或offset_end是一个dict，key是TopicPartition对象，value是offset
+    total = 0
+    start_time, end_time = None, None
+    # print(f"[{now_time()}] {topic} -> before for loop...")
+    for par in partitions:
+        par_start = offset_start[par]
+        par_end = offset_end[par]
+        par_record_num = par_end - par_start
+        total += par_record_num
+        print(f"[{now_time()}] topic '{topic}' partition@[{par.partition}]: offset_start={par_start}, offset_end={par_end}, record_num={par_record_num}.")
+        # 下面这个判断很重要，对于空的partition，默认下会一直阻塞 ----- KEY
+        # 如果设置了 consumer_timeout_ms，则该topic每次查询此partition都会超时，此时如果设置了重试逻辑，则会一直重试，直到超出最大次数
+        if par_record_num == 0:
+            print(f"[{now_time()}] topic '{topic}' partition@[{par.partition}]: empty partition, skip query timestamp...")
+            continue
+        consumer.assign([par])
+        rec_start, rec_end = None, None
+        # print(f"[{now_time()}] {topic} -> for loop -> partition[{par.partition}] -> seek_to_beginning ...")
+        # 获取当前partition最早的记录时间
+        consumer.seek_to_beginning()
+        r = consumer.poll(max_records=1, timeout_ms=timeout)
+        # print(f"[{now_time()}] {topic} -> for loop -> partition[{par.partition}] -> seek_to_beginning -> scroll ...")
+        for rec in consumer:
+            rec_start = rec
+            break
+        # print(f"[{now_time()}] {topic} -> for loop -> partition[{par.partition}] -> seek_to_end ...")
+        # 获取当前partition最新记录的时间
+        consumer.seek(partition=par, offset=max(par_end-1, 0))
+        # 另一种方式
+        # consumer.seek_to_end()
+        # last_pos = consumer.position(par)
+        # consumer.seek(partition=par, offset=last_pos-1)
+        r = consumer.poll(max_records=1, timeout_ms=timeout)
+        # print(f"[{now_time()}] {topic} -> for loop -> partition[{par.partition}] -> seek_to_end -> scroll ...")
+        for rec in consumer:
+            rec_end = rec
+            break
+        # 有了上面的 if par_record_num == 0 的判断，这里检查就没有必要了
+        # if rec_start is None or rec_end is None:
+        #     print(f"[{now_time()}] topic '{topic}' partition@[{par.partition}]: failed to query record time...")
+        #     raise TimeoutError
+        par_start_time = datetime.fromtimestamp(rec_start.timestamp/1000)
+        par_end_time = datetime.fromtimestamp(rec_end.timestamp/1000)
+        print(f"[{now_time()}] topic '{topic}' partition@[{par.partition}]: "
+              f"offset_start={par_start} at {par_start_time.strftime('%Y-%m-%d %H:%M:%S')}, "
+              f"offset_end={par_end} at {par_end_time.strftime('%Y-%m-%d %H:%M:%S')}, record_num={par_record_num}.")
+        if start_time and start_time <= par_start_time:
+            pass
+        else:
+            start_time = par_start_time
+        if end_time and par_end_time <= end_time:
+            pass
+        else:
+            end_time = par_end_time
+        # sleep(0.2)
+    start_time = start_time.strftime('%Y-%m-%d %H:%M:%S') if start_time else None
+    end_time = end_time.strftime('%Y-%m-%d %H:%M:%S') if end_time else None
+    print(f"[{now_time()}] topic '{topic}' of {len(partitions)} partitions has total records : {total}, start at {start_time}, end at {end_time}.")
+    return {'topic': topic, 'records': total, 'start': start_time, 'end': end_time}
+
+def kafka_topics_stat_v1(topics):
+    # consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers)
+    consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers, consumer_timeout_ms=5*1000)
+    topic_num = len(topics)
+    res = []
+    for num, topic in enumerate(topics, start=1):
+        print(f"[{now_time()}] ******** [{num}] querying {topic} ********")
+        topic_stat = topic_summary(consumer, topic)
+        # topic_stat = topic_summary(consumer, topic, 5*1000)
+        res.append(topic_stat)
+        print(f"[{now_time()}] ========= [{num}] querying {topic} done, remaining {topic_num-num} =========")
+        sleep(1)
+    consumer.close()
+    topic_stat_df = pd.DataFrame(res)
+    topic_stat_df.to_excel("topics_summary.xlsx", index=False)
+
+
+def kafka_topics_stat_v2(topics):
+    """对应抛出 TimeoutError 的失败重试版本，留作对比参考"""
+    consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers, consumer_timeout_ms=5 * 1000)
+    topic_num = len(topics)
+    res = []
+    num, retry, max_retry = 1, 0, 30
+    while len(topics) > 0:
+        # 最大重试次数
+        if retry >= max_retry:
+            print()
+            print(f"[{now_time()}] ------ failed too many times and exceeds max iteration[{max_retry}], stop running ------")
+            print(f"remaining topics: {topics}")
+            break
+        topic = topics.pop(0)
+        print(f"[{now_time()}] ******** [{num}] querying {topic} ********")
+        # consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers, consumer_timeout_ms=5*1000)
+        try:
+            topic_stat = topic_summary(consumer, topic)
+            # topic_stat = topic_summary(consumer, topic, 5*1000)
+            res.append(topic_stat)
+            print(f"[{now_time()}] ========= [{num}] querying {topic} done, remaining {topic_num-num} =========")
+            num += 1
+        except TimeoutError as e:
+            # 失败重试放回
+            retry += 1
+            topics.append(topic)
+            print(f"[{now_time()}] ------ [{num}] querying {topic} failed. total retry num: {retry} ------")
+        finally:
+            # consumer.close()
+            sleep(1)
+    consumer.close()
+    topic_stat_df = pd.DataFrame(res)
+    topic_stat_df.to_excel("topics_summary.xlsx", index=False)
+
+
+consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers)
+topics = consumer.topics()
+consumer.close()
+topic_num = len(topics)
+print(f"total topic num to query: {topic_num}...")
+kafka_topics_stat_v1(topics)
+# kafka_topics_stat_v2(topics)
