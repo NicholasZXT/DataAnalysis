@@ -3,7 +3,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 import os
 import numpy as np
 
-from Practice import LeNet5_inference
+from . import LeNet5_inference
 
 # 定义神经网络相关的参数
 BATCH_SIZE = 100

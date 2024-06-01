@@ -4,8 +4,8 @@ import os
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 
-from Practice import mnist_inference
-from Practice import mnist_train
+from . import mnist_inference
+from . import mnist_train
 
 # 加载模型的间隔，5s一次
 EVAL_INTERVAL_SECS = 5
