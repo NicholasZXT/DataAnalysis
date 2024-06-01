@@ -2,7 +2,7 @@
 + 打包模型
 
 ```shell
-cd model_deploy  # cd 到指定目录
+cd torchserve_demo  # cd 到指定目录
 
 torch-model-archiver -f --version 1.0
 	--model-name mymodel        # 模型的名称，这个名称后续也会作为访问的URL的一部分，打包的文件名称为 mymodel.mar

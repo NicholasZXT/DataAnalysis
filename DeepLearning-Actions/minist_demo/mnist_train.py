@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 
-from Practice import mnist_inference
+from . import mnist_inference
 
 # 配置神经网络的参数
 BATCH_SIZE = 100
