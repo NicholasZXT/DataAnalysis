@@ -70,7 +70,7 @@ class EchoClientV1:
         print("Echo client is waiting data...")
         # 等待服务器返回消息时，是阻塞的
         data = s.recv(1024)
-        print("Recieved: ", str(data, encoding='utf-8'))
+        print("Received: ", str(data, encoding='utf-8'))
         s.close()
         print("Echo client stop.")
 

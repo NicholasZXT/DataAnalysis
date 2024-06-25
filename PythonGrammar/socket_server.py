@@ -21,7 +21,7 @@ class EchoServerV1:
             # 服务端的socket是被动式，它会使用如下的 bind, listen, accept 三个方法
             s.bind((self.host, self.port))
             s.listen()
-            print("Echo server is listening...")
+            print('Echo server is listening on: {}, {}'.format(host, port))
             # 调用此方法会阻塞，直到接收到客户端建立的连接，发送过来新的socket  ----- 第 1 个阻塞
             conn, addr = s.accept()
             print("Echo server accept connection from: ", addr)
@@ -32,7 +32,7 @@ class EchoServerV1:
                     data = conn.recv(1024)
                     if not data:
                         break
-                    print("Echo server recieved: ", str(data, encoding='utf-8'))
+                    print("Echo server received: ", str(data, encoding='utf-8'))
                     conn.sendall(data)
         print("Echo server stop.")
 
@@ -44,14 +44,15 @@ class EchoServerV2:
     def __init__(self, host, port):
         self.host = host
         self.port = port
-        self.sel = selectors.DefaultSelector()
+        self.sel: selectors.DefaultSelector = selectors.DefaultSelector()
 
     def run(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind((self.host, self.port))
         sock.listen()
-        sock.setblocking(False)
         logging.info('Echo server is listening on: {}, {}'.format(host, port))
+        # 必须要设置为非阻塞模式
+        sock.setblocking(False)
         # 将服务端的 监听socket 注册到 selector，监听 READ 事件，同时附带的 data 用于标识此 socket
         # 如果 sel 返回的是服务端 socket，那么对应 key.data 就是这里的 data
         data = {"server_socket": sock.fileno()}
@@ -123,7 +124,7 @@ class EchoServerV2:
             data_decode = str(recv_data, encoding='utf-8')
             if len(data_decode):
                 # 接收到了data, 处理一下，放入 socke_info 里
-                logging.info("Echo server recieved '{}' from '{}'".format(data_decode, sock_info['client_socket']))
+                logging.info("Echo server received '{}' from '{}'".format(data_decode, sock_info['client_socket']))
                 sock_info['contents'] = data_decode
             else:
                 # 没收到data，说明客户端关闭了连接，此时服务端也要关闭连接，但是在此之前，要将其从 selector 中移除
