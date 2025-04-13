@@ -1,3 +1,5 @@
+import os
+# ----------
 # from langchain import OpenAI
 from langchain.llms import OpenAI, ChatGLM, Tongyi
 from langchain.chat_models import init_chat_model, ChatOpenAI, ChatBaichuan
@@ -8,6 +10,14 @@ from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplat
 from langchain_core.prompts import FewShotPromptTemplate, FewShotChatMessagePromptTemplate, PipelinePromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.output_parsers import MarkdownListOutputParser, JsonOutputParser, CommaSeparatedListOutputParser
+# ----------
+# document_loaders, embeddings, vectorstores, retrievers 都是从 langchain_community 包里的内容，官方建议直接从langchain_community包中导入
+from langchain_core.documents import Document
+from langchain_community.document_loaders import TextLoader, CSVLoader, JSONLoader, WebBaseLoader
+from langchain_community.embeddings import OpenAIEmbeddings, OllamaEmbeddings, HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvus, OpenSearchVectorSearch, \
+    SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
+from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
 # ----------
 
 
@@ -175,3 +185,36 @@ def output_parser_usage():
 
     # 调用模型之后（假设模型返回为 output）那么使用如下方式解析模型输出
     # markdown_parser.parse(text=output)
+
+# ======================= 数据检索相关模块使用 =======================
+def document_loader_usage():
+    file_path = os.path.join(os.getcwd(), 'test.txt')
+    print(os.path.exists(file_path))
+    txt_loader = TextLoader(file_path=file_path, autodetect_encoding=True)
+    docs = txt_loader.load()
+    doc = docs[0]
+    print(doc.id)
+    print(doc.metadata)
+    print(doc.type)
+    print(doc.page_content)
+    print(doc)
+
+
+def text_embedding_usage():
+    # TODO
+    pass
+
+
+def vector_store_usage():
+    # TODO
+    pass
+
+
+def retriever_usage():
+    # TODO
+    pass
+
+
+# ======================= Chain 模块使用 =======================
+def chain_usage():
+    pass

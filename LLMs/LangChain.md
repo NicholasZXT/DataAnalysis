@@ -12,7 +12,9 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 这个模块是langchain_core模块的核心模块，基于 Runnable设计模式 和 LangChain Expression Language (LCEL) 定义了一系列的接口规范。
 
-## `language_model`模块
+------
+## Model IO相关
+### `language_model`模块
 
 主要有两类：
 - LLMs: 生成式模型，对应于 Completion 任务
@@ -53,7 +55,7 @@ package名称为`langchain_core`，需要关注的有如下内容。
 因此在**实际使用过程中，需要关注的是：`invoke`/`ainvoke`、`batch`/`abatch`、`stream`/`astream` 这3对方法**。
 
 
-## `prompts`模块
+### `prompts`模块
 
 主要内容有：
 - `base.py`
@@ -102,7 +104,7 @@ ChatModel使用的Prompt在`chat.py`中定义，它和上面基于`base.py`里�
 **使用说明**
 
 
-## `messages`模块
+### `messages`模块
 
 用于封装 prompts 和 chat conversations中的信息。
 
@@ -155,7 +157,7 @@ ChatModel使用的Prompt在`chat.py`中定义，它和上面基于`base.py`里�
   - `pretty_print()`:
 
 
-## `output` 和 `output_parsers` 模块
+### `output` 和 `output_parsers` 模块
 
 `output`模块用于封装LLM输出的内容。
 - `chat_generation.py`
@@ -182,27 +184,125 @@ ChatModel使用的Prompt在`chat.py`中定义，它和上面基于`base.py`里�
   - `MarkdownListOutputParser`
 - `openai_function.py`
 
+------
+## 数据检索相关
 
-## `retriever.py`
+构建LEDVR工作流相关的模块:
+- Loader: 加载器，用于加载Document数据
+- Embedding: 向量嵌入，生成Document的Text Embedding向量
+- Documentation Transform: 对Document进行转换，生成新的Document
+- VectorStore: 向量数据库，用于存储Document的Text Embedding向量
+- Retriever: 向量检索器，统一封装VectorStore的检索功能
 
+
+### `document_loaders`模块
+
+> 还有一个 `load` 模块，该模块提供了序列化和反序列化相关的工具.
+
+module内容如下：
+- `base.py`
+  - `BaseLoader`: 所有 Loader 的抽象基类——定义了统一接口
+  - `BaseBlobParser`: 
+- `blob_loaders.py`
+  - `BlobLoader`
+- `langsmith.py`
+  - `LangSmithLoader`
+
+
+**使用说明**
+
+`BaseLoader`里定义了如下接口：
+- `load`/`aload`: 加载数据，返回 `List[Document]`
+- `lazy_load`/`alazy_load`: 迭代加载数据，返回 `Iterator[Document]`
+- `load_and_split`: 加载并分割数据，返回 `List[Document]`
+
+这几个方法也是所有Loader的通用方法。
+
+### `documents`模块
+
+module内容如下：
+- `base.py`
+  - `BaseMedia`: 所有 Media 的抽象基类，Media 包括text
+  - `Blob`
+  - `Document`: 文档的基类，包含text和metadata —— KEY
+- `compressor.py`
+  - `BaseDocumentCompressor`
+- `transformers.py`
+  - `BaseDocumentTransformer`
+
+**使用说明**
+
+`BaseMedia`继承自 `Serializable`，所以也是一个Pydantic的`BaseModel`子类，里面定义了如下两个属性：
+- `id`: 可选str，用于标识文档
+- `metadata`: dict，用于存储文档的元数据
+
+`Document`继承自 `BaseMedia`，新增如下两个属性：
+- `type`: 固定是 Document
+- `page_content`: str，文档的文本内容
+
+
+### `embeddings`模块
+
+module内容如下：
+- `embeddings.py`: 只有一个 `Embeddings` 抽象基类
+
+**使用说明**   
+
+`Embeddings`是一个元类，定义了如下方法：
+- `embed_query`/`aembed_query`: 用于计算query的embedding向量，返回一个 `List[float]`
+- `embed_documents`/`aembed_documents`: 用于**批量计算**query的embedding向量，返回一个 `List[List[float]]`
+
+
+### `vectorstores`模块
+
+module内容如下：
+- `base.py`
+  - `VectorStore`: 所有 VectorStore 的抽象基类
+  - `VectorStoreRetriever`: 所有 VectorStoreRetriever 的抽象基类，它继承自 `retrievers.py`里的`BaseRetriever`
+- `in_memory.py`
+  - `InMemoryVectorStore`
+- `utils.py`
+
+
+**使用说明**   
+
+`VectorStore`抽象基类里定义了如下方法：
+- `add_texts`/`aadd_texts`
+- `add_documents`/`aadd_documents`
+- `delete`/`adelete`
+- `get_by_ids`/`aget_by_ids`
+- `search`/`asearch`
+- `similarity_search`/`asimilarity_search`
+- `similarity_search`/`asimilarity_search`
+- `as_retriever`: 返回一个 `VectorStoreRetriever` 对象，这个方法比较实用 —— KEY
+
+
+`VectorStoreRetriever`抽象基类里定义了如下方法：
+- `add_documents`/`aadd_documents`
+- `add_documents`/`aadd_documents`
+
+
+### `retriever.py`
+
+module内容如下：
 - `BaseRetriever`类
 
-
-## `tools`模块
-
-
-## `documents` 和 `document_loaders`模块
-
-
-## `memory.py`
+------
+## Memory相关
+### `memory.py`
 
 只提供了一个类：`BaseMemory`，所有memory的基类，提供了一些通用的接口。
 
-## `vectorstores` 模块
+
+------
+## Agent相关
 
 
-## `embeddings`模块
 
+------
+## 回调函数
+
+### `tools`模块
 
 ------------
 
@@ -253,15 +353,62 @@ module名称为`langchain`，所有的模块可以分为如下6大类：
 ------
 ## 数据增强
 
-### `retriever` 模块
-
 ### `document_loaders`模块
+
+这个模块主要从两个地方导入内容：
+- `langchain_core.document_loaders`里导入 `BaseLoader` 和 `BaseBlobParser`
+- `langchain_community.document_loaders`里导入各种类型的 Loader 实现类
+
+> langchain官方建议后续直接从 `langchain_community`包里导入。
+
+个人感觉常用的有如下Loader实现类：
+- TextLoader
+- CSVLoader
+- JSONLoader
+- WebBaseLoader
+- DataFrameLoader
+- HuggingFaceDatasetLoader
+- PyMuPDFLoader
+- PyPDFDirectoryLoader
+- PyPDFium2Loader
+- PyPDFLoader
+- BiliBiliLoader, 居然还有B站
 
 ### `document_transformers`模块
 
 ### `embeddings`模块
 
+这个模块主要从两个地方导入内容：
+- `langchain_core.embeddings`里导入 `Embeddings` 抽象基类
+- `langchain_community.embeddings`里导入各种类型的 Embeddings 实现类
+
+> langchain官方建议后续直接从 `langchain_community`包里导入。
+
+每一个Embeddings实现类都继承自 `Embeddings`抽象基类，并且继承了 Pydantic的 `BaseModel`子类。
+
+不过每个Embeddings实现类初始化时配置模型的参数好像都不太一样，具体需要参考对应的实现类的文档或源码。
+
+常用的Embeddings实现类：
+- OpenAIEmbeddings
+- HuggingFaceEmbeddings
+- OllamaEmbeddings
+
+
 ### `vectorstores`模块
+
+和上面类似，这个模块主要从两个地方导入内容：
+- `langchain_core.vectorstores`里导入 `VectorStore` 抽象基类
+- `langchain_community.vectorstores`里导入各种类型的 VectorStore 实现类
+
+> langchain官方建议后续直接从 `langchain_community`包里导入。
+
+### `retriever` 模块
+
+和上面类似，这个模块主要从两个地方导入内容：
+- `langchain_core.retriever`里导入 `BaseRetriever` 抽象基类
+- `langchain_community.retriever`里导入各种类型的 BaseRetriever 实现类
+
+> langchain官方建议后续直接从 `langchain_community`包里导入。
 
 ------
 ## Chain 相关
