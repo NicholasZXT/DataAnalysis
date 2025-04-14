@@ -1,8 +1,20 @@
 import os
 # ----------
 # from langchain import OpenAI
-from langchain.llms import OpenAI, ChatGLM, Tongyi
-from langchain.chat_models import init_chat_model, ChatOpenAI, ChatBaichuan
+# LLM 模型包装器
+# from langchain.llms import OpenAI, ChatGLM, Tongyi  # 这个用法过时了，它只是从下面的 langchain_community.llms 中导入对应对象
+# from langchain_community.llms import OpenAI, ChatGLM, Tongyi
+# 上面的导入其实是从下面位置导入的包装器对象
+from langchain_community.llms.openai import OpenAI
+from langchain_community.llms.chatglm import ChatGLM
+from langchain_community.llms.tongyi import Tongyi
+# 但是官方文档又提示OpenAI后续建议直接从下面的包里导入
+# from langchain_openai.llms import OpenAI
+# ChatLLM 模型包装器
+from langchain.chat_models import init_chat_model
+from langchain_community.chat_models import ChatOpenAI, ChatHuggingFace, ChatLlamaCpp, ChatTongyi
+# ChatOpenAI 官方文档建议直接从 langchain_openai 包中导入
+# from langchain_openai.chat_models import ChatOpenAI
 # ----------
 from langchain_core.prompts import StringPromptTemplate, PromptTemplate
 from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplate, HumanMessagePromptTemplate, \
@@ -19,6 +31,65 @@ from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvu
     SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
 from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
 # ----------
+
+
+API_KEY = 'Random'
+LLM_URL = 'http://172.16.0.32:10086/v1'
+# ======================= LLM + ChatLLM 模型包装器 使用 =======================
+def llm_usage():
+    client_llm = OpenAI(
+        openai_api_key=API_KEY,
+        openai_api_base=LLM_URL,
+        model_name='Qwen2.5-32B-Instruct',
+        temperature=0.7,
+        max_tokens=512,
+        top_p=1,
+        streaming=False,
+        batch_size=20,
+    )
+    input_str = "请解释下机器学习算法SVM的原理"
+    res = client_llm.invoke(input=input_str)
+    print(res)
+
+    for res in client_llm.stream(input=input_str):
+        print(res, end='')
+
+    inputs = ["请解释下机器学习算法SVM的原理", "请解释下机器学习算法GBDT的原理"]
+    res = client_llm.batch(inputs=inputs)
+    print(res[0])
+    print(res[1])
+
+    # 也可以直接使用 __call__ 方法，这是 BaseLLM/BastChatModel 提供的Callable调用，不过后续版本可能会移除此种调用方式
+    res = client_llm(prompt=input_str)
+    print(res)
+
+
+def chat_llm_usage():
+    client_chat = ChatOpenAI(
+        openai_api_key=API_KEY,
+        openai_api_base=LLM_URL,
+        model_name='Qwen2.5-32B-Instruct',
+        temperature=0.7,
+        max_tokens=512,
+        top_p=1,
+        streaming=False,
+        # batch_size=20,
+    )
+    messages = [
+        {'role': 'system', 'content': '你是一个机器学习方面的专家'},
+        {'role': 'user', 'content': '请问什么是SVM算法'},
+    ]
+    res = client_chat.invoke(input=messages)
+    # print(res)
+    print(res.content)
+
+    for res in client_chat.stream(input=messages):
+        print(res.content, end='')
+
+    # Callable调用，不过只支持 List[BaseMessage] 参数
+    msg = [SystemMessage(content='你是一个机器学习方面的专家'), HumanMessage(content='请问什么是SVM算法')]
+    res = client_chat(messages=msg)
+    print(res.content)
 
 
 # ======================= PromptTemplate + Message 使用 =======================
@@ -183,8 +254,19 @@ def output_parser_usage():
     print(r2.text)
     print(prompt.partial_variables)
 
-    # 调用模型之后（假设模型返回为 output）那么使用如下方式解析模型输出
-    # markdown_parser.parse(text=output)
+    client_llm = OpenAI(
+        openai_api_key=API_KEY,
+        openai_api_base=LLM_URL,
+        model_name='Qwen2.5-32B-Instruct',
+        max_tokens=512,
+    )
+    res = client_llm.invoke(input=prompt.format_prompt(ml='SVM'))
+    print(res)
+
+    # 调用模型之后，使用如下方式解析模型输出
+    res_parse = markdown_parser.parse(text=res)
+    for line in res_parse:
+        print(line)
 
 # ======================= 数据检索相关模块使用 =======================
 def document_loader_usage():
