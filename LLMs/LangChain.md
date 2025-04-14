@@ -12,6 +12,23 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 这个模块是langchain_core模块的核心模块，基于 Runnable设计模式 和 LangChain Expression Language (LCEL) 定义了一系列的接口规范。
 
+这里重点介绍`base.py`文件里定义的一些常用抽象基类。
+
+- `Runnable`: LangChain里大部分对象执行的基本单元对象，定义了如下常用的调用方法:
+  - `invoke`/`ainvoke`: 输入单条，输出结果
+  - `batch`/`abatch`: 批量invoke，输出结果
+  - `stream`/`astream`: 流式调用invoke
+- `RunnableSerializable`: 继承了 `Serializable` + `Runnable`，是大部分LLM/ChatLLM的抽象基类
+
+## `load`模块
+
+定义了LangChain里有关对象序列化/反序列化相关的内容。
+
+> LangChain的序列化/反序列化主要基于Pydantic的`BaseModel`实现的。
+
+最重要的是 `serialization.py` 源码，提供了如下抽象类：
+- `Serializable`: 支持序列化/反序列化的抽象基类，大部分LangChain对象都基于此抽象类做序列化，它本身继承了`BaseModel`。
+
 ------
 ## Model IO相关
 ### `language_model`模块
@@ -49,6 +66,8 @@ package名称为`langchain_core`，需要关注的有如下内容。
   - 由 `BaseLanguageModel` 定义的抽象方法
 - `generate`/`agenerate`: 调用模型产生输出
   - 由`BaseLLM`/`BaseChatModel`类实现的方法，比较底层，一般不需要手动调用
+
+> `BaseLLM` 和 `BastChatModel` 也提供了 `__call__` 方法，支持Callable调用的方式，不过看源码里，这种Callable调用被标记为废弃，后续1.0版本可能会移除掉。
 
 整个抽象层次的调用逻辑为：`Runnable`定义抽象方法 --调用--> `BaseLanguageModel`定义抽象方法 --调用--> `BaseLLM`/`BaseChatModel`实现方法。
 
