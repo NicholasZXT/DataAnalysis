@@ -1,16 +1,17 @@
 import os
 # ----------
 # from langchain import OpenAI
-# LLM 模型包装器
+# --- LLM 模型包装器 ---
 # from langchain.llms import OpenAI, ChatGLM, Tongyi  # 这个用法过时了，它只是从下面的 langchain_community.llms 中导入对应对象
 # from langchain_community.llms import OpenAI, ChatGLM, Tongyi
 # 上面的导入其实是从下面位置导入的包装器对象
 from langchain_community.llms.openai import OpenAI
-from langchain_community.llms.chatglm import ChatGLM
-from langchain_community.llms.tongyi import Tongyi
 # 但是官方文档又提示OpenAI后续建议直接从下面的包里导入
 # from langchain_openai.llms import OpenAI
-# ChatLLM 模型包装器
+from langchain_community.llms.chatglm import ChatGLM
+from langchain_community.llms.tongyi import Tongyi
+from langchain_community.llms.vllm import VLLM
+# --- ChatLLM 模型包装器 ---
 from langchain.chat_models import init_chat_model
 from langchain_community.chat_models import ChatOpenAI, ChatHuggingFace, ChatLlamaCpp, ChatTongyi
 # ChatOpenAI 官方文档建议直接从 langchain_openai 包中导入
@@ -31,6 +32,9 @@ from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvu
     SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
 from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
 # ----------
+from langchain_core.tools import BaseTool, StructuredTool, tool
+# from langchain.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
+from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 
 
 API_KEY = 'Random'
@@ -297,6 +301,73 @@ def retriever_usage():
     pass
 
 
-# ======================= Chain 模块使用 =======================
+# ======================= Chain 相关模块使用 =======================
 def chain_usage():
+    # TODO
     pass
+
+
+# ======================= Agent 相关模块使用 =======================
+@tool
+def multiply_tool(a: int, b: int) -> int:
+    """Multiply two numbers."""
+    return a * b
+
+def multiply_func(a: int, b: int) -> int:
+    """Multiply two numbers."""
+    return a * b
+
+def tool_usage():
+    # 只有 部分 ChatLLM 支持 bind_tools
+    # client_chat = ChatGLM(
+    client_chat = ChatOpenAI(
+        openai_api_key=API_KEY,
+        openai_api_base=LLM_URL,
+        model_name='Qwen2.5-32B-Instruct',
+        max_tokens=512,
+    )
+    # client_chat = ChatTongyi(
+    #     dashscope_api_key=API_KEY,
+    #     openai_api_base=LLM_URL,
+    #     model_name='Qwen2.5-32B-Instruct',
+    #     max_tokens=512,
+    # )
+    # client_chat.bind()  # 这个方法是绑定运行时参数
+    # client_chat.bind_functions()   # 这个方法只有 ChatOpenAI 有，对应OpenAI的 function_call 功能配置
+    # client_chat.bind_tools()  # bind_tools 方法也不是所有 ChatLLM 都有的，比如 ChatGLM 就没有，但是 ChatTongyi 有
+
+    # 检查下tool的封装
+    print(type(multiply_tool))
+    # <class 'langchain_core.tools.structured.StructuredTool'>
+    print(multiply_tool.name)
+    print(multiply_tool.description)
+    print(multiply_tool.args)
+    print(multiply_tool.args_schema)
+    print(multiply_tool.metadata)
+    print(multiply_tool.tags)
+    print(multiply_tool.response_format)
+    # 手动调用
+    print(multiply_tool.invoke({"a": 2, "b": 3}))
+
+    # Langchain-community 提供的现成工具
+    ls_tool = ListDirectoryTool()
+    print(type(ls_tool))
+    # <class 'langchain_community.tools.file_management.list_dir.ListDirectoryTool'>
+    print(ls_tool.name)
+    print(ls_tool.description)
+    print(ls_tool.args)
+    print(ls_tool.args_schema)
+    res = ls_tool.invoke(input={'dir_path': './LLMs'})
+    print(res)
+
+    # ChatOpenAI 只支持 bind_functions，不支持 bind_tools
+    # client_chat_with_tool = client_chat.bind_tools(tools=[multiply_tool])
+    # client_chat_with_tool = client_chat.bind_functions(functions=[multiply], function_call='auto')
+    client_chat_with_tool = client_chat.bind_functions(functions=[multiply_func])
+    messages = [
+        {'role': 'system', 'content': '你是一个算术专家'},
+        {'role': 'user', 'content': '请计算一下1024乘以1024的结果'},
+    ]
+    res = client_chat_with_tool.invoke(input=messages)
+    print(res)
+    # print(res.content)
