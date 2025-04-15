@@ -32,6 +32,11 @@ from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvu
     SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
 from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
 # ----------
+from langchain.chains.llm import LLMChain
+from langchain_core.memory import BaseMemory
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain.memory import ConversationBufferMemory, ChatMessageHistory, FileChatMessageHistory
+# ----------
 from langchain_core.tools import BaseTool, StructuredTool, tool
 # from langchain.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
@@ -303,8 +308,70 @@ def retriever_usage():
 
 # ======================= Chain 相关模块使用 =======================
 def chain_usage():
-    # TODO
-    pass
+    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    template = "Tell me a {adjective} joke about {content}."
+    prompt = PromptTemplate(template=template, input_variables=['adjective', 'content'])
+    aipt = AIMessagePromptTemplate.from_template(template="you are an artist")  # 这个没有占位符
+    hmpt = HumanMessagePromptTemplate.from_template(template=template)
+    msg_pt = ChatPromptTemplate.from_messages(messages=[aipt, hmpt])
+
+    # ------ 使用旧版本的 LLMChain -----
+    chain_llm = LLMChain(llm=client_llm, prompt=prompt)
+    chain_chat = LLMChain(llm=client_chat, prompt=msg_pt)
+    print(type(chain_llm))
+    print(type(chain_chat))
+    # <class 'langchain.chains.llm.LLMChain'>
+
+    res_llm = chain_llm.invoke(input={'adjective': 'happy', 'content': 'dog'})
+    print(res_llm)
+
+    res_chat = chain_chat.invoke(input={'adjective': 'fantastic', 'content': 'cat'})
+    print(res_chat)
+
+    # ------ 使用新版本的 LCEL 语法 -----
+    chain_llm = prompt | client_llm
+    chain_chat = msg_pt | client_chat
+    print(type(chain_llm))
+    print(type(chain_chat))
+    # <class 'langchain_core.runnables.base.RunnableSequence'>
+
+    res_llm = chain_llm.invoke(input={'adjective': 'good', 'content': 'fish'})
+    print(res_llm)
+
+    res_chat = chain_chat.invoke(input={'adjective': 'nice', 'content': 'bird'})
+    print(res_chat)
+
+
+def memory_usage():
+    # ----- 早期版本基于 BaseMemory 实现的使用 -----
+    cb_memory = ConversationBufferMemory()
+    print(cb_memory.memory_key)  # 存储历史对话的 key
+    # 传入的 inputs 没啥用，随便传个空dict就行
+    print(cb_memory.load_memory_variables(inputs={}))
+    # 第一次存入对话
+    cb_memory.save_context(inputs={'input': '早上好'}, outputs={'output': '早上好，我是xxx'})
+    print(cb_memory.load_memory_variables(inputs={}))
+    # 第二次存入对话
+    cb_memory.save_context(inputs={'input': '中午好'}, outputs={'output': '中午好，我是xxx'})
+    # 两次的对话历史是连在一起的
+    print(cb_memory.load_memory_variables(inputs={}))
+    # 清空对话历史
+    cb_memory.clear()
+    print(cb_memory.load_memory_variables(inputs={}))
+
+    # 结合 Chain 使用
+    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    template = "Tell me a {adjective} joke about {content}."
+    prompt = PromptTemplate(template=template, input_variables=['adjective', 'content'])
+
+    chain_llm = LLMChain(llm=client_llm, prompt=prompt, memory=cb_memory)
+    chain_llm = LLMChain(llm=client_llm, prompt=prompt, memory=cb_memory, verbose=True)
+
+    res1 = chain_llm.invoke(input={'adjective': 'good', 'content': 'fish'})
+
+    # ----- 基于 BaseChatMessageHistory 实现的使用 -----
+
 
 
 # ======================= Agent 相关模块使用 =======================

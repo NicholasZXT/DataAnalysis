@@ -13,7 +13,9 @@ package名称为`langchain_core`，需要关注的有如下内容。
 这个模块是langchain_core模块的核心模块，基于 Runnable设计模式 和 LangChain Expression Language (LCEL) 定义了一系列的接口规范。
 也是实现 Chain 的核心模块。 
 
-这里重点介绍`base.py`文件里定义的一些常用抽象基类。
+这里重点介绍如下文件里定义的一些常用抽象基类。
+
+**`base.py`文件**
 
 - `Runnable`: LangChain里大部分对象执行的基本单元对象，定义了如下常用的调用方法:
   - `invoke`/`ainvoke`: 输入单条，输出结果
@@ -23,6 +25,13 @@ package名称为`langchain_core`，需要关注的有如下内容。
 > `Runnable`抽象基类还重载了运算符`|`（重写了`__or__`/`__oro__`方法），并提供了`pipe`方法，为LCEL的 `|` 语法提供了支持。
 
 - `RunnableSerializable`: 继承了 `Serializable` + `Runnable`，是大部分LLM/ChatLLM的抽象基类
+
+
+**`history.py`文件**
+
+只有一个 `RunnableWithMessageHistory` 抽象类，它和 `chat_history.py`里的 `BaseChatMessageHistory` 抽象类配合使用。
+
+
 
 ## `load`模块
 
@@ -330,10 +339,18 @@ module内容如下：
 ------
 ## Memory相关
 
-### `memory.py`
+从langchain v0.3.3 版本开始，memory模块被表示为废弃。  
 
-> 从langchain v0.3.3 版本开始，memory模块被表示为废弃。  
-> 官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议转向使用 LangGraph
+官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议转向使用 LangGraph.
+
+根据上面的官方文档，Langchain 里有关 Memory 的设计思路经历了3个阶段：
+1. 基于`BaseMemory`的早期设计
+2. 基于 `RunnableWithMessageHistory` + `BaseChatMessageHistory` 的设计，这个设计思路还在沿用，适用于简单的场景
+3. 基于 LangGraph 的思路，这个是后续的发展方向
+
+LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
+
+### `memory.py`
 
 只提供了一个类：`BaseMemory`，所有memory的基类，提供了一些通用的接口。   
 
@@ -524,17 +541,38 @@ module内容如下：
 
 ### `memeory`模块
 
-module（常用）内容如下：
+这个模块混合了早期 基于`BaseMemory`实现 思路的Memory组件和 基于`BaseChatMessageHistory`实现 思路的Memory组件。
+
+module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `simple.py`:
+  - `SimpleMemory`: 用于（初始化）存储一个固定的聊天记录，只能读，不能修改或者清除。
 - `readonly.py`:
+  - `ReadOnlySharedMemory`: 对一个`BaseMemory`对象进行只读的包装，不能修改，不能清除。
 - `chat_memory.py`:
-- `buffer.py`:
+  - `BaseChatMemory`: Chat类型Memory的抽象基类
+- `buffer.py`: 提供了对话类的 Memory
+  - `ConversationBufferMemory`
+  - `ConversationStringBufferMemory`
 - `buffer_window.py`:
-- `summary.py`:
+  - `ConversationBufferWindowMemory`
+- `summary.py`: 提供了摘要类的 Memory
+  - `ConversationSummaryMemory`
 - `summary_buffer.py`:
+  - `ConversationSummaryBufferMemory`
 - `token_buffer.py`:
+  - `ConversationTokenBufferMemory`
 - `combined.py`:
 
+
+**基于`BaseChatMessageHistory`实现** 的组件在`langchain.memory.chat_message_history`模块里。
+> 此模块其实只是一个简单导入的封装，实际是从 `langchain_community.chat_message_histories` 模块导入对应的类。
+
+常用的ChatMessageHistory实现类如下：
+- `ChatMessageHistory`: 这个其实就是 `langchain_core.chat_history.py` 里 `InMemoryChatMessageHistory` 的别名
+- `FileChatMessageHistory`: 基于本地文件实现
+- `RedisChatMessageHistory`
+- `SQLChatMessageHistory`
+- `ElasticsearchChatMessageHistory`
 
 
 ------
