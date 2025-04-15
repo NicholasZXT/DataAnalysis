@@ -335,7 +335,15 @@ module内容如下：
 > 从langchain v0.3.3 版本开始，memory模块被表示为废弃。  
 > 官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议转向使用 LangGraph
 
-只提供了一个类：`BaseMemory`，所有memory的基类，提供了一些通用的接口。
+只提供了一个类：`BaseMemory`，所有memory的基类，提供了一些通用的接口。   
+
+`BaseMemory`继承了`Serializable`，所以也是一个Pydantic的`BaseModel`子类。
+
+`BaseMemory`定义了如下抽象方法：
+- `memory_variables`: 返回`list[str]`，表示此memory提供了哪些key给模型使用。
+- `load_memory_variables`/`aload_memory_variables`: 返回一个字典
+- `save_context`/`asave_context`: 保存上下文的输入和输出信息
+- `clear`/`aclear`: 清空上下文信息
 
 
 ### `chat_history.py`
@@ -345,6 +353,15 @@ module内容如下：
 - `InMemoryChatMessageHistory`: 存放在内存中的聊天历史记录简单实现类
 
 
+`BaseChatMessageHistory`定义了一个属性`messages: list[BaseMessage]`，还定义了如下抽象方法：
+- `add_message`: 用于添加消息
+- `add_messages`/`aadd_messages`: 用于批量添加消息
+- `add_user_message`/`add_ai_message`: 用于添加用户/AI消息
+- `aget_messages`: 异步获取历史消息
+- `clear`/`aclear`: 清空历史消息
+
+
+`InMemoryChatMessageHistory`就是一个简单的基于内存列表实现历史记录实现类。
 
 ------
 ## Agent相关
@@ -506,6 +523,19 @@ module内容如下：
 ## Memory 相关
 
 ### `memeory`模块
+
+module（常用）内容如下：
+- `simple.py`:
+- `readonly.py`:
+- `chat_memory.py`:
+- `buffer.py`:
+- `buffer_window.py`:
+- `summary.py`:
+- `summary_buffer.py`:
+- `token_buffer.py`:
+- `combined.py`:
+
+
 
 ------
 ## Agent相关
