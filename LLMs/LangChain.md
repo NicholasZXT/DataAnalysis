@@ -176,6 +176,23 @@ ChatModel使用的Prompt在`chat.py`中定义，它和上面基于`base.py`里�
   - `pretty_print()`:
 
 
+
+### `prompt_values.py`
+
+定义了 PromptTemplate 的输出值。
+
+内容如下：
+- `PromptValue`: 封装了 prompt 的输出值，这个类是一个抽象类，继承自`Serializable`——也是pydantic的`BaseModel`子类。
+- `StringPromptValue`: 继承自`PromptValue`，用于封装字符串类型的 prompt 输出值。     
+  有如下属性：
+  - `type`: str类型，固定为`StringPromptValue`
+  - `text`: str类型，存放具体提示文本
+- `ChatPromptValue`: 继承自`PromptValue`，用于封装ChatMessage类型的 prompt 输出值。    
+  有如下属性：
+  - `messages`: List[BaseMessage]类型，存放具体提示消息
+- `ChatPromptValueConcrete`: 继承自`ChatPromptValue`
+
+
 ### `output` 和 `output_parsers` 模块
 
 `output`模块用于封装LLM输出的内容。
@@ -316,12 +333,38 @@ module内容如下：
 ------
 ## Agent相关
 
+### `tools`模块
+
+module内容如下：
+- `base.py`
+  - `BaseTool`: 所有工具类的抽象基类，它继承了 `RunnableSerializable`，所以也是一个Pydantic的`BaseModel`子类。
+  - `BaseToolkit`: 所有工具集类的抽象基类，它没有继承 `BaseTool`，不过继承了Pydantic的`BaseModel`。
+- `simple.py`
+  - `Tool`: 工具类，继承自 `BaseTool`
+- `structured.py`
+  - `StructuredTool`: 结构化工具类，继承自 `BaseTool`
+- `convert.py`: 提供了`@tool`装饰器，用于将函数转换为工具类（`StructuredTool`对象或者`Tool`对象）。
+- `render.py`
+- `reriever.py`
+
+
+**使用说明**
+`BaseTool`类里定义了如下属性：
+- `name`: str类型，工具类的名称，用于标识工具类的唯一性，必须唯一。
+- `description`: str类型，工具类的描述，用于标识工具类的用途。
+- `args_schema`: Pydantic的`BaseModel`子类，用于定义工具类的参数，如果定义了该属性，则该工具类将支持参数校验。
+定义了如下调用方法：
+- `run`/`arun`: 用于执行工具类内部原生函数的调用
+- `invoke`/`ainvoke`: 对`run`/`arun`的封装，满足`RunnableSerializable`接口的要求，建议通过这两个方法调用。
+- Callable调用，不过后续可能不再支持
+
+### `agents.py`
 
 
 ------
 ## 回调函数
 
-### `tools`模块
+### `callbacks`模块
 
 ------------
 
@@ -441,6 +484,40 @@ module名称为`langchain`，所有的模块可以分为如下6大类：
 
 ------
 ## Agent相关
+
+### `tools`模块
+
+和上面类似，这个模块主要从两个地方导入内容：
+- `langchain_core.tool`里导入抽象基类
+- `langchain_community.tool`里导入各种实现类
+
+> langchain官方建议后续直接从 `langchain_community.tool`包里导入。
+
+各个感觉比较常用的一些Tool如下：
+- ListDirectoryTool
+- ReadFileTool
+- WriteFileTool
+- CopyFileTool
+- MoveFileTool
+- DeleteFileTool
+- FileSearchTool
+- ExtractTextTool
+- HumanInputRun
+- ShellTool
+- GoogleSearchRun
+- GoogleSearchResults
+- JsonGetValueTool
+- JsonListKeysTool
+- BaseRequestsTool
+- BaseSQLDatabaseTool
+- BaseSparkSQLTool
+- ListSQLDatabaseTool
+- ListSparkSQLTool
+- RequestsDeleteTool
+- RequestsGetTool
+- RequestsPatchTool
+- RequestsPostTool
+- RequestsPutTool
 
 ### `agents`模块
 
