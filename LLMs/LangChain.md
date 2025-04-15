@@ -11,6 +11,7 @@ package名称为`langchain_core`，需要关注的有如下内容。
 ## `runnables`模块
 
 这个模块是langchain_core模块的核心模块，基于 Runnable设计模式 和 LangChain Expression Language (LCEL) 定义了一系列的接口规范。
+也是实现 Chain 的核心模块。 
 
 这里重点介绍`base.py`文件里定义的一些常用抽象基类。
 
@@ -18,6 +19,9 @@ package名称为`langchain_core`，需要关注的有如下内容。
   - `invoke`/`ainvoke`: 输入单条，输出结果
   - `batch`/`abatch`: 批量invoke，输出结果
   - `stream`/`astream`: 流式调用invoke
+
+> `Runnable`抽象基类还重载了运算符`|`（重写了`__or__`/`__oro__`方法），并提供了`pipe`方法，为LCEL的 `|` 语法提供了支持。
+
 - `RunnableSerializable`: 继承了 `Serializable` + `Runnable`，是大部分LLM/ChatLLM的抽象基类
 
 ## `load`模块
@@ -325,9 +329,21 @@ module内容如下：
 
 ------
 ## Memory相关
+
 ### `memory.py`
 
+> 从langchain v0.3.3 版本开始，memory模块被表示为废弃。  
+> 官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议转向使用 LangGraph
+
 只提供了一个类：`BaseMemory`，所有memory的基类，提供了一些通用的接口。
+
+
+### `chat_history.py`
+
+内容如下：
+- `BaseChatMessageHistory`: 用于表示聊天历史记录的抽象基类
+- `InMemoryChatMessageHistory`: 存放在内存中的聊天历史记录简单实现类
+
 
 
 ------
@@ -475,7 +491,16 @@ module名称为`langchain`，所有的模块可以分为如下6大类：
 ------
 ## Chain 相关
 
+> langchain_core 没有对应的chains模块，因为chains相关的核心接口/抽象类都在 `langchain_core.runnables` 中定义好了。
+> **`chains` 模块才是 langchain 包的核心内容**。
+
 ### `chains`模块
+
+module内容如下：
+- `base.py`:
+  - `Chain`: Chain组件的抽象基类，它继承了 `RunnableSerializable`，所以也是一个Pydantic的`BaseModel`子类。
+
+`chains`模块提供了一系列的Chain组件实现类。
 
 ------
 ## Memory 相关
