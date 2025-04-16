@@ -15,7 +15,7 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 这里重点介绍如下文件里定义的一些常用抽象基类。
 
-**`base.py`文件**
+### `base.py`
 
 - `Runnable`: LangChain里大部分对象执行的基本单元对象，定义了如下常用的调用方法:
   - `invoke`/`ainvoke`: 输入单条，输出结果
@@ -27,10 +27,45 @@ package名称为`langchain_core`，需要关注的有如下内容。
 - `RunnableSerializable`: 继承了 `Serializable` + `Runnable`，是大部分LLM/ChatLLM的抽象基类
 
 
-**`history.py`文件**
+### `history.py`
 
-只有一个 `RunnableWithMessageHistory` 抽象类，它和 `chat_history.py`里的 `BaseChatMessageHistory` 抽象类配合使用。
+只有一个 `RunnableWithMessageHistory` 类——注意，**它不是抽象类**。
 
+它和 `chat_history.py`里的 `BaseChatMessageHistory` 抽象类配合使用，并且支持通过 LCEL 表达式和 LangGraph 集成。
+
+**使用说明**
+
+`RunnableWithMessageHistory`使用时有3个需要关注的概念：
+
+（1）Runnable对象
+
+`RunnableWithMessageHistory` 是**对一个可运行对象（如链或模型）的封装**。这个可运行对象可以是：
+
+- 一个简单的语言模型（LLM）。
+- 一个复杂的链（chain），例如 ConversationChain。
+- 其他实现了 `Runnable` 接口的对象。
+
+（2）消息历史（Message History）
+
+消息历史通常由 `BaseChatMessageHistory`实现类 管理。它记录了用户与助手之间的交互消息。
+
+（3）动态加载历史
+
+`RunnableWithMessageHistory` 需要通过一个函数动态加载消息历史——对应于`get_session_history`属性。
+
+这使得你可以从外部存储（如数据库）中获取历史记录，并在每次运行时动态更新。
+
+
+`RunnableWithMessageHistory`的初始化参数如下：
+- `get_session_history`: 类型是一个`Callable`对象，要求必须返回一个`BaseChatMessageHistory`——也就是一个简单工厂函数。    
+  它的作用是根据不同用户的身份，加载对应的消息历史，所以要采用简单工厂函数的方式。
+- `history_factory_config`: 类型是`Sequence[ConfigurableFieldSpec]`。    
+  作用是说明简单工厂函数的参数，**简单工厂函数有多个参数时会用到**，如果简单工厂函数只需要一个参数，则可以省略。
+- `history_messages_key`: `Optional[str]`类型
+- `input_messages_key`: `Optional[str]`类型
+- `output_messages_key`: `Optional[str]`类型
+
+调用`invoke`方法执行。
 
 
 ## `load`模块
@@ -351,7 +386,9 @@ module内容如下：
 `BaseChatMessageHistory` 是和 `langchain.memory` 模块的 `ChatBaseMemory` 配合使用的，大致流程是 `ChatBaseMemory` 会
 将历史聊天记录的存储委托给某个 `BaseChatMessageHistory` 实现类来进行。
 
-`RunnableWithMessageHistory` 的使用方式不一样，它是为了和 LangGraph 配合使用的。LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
+`RunnableWithMessageHistory` 的使用方式不一样，它是**为了和 LangGraph 配合使用，并且支持 LCEL 表达式**。
+
+LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 
 ### `memory.py`
