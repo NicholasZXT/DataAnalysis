@@ -36,11 +36,14 @@ from langchain.chains.llm import LLMChain
 from langchain_core.memory import BaseMemory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain.memory import ConversationBufferMemory, ChatMessageHistory, FileChatMessageHistory
+from langchain_core.runnables import RunnableWithMessageHistory
 # ----------
 from langchain_core.tools import BaseTool, StructuredTool, tool
 # from langchain.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
-
+# ----------
+from langchain.globals import set_verbose
+from langchain.callbacks.tracers import ConsoleCallbackHandler
 
 API_KEY = 'Random'
 LLM_URL = 'http://172.16.0.32:10086/v1'
@@ -427,6 +430,60 @@ def chat_history_usage():
     print(res2_history)
 
 
+def runnable_history_usage():
+    # ----- 基于 RunnableWithMessageHistory 实现的使用 -----
+    # RunnableWithMessageHistory 使用分为3个部分：
+
+    # 1. 配置一个 Runnable 对象，Chain对象 或者 RunnableSequences对象 都可以
+    template = "对话历史:\n{history}\n用户输入: {input}\n请你回复."
+    prompt = PromptTemplate(template=template, input_variables=["history", "input"])
+    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    # set_verbose(False)  # 全局 verbose 设置，不好用
+    # client_llm.with_config({'callbacks': [ConsoleCallbackHandler()]})   # 设置控制台回调日志，也不好用
+    # 这里用 LLMChain 来演示，因为 RunnableSequence 不太好设置 verbose
+    # chain = prompt | client_llm
+    # print(type(chain))  # <class 'langchain_core.runnables.base.RunnableSequence'>
+    chain = LLMChain(llm=client_llm, prompt=prompt, verbose=True)
+
+    # 2. 配置一个根据用户身份生成 BaseChatMessageHistory实现类的工厂函数
+    # 这里使用了一个全局字典作为用户会话历史记录的存储，方便观察结果，实际中对应的是数据库或者redis等
+    store = {}
+    # 这个工厂函数目前只有一个参数，如果有多个参数，需要更复杂的配置
+    def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
+        if session_id not in store:
+            store[session_id] = ChatMessageHistory()
+        return store[session_id]
+
+    # 3. 配置 RunnableWithMessageHistory 对象
+    chain_with_history = RunnableWithMessageHistory(
+        runnable=chain,
+        get_session_history=get_by_session_id,
+        input_messages_key="input",
+        history_messages_key="history",
+    )
+
+    # 4. 调用 RunnableWithMessageHistory 对象的 invoke 方法，用户身份通过 config 参数设置
+    # >>> 用户1的会话
+    u1_r1 = chain_with_history.invoke(input={"input": "你好，我先和你打个招呼"}, config={"configurable": {"session_id": "user-1"}})
+    print(u1_r1)
+    # print(store)
+    print(store.keys())
+
+    u1_r2 = chain_with_history.invoke(input={"input": "我们刚才聊了什么"}, config={"configurable": {"session_id": "user-1"}})
+    print(u1_r2)
+    print(store.keys())
+
+    # >>> 用户2的会话
+    u2_r1 = chain_with_history.invoke(input={"input": "你好，我想和你聊聊历史"}, config={"configurable": {"session_id": "user-2"}})
+    print(u2_r1)
+    print(store.keys())
+
+    u2_r2 = chain_with_history.invoke(input={"input": "我们刚才聊了什么"}, config={"configurable": {"session_id": "user-2"}})
+    print(u2_r2)
+    print(store.keys())
+
+
+
 # ======================= Agent 相关模块使用 =======================
 @tool
 def multiply_tool(a: int, b: int) -> int:
@@ -494,7 +551,9 @@ def tool_usage():
 
 
 def main():
-    memory_usage()
+    # memory_usage()
+    # chat_history_usage()
+    runnable_history_usage()
 
 
 if __name__ == '__main__':
