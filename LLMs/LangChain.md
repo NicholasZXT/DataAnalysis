@@ -345,10 +345,14 @@ module内容如下：
 
 根据上面的官方文档，Langchain 里有关 Memory 的设计思路经历了3个阶段：
 1. 基于`BaseMemory`的早期设计
-2. 基于 `RunnableWithMessageHistory` + `BaseChatMessageHistory` 的设计，这个设计思路还在沿用，适用于简单的场景
+2. 基于 `RunnableWithMessageHistory` 或 `BaseChatMessageHistory` 的设计，这个设计思路还在沿用，适用于简单的场景
 3. 基于 LangGraph 的思路，这个是后续的发展方向
 
-LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
+`BaseChatMessageHistory` 是和 `langchain.memory` 模块的 `ChatBaseMemory` 配合使用的，大致流程是 `ChatBaseMemory` 会
+将历史聊天记录的存储委托给某个 `BaseChatMessageHistory` 实现类来进行。
+
+`RunnableWithMessageHistory` 的使用方式不一样，它是为了和 LangGraph 配合使用的。LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
+
 
 ### `memory.py`
 
@@ -380,6 +384,12 @@ LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 `InMemoryChatMessageHistory`就是一个简单的基于内存列表实现历史记录实现类。
 
+**使用说明**
+
+`BaseChatMessageHistory`是配合`langchain.memory.chat_memory.py`里的`BaseChatMemory`一起使用的。
+
+上面的`InMemoryChatMessageHistory`实现类其实就是`BaseChatMemory`里的`chat_memory`默认实现。
+
 ------
 ## Agent相关
 
@@ -398,7 +408,7 @@ module内容如下：
 - `reriever.py`
 
 
-**使用说明**
+**使用说明**    
 `BaseTool`类里定义了如下属性：
 - `name`: str类型，工具类的名称，用于标识工具类的唯一性，必须唯一。
 - `description`: str类型，工具类的描述，用于标识工具类的用途。
@@ -536,12 +546,42 @@ module内容如下：
 
 `chains`模块提供了一系列的Chain组件实现类。
 
+**使用说明**
+抽象基类`Chain`里定义了如下属性（这些属性可以在初始化时传入）：
+- `metadata: Optional[Dict[str, Any]] = None`
+- `tags: Optional[List[str]] = None`
+- `verbose: bool`: 控制是否输出日志
+- `memory: Optional[BaseMemory]`: 存储 Memory 对象
+- `callbacks: Callbacks`: 回调函数
+- `callback_manager: Optional[BaseCallbackManager]`
+
+抽象基类`Chain`定义了如下抽象方法：
+- Callable调用: 执行Chain组件
+  - 已被标记为废弃，后续不再支持，代替方法是`invoke`/`ainvoke`。
+  - 输入的`inputs`是一个`Union[Dict[str, Any], Any]`，应当包含`Chain.input_keys`里的所有key（Memory使用的key除外），如果只有一个参数，则可以直接传入。
+  - 返回值是`Dict[str, Any]`，A dict of named outputs，包含了`Chain.output_keys`属性指定的所有key
+- `run`/`arun`: 执行Chain组件
+  - 已被标记为废弃，后续不再支持，代替方法是`invoke`/`ainvoke`。
+  - 和Callable调用的区别是，它接受的输入不是像`__call__`中那样的`Dict[str, Any]`，而是必须拆开以关键字参数的形式传入，如果只有一个参数，则采用位置参数（第1个）传入.
+  - 返回值是`Any`，要看具体的`Chain`和配置的LLM
+- `save`: 保存Chain，可以传入一个`file_path`
+- `dict`: 以dict的形式返回Chain的表示
+
+此外，`Chain`还定义了如下两个抽象property需要子类实现：
+- `input_keys`: `List[str]`类型，指定Chain组件的输入key
+- `output_keys`: `List[str]`类型，指定Chain组件的输出key
+- `_chain_type`: `str`类型，指定Chain组件的类型，不过这个属性一般是内部使用的
+
+
+
+`LLMChain`
+
 ------
 ## Memory 相关
 
 ### `memeory`模块
 
-这个模块混合了早期 基于`BaseMemory`实现 思路的Memory组件和 基于`BaseChatMessageHistory`实现 思路的Memory组件。
+这个模块混合了早期 **基于`BaseMemory`实现** 思路的Memory组件和 **基于`BaseChatMessageHistory`实现** 思路的Memory组件。
 
 module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `simple.py`:
@@ -562,6 +602,19 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `token_buffer.py`:
   - `ConversationTokenBufferMemory`
 - `combined.py`:
+
+
+**使用说明**
+
+`BaseChatMemory`抽象类继承了`BaseMemory`类，并在此基础上定义了如下属性：
+- `chat_memory: BaseChatMessageHistory`: 这个就是配合下面的`BaseChatMessageHistory`使用的，它的默认实现就是`InMemoryMessageHistory`。
+- `output_key: Optional[str] = None`:
+- `input_key: Optional[str] = None`:
+- `return_messages: bool = False`:
+
+
+**`BaseChatMemory` 底层会将历史消息的读写操作委托给 `BaseChatMessageHistory` 实现类**，具体过程是：
+`save_context`方法里调用`chat_memory: BaseChatMessageHistory`属性对象的`add_messages`方法。
 
 
 **基于`BaseChatMessageHistory`实现** 的组件在`langchain.memory.chat_message_history`模块里。

@@ -323,6 +323,9 @@ def chain_usage():
     print(type(chain_chat))
     # <class 'langchain.chains.llm.LLMChain'>
 
+    # Callable调用，run调用，invoke调用——后续推荐使用invoke方法
+    res_llm = chain_llm(inputs={'adjective': 'happy', 'content': 'dog'})
+    res_llm = chain_llm.run(adjective='happy', content='dog')  # 多个输入以关键字参数传入，并且返回的是 str，不是dict
     res_llm = chain_llm.invoke(input={'adjective': 'happy', 'content': 'dog'})
     print(res_llm)
 
@@ -347,7 +350,9 @@ def memory_usage():
     # ----- 早期版本基于 BaseMemory 实现的使用 -----
     cb_memory = ConversationBufferMemory()
     print(cb_memory.memory_key)  # 存储历史对话的 key
-    # 传入的 inputs 没啥用，随便传个空dict就行
+    print(cb_memory.input_key)   # 这个属性需要注意一下，它和下面提到的 ChatBaseMemory 的bug有关
+    print(cb_memory.output_key)
+    # 对于 ConversationBufferMemory，传入的 inputs 其实没用到，但是必须要有，所以随便传个空dict
     print(cb_memory.load_memory_variables(inputs={}))
     # 第一次存入对话
     cb_memory.save_context(inputs={'input': '早上好'}, outputs={'output': '早上好，我是xxx'})
@@ -363,15 +368,63 @@ def memory_usage():
     # 结合 Chain 使用
     client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
     template = "Tell me a {adjective} joke about {content}."
-    prompt = PromptTemplate(template=template, input_variables=['adjective', 'content'])
 
-    chain_llm = LLMChain(llm=client_llm, prompt=prompt, memory=cb_memory)
+    # ConversationBufferMemory 有个bug: BaseChatMemory的 _get_input_output 方法里，
+    # 会检查 ConversationBufferMemory.input_key 和 ConversationBufferMemory.memory_variables
+    # 下面的 nothing 不会用到，但是必须传，否则会报错
+    prompt = PromptTemplate(template=template, input_variables=['adjective', 'content', 'nothing'])
+    cb_memory = ConversationBufferMemory(input_key='nothing')
+    # chain_llm = LLMChain(llm=client_llm, prompt=prompt, memory=cb_memory)
+    chain_llm = LLMChain(llm=client_llm, prompt=prompt, memory=cb_memory, verbose=True)
+    # print(chain_llm._chain_type)
+    print(chain_llm.input_keys)
+    print(chain_llm.output_keys)
+
+    cb_memory.clear()
+    # 传入的input dict 的 key 必须要和 chain_llm.input_keys 里包含的一致
+    res1 = chain_llm.invoke(input={'adjective': 'good', 'content': 'fish', 'nothing': ''})
+    print(res1)
+    res1_history = cb_memory.load_memory_variables(inputs={})
+    res2 = chain_llm.invoke(input={'adjective': 'nice', 'content': 'cat', 'nothing': ''})
+    print(res2)
+    res2_history = cb_memory.load_memory_variables(inputs={})
+    print(res1_history)
+    # 可以看出，两次的对话历史是连在一起的
+    print(res2_history)
+
+
+def chat_history_usage():
+    # ----- 基于 BaseChatMessageHistory 实现的使用 -----
+    # --- 单独使用 ---
+    history = ChatMessageHistory()
+    history.add_message(message=HumanMessage(content='hello from me'))
+    history.add_message(message=AIMessage(content='hello from chat-llm'))
+    print(history)
+    print(history.messages)
+
+    # --- 配合 Memory 组件使用 ---
+    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    template = "Tell me a {adjective} joke about {content}."
+    prompt = PromptTemplate(template=template, input_variables=['adjective', 'content', 'nothing'])
+    # ChatMessageHistory 其实就是 ConversationBufferMemory 里 chat_memory 属性的默认实现
+    # history = ChatMessageHistory()
+    history = FileChatMessageHistory(file_path='./LLMs/chat_history.json')
+    cb_memory = ConversationBufferMemory(chat_memory=history, input_key='nothing')
+    # chain_llm = LLMChain(llm=client_llm, prompt=prompt, memory=cb_memory)
     chain_llm = LLMChain(llm=client_llm, prompt=prompt, memory=cb_memory, verbose=True)
 
-    res1 = chain_llm.invoke(input={'adjective': 'good', 'content': 'fish'})
-
-    # ----- 基于 BaseChatMessageHistory 实现的使用 -----
-
+    res1 = chain_llm.invoke(input={'adjective': 'good', 'content': 'cat', 'nothing': ''})
+    print(res1)
+    print(history)
+    print("-------------------------------------------")
+    res1_history = cb_memory.load_memory_variables(inputs={})
+    res2 = chain_llm.invoke(input={'adjective': 'nice', 'content': 'fish', 'nothing': ''})
+    print(res2)
+    print(history)
+    res2_history = cb_memory.load_memory_variables(inputs={})
+    print("-------------------------------------------")
+    print(res1_history)
+    print(res2_history)
 
 
 # ======================= Agent 相关模块使用 =======================
@@ -438,3 +491,11 @@ def tool_usage():
     res = client_chat_with_tool.invoke(input=messages)
     print(res)
     # print(res.content)
+
+
+def main():
+    memory_usage()
+
+
+if __name__ == '__main__':
+    main()
