@@ -106,15 +106,18 @@ package名称为`langchain_core`，需要关注的有如下内容。
 `RunnableWithMessageHistory`使用时有3个需要关注的概念：
 
 （1）Runnable对象    
+
 `RunnableWithMessageHistory` 是**对一个可运行对象（比如链或模型）的封装**。这个可运行对象可以是：
 - 一个简单的语言模型（LLM）。
 - 一个复杂的链（chain），例如 ConversationChain。
 - 其他实现了 `Runnable` 接口的对象。
 
 （2）消息历史（Message History）    
+
 消息历史通常由 `BaseChatMessageHistory`实现类 管理。它记录了用户与助手之间的交互消息。
 
 （3）动态加载历史    
+
 `RunnableWithMessageHistory` 需要通过一个函数动态加载消息历史——对应于`get_session_history`属性。    
 这使得你可以从外部存储（如数据库）中获取历史记录，并在每次运行时动态更新。
 
@@ -124,11 +127,45 @@ package名称为`langchain_core`，需要关注的有如下内容。
   它的作用是**根据不同用户的身份，加载对应的消息历史**，所以要采用简单工厂函数的方式。
 - `history_factory_config`: 类型是`Sequence[ConfigurableFieldSpec]`。    
   作用是说明简单工厂函数的参数，**简单工厂函数有多个参数时会用到**，如果简单工厂函数只需要一个参数，则可以省略。
-- `history_messages_key`: `Optional[str]`类型，用于指定 prompt 中，填充历史消息的key。 默认是None，此时就没法向对话中填充历史消息了。
-- `input_messages_key`: `Optional[str]`类型
-- `output_messages_key`: `Optional[str]`类型
+- `history_messages_key`: `Optional[str]`类型，用于指定 prompt 中，填充历史消息的key，默认是None。
+- `input_messages_key`: `Optional[str]`类型，用于指定从输入中获取某个消息的key，默认是None。
+- `output_messages_key`: `Optional[str]`类型，用于指定从输出中获取某个消息的key，默认是None。
 
-调用`invoke`方法执行。
+> 如果封装的 Runnable 对象的输入是一个 Dict，那么 `history_messages_key` 和 `input_messages_key`都必须要设置，否则可能获取不了历史消息。
+
+
+`RunnableWithMessageHistory`的大致执行逻辑如下：
+1. 初始化时，构造一个`RunnableSequence`，按顺序封装如下调用：    
+   `self._enter_history` -> `RunnablePassthrough.assign` -> `Chain` -> `self._exit_history`
+
+2. 在 `self._enter_history` 里，     
+  2.1 从RunnableConfig里获取`BaseChatMessageHistory`对象，读取其中**所有**历史消息；    
+  2.2 如果没有设置`history_messages_key`和`input_messages_key`，则直接将所有历史消息作为输入；   
+  2.3 如果没有设置`history_messages_key`，但设置了`input_messages_key`，则调用`self._get_input_messages`，
+      从输入中获取指定key消息，封装成`HumanMessage`追加到2.1中的历史消息列表里    
+  2.4 返回历史消息列表，进入下一个Runnable
+
+3. 只要`history_messages_key`或者`input_messages_key`有一个存在，则使用`RunnablePassthrough.assign`封装 步骤2 中的 Runnable 对象    
+  3.1 在 input 中新增一个key，存放步骤2返回的历史消息列表   
+  3.2 这个key的名称优先使用 `history_messages_key`，没有则使用 `input_messages_key`   
+  如果`history_messages_key`和`input_messages_key`都没有设置，那么就不会在input中新增存放历史消息的key。
+
+> 这一步其实很重要，如果`history_messages_key`和`input_messages_key`都没有设置，不执行`RunnablePassthrough.assign`封装的话，
+> 那么首先执行就是步骤2中的`self._enter_history`，但是该方法返回值是 `list[BaseMessage]`；
+> 后续的 Chain 本来是期望接收一个 Dict 的，对于 `list[BaseMessage]` 的处理很可能出问题。
+> 如果执行了 `RunnablePassthrough.assign` 封装的话，那么返回的肯定是一个 Dict，那么后续的 Chain 就不会出问题。
+
+4. 执行`Chain`
+
+5. `self._exit_history`作为`Chain.with_listeners(on_end= ... )`监听器调用，在Chain执行完时触发：    
+  5.1 从RunnableConfig里获取`BaseChatMessageHistory`对象    
+  5.2 调用`self._get_input_messages(inputs)`，尝试从input中以`input_messages_key`（没有则使用'input'作为默认key）获取消息，封装为`HumanMessage`
+  5.3 获取步骤4中的output，调用`self._get_output_messages(outpus)`，尝试以`output_messages_key`为key从output中获取消息，封装为`AIMessage`
+  5.4 向 `BaseChatMessageHistory`对象中追加 [`HumanMessage`, `AIMessage`]
+
+> `input_messages_key`和`output_messages_key`这两个参数的最大作用是在`self._exit_history`中，此时Chain调用结束，
+> 需要使用这两个key分别从 input和output中 获取 用户的输入 和 模型的输出，并存入`BaseChatMessageHistory`对象中。
+> 如果没有设置或设置的不对，导致没有获取到用户输入和模型的输出，那么就无法将本次对话存入历史记录中，后续对话也就拿不到历史记录。
 
 
 ------
@@ -278,7 +315,7 @@ ChatModel使用的Prompt在`chat.py`中定义，它和上面基于`base.py`里�
 
 主要类如下（缩进表示继承关系）：
 - `BaseMessagePromptTemplate`: 大部分 Chat 相关 Template 的抽象基类。
-  - `MessagesPlaceholder`: 占位符，用于在 prompt 中插入一个变量，这个变量是一个列表，列表中的每个元素都是一个 `BaseMessage` 对象。
+  - `MessagesPlaceholder`: 占位符，用于在 ChatPrompt 中插入一个变量，这个变量是一个列表，列表中的每个元素都是一个 `BaseMessage` 对象。
   - `BaseStringMessagePromptTemplate`: 抽象类，以下才是常用的 Prompt Template 实现类。
     - `ChatMessagePromptTemplate`: 专门用于生成符合对话格式的消息（如用户消息、AI 回复、系统提示等）.
       - 主要用于生成**单个**对话消息模板

@@ -117,17 +117,20 @@ def prompt_template_usage():
 
     # PromptTemplate 使用
     template = "Tell me a {adjective} joke about {content}."
+
     # 第1种：直接实例化
     pt1 = PromptTemplate(input_variables=["adjective", "content"], template=template)
     pt1.format(adjective="funny", content="chickens")
+
     # 第2种：使用from_template方法——推荐这个
     pt2 = PromptTemplate.from_template(template=template)
-    pt2.format(adjective="funny-2", content="chickens-2")
+    pt2.format(adjective="nice", content="dog")
     print(pt2.template)
     print(pt2.template_format)
     print(pt2.input_variables)
+
     # 下面返回的是 <class 'langchain_core.prompt_values.StringPromptValue'>
-    pv2 = pt2.format_prompt(adjective="funny-3", content="chickens-3")
+    pv2 = pt2.format_prompt(adjective="fantastic", content="fish")
     print(type(pv2))
     print(pv2)
 
@@ -163,9 +166,9 @@ def chat_prompt_template_usage():
     # --- ChatPromptTemplate 用于组合多个ChatMessagePromptTemplate ---
     # 使用 from_messages() 方法，此方法接收一个 List
     # 其中的元素可以是：Union[BaseMessagePromptTemplate, BaseMessage, BaseChatPromptTemplate]
-    # 使用 # List[BaseChatPromptTemplate] 创建时，后续的 format方法会起作用
+    # 使用 List[BaseChatPromptTemplate] 创建时，后续的 format方法会起作用
     cpt = ChatPromptTemplate.from_messages(messages=[cmpt, hmpt])
-    # 使用 # List[BaseChatPromptTemplate] 创建时，后续的 format方法就没啥用了
+    # 使用 List[BaseMessage] 创建时，后续的 format方法就没啥用了
     cpt = ChatPromptTemplate.from_messages(messages=[cmpt_msg, hmpt_msg])  # List[BaseMessage]
     # --- format 方法 ---
     cpt_r1 = cpt.format(adjective="fantastic", content="cat", desc="laugh", something="rabbit")
@@ -186,6 +189,61 @@ def chat_prompt_template_usage():
     # <class 'langchain_core.messages.chat.ChatMessage'>
     for msg in cpt_r3:
         print(msg)
+
+
+def placeholder_usage():
+    # ------ MessagesPlaceholder 使用 ------
+    # 注意，MessagesPlaceholder 只能用于 ChatPromptTemplate 中，不能搭配 PromptTemplate 使用
+    # 使用 optional=True，表示这个变量是可选的，如果不传，则不会报错，但会返回空列表
+    prompt = MessagesPlaceholder(variable_name="history", optional=True)
+    # 如果没有 optional=True，下面会抛异常
+    print(prompt.format_messages())
+    # 传入一系列消息
+    history = [("system", "You are an AI assistant."), HumanMessage(content="Hello!")]
+    res = prompt.format_messages(history=history)
+    print(res)
+    for msg in res:
+        print(msg.content)
+
+    # 组合 MessagesPlaceholder + ChatPromptTemplate 使用，构造对话历史模版
+    chat_prompt = ChatPromptTemplate.from_messages(
+        messages=[
+            ("system", "你是一个智能助手，负责回答用户的问题。"),
+            MessagesPlaceholder("history"),
+            ("human", "{user_input}")
+        ]
+    )
+    # 准备对话历史
+    conversation_history = [
+        HumanMessage(content="你好！"),
+        AIMessage(content="你好！有什么我可以帮忙的吗？"),
+        HumanMessage(content="今天的天气怎么样？"),
+        AIMessage(content="今天天气晴朗，温度适中。"),
+    ]
+    # 用户当前输入
+    user_input = "明天会下雨吗？"
+    # --- invoke 方法 ---
+    r1 = chat_prompt.invoke(input={"history": conversation_history, "user_input": user_input})
+    print(type(r1))  # <class 'langchain_core.prompt_values.ChatPromptValue'>
+    print(r1)
+    r1_msgs = r1.to_messages()
+    print(type(r1_msgs[0]))  # <class 'langchain_core.messages.system.SystemMessage'>
+    for msg in r1_msgs:
+        # print(msg)
+        print(msg.content)
+    # --- format_prompt 方法，返回值和 invoke 方法一样 ---
+    formatted_prompt = chat_prompt.format_prompt(history=conversation_history, user_input=user_input)
+    print(type(formatted_prompt))  # <class 'langchain_core.prompt_values.ChatPromptValue'>
+    for msg in formatted_prompt.to_messages():
+        # print(msg)
+        print(msg.content)
+    # --- format_messages 方法 ---
+    formatted_msgs = chat_prompt.format_messages(history=conversation_history, user_input=user_input)
+    print(type(formatted_msgs[0]))  # <class 'langchain_core.messages.system.SystemMessage'>
+    for msg in formatted_msgs:
+        # print(msg)
+        print(msg.content)
+
 
 def fewshot_prompt_template_usage():
     # ----- FewShotPromptTemplate 使用 -----
@@ -583,23 +641,36 @@ def runnable_history_usage():
     # RunnableWithMessageHistory 使用分为3个部分：
 
     # 1. 配置一个 Runnable 对象，Chain对象 或者 RunnableSequences对象 都可以
-    template = "对话历史:\n{history}\n用户输入: {input}\n请你回复."
-    prompt = PromptTemplate(template=template, input_variables=["history", "input"])
-    # template = "对话历史:\n\n用户输入: {input}\n请你回复."
-    # prompt = PromptTemplate(template=template, input_variables=["input"])
-    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    # RunnableWithMessageHistory 主要是和 ChatModel + ChatPromptTemplate 配合使用的，
+    # 它和 LLM + PromptTemplate 的搭配有问题：通过 history 插入的历史消息显示的是 HumanMessage/AIMessage 的字符串表示，而不是里面的 content。
+    # client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    # template = """你是一个智能助手，负责回答用户的问题。对话历史:\n{history}\n用户输入:\n{user_input}\n请根据上下文生成回复："""
+    # prompt = PromptTemplate(template=template, input_variables=["history", "user_input"])
+
+    # 改为使用 ChatModel + ChatPromptTemplate
+    client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    prompt_chat = ChatPromptTemplate.from_messages(
+        messages=[
+            ("system", "你是一个智能助手，负责回答用户的问题。"),
+            MessagesPlaceholder("history"),
+            ("human", "{user_input}")
+        ]
+    )
+
     # set_verbose(False)  # 全局 verbose 设置，不好用
     # client_llm.with_config({'callbacks': [ConsoleCallbackHandler()]})   # 设置控制台回调日志，也不好用
     # 这里用 LLMChain 来演示，因为 RunnableSequence 不太好设置 verbose
     # chain = prompt | client_llm
     # print(type(chain))  # <class 'langchain_core.runnables.base.RunnableSequence'>
-    chain = LLMChain(llm=client_llm, prompt=prompt, verbose=True)
+    # chain = LLMChain(llm=client_llm, prompt=prompt, verbose=True)
+    chain = LLMChain(llm=client_chat, prompt=prompt_chat, verbose=True)
 
     # 2. 配置一个根据用户身份生成 BaseChatMessageHistory实现类对象的工厂函数
     # 这里使用了一个全局字典作为用户会话历史记录的存储，方便观察结果，实际中对应的是数据库或者redis等
     store = {}
-    # 这个工厂函数目前只有一个参数，如果有多个参数，需要更复杂的配置
+
     def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
+        # 这个工厂函数目前只有一个参数，如果有多个参数，需要更复杂的配置
         if session_id not in store:
             store[session_id] = ChatMessageHistory()
         return store[session_id]
@@ -608,29 +679,29 @@ def runnable_history_usage():
     chain_with_history = RunnableWithMessageHistory(
         runnable=chain,
         get_session_history=get_by_session_id,
-        input_messages_key="input",
         history_messages_key="history",
+        input_messages_key="user_input",
+        output_messages_key="text"  # 这个是 LLMChain 输出的默认 key
     )
 
     # 4. 调用 RunnableWithMessageHistory 对象的 invoke 方法，用户身份通过 config 参数设置
+    config_u1 = {"configurable": {"session_id": "user-1"}}
+    config_u2 = {"configurable": {"session_id": "user-2"}}
     # >>> 用户1的会话
     print("------------ user-1 -----------------")
-    u1_r1 = chain_with_history.invoke(input={"input": "你好，我先和你打个招呼"}, config={"configurable": {"session_id": "user-1"}})
+    u1_r1 = chain_with_history.invoke(input={"user_input": "你好，我先和你打个招呼"}, config=config_u1)
     print(u1_r1)
-    # print(store)
-    # print(store.keys())
     print(">>>>> user-1 chat-2")
-    u1_r2 = chain_with_history.invoke(input={"input": "我们刚才聊了什么"}, config={"configurable": {"session_id": "user-1"}})
+    u1_r2 = chain_with_history.invoke(input={"user_input": "我们刚才聊了什么"}, config=config_u1)
     print(u1_r2)
-    # print(store.keys())
+    print(store.keys())
 
     # >>> 用户2的会话
     print("------------ user-2 -----------------")
-    u2_r1 = chain_with_history.invoke(input={"input": "你好，我想和你聊聊历史"}, config={"configurable": {"session_id": "user-2"}})
+    u2_r1 = chain_with_history.invoke(input={"user_input": "你好，我想和你聊聊历史"}, config=config_u2)
     print(u2_r1)
-    print(store.keys())
-
-    u2_r2 = chain_with_history.invoke(input={"input": "我们刚才聊了什么"}, config={"configurable": {"session_id": "user-2"}})
+    print(">>>>> user-2 chat-2")
+    u2_r2 = chain_with_history.invoke(input={"user_input": "我们刚才聊了什么"}, config=config_u2)
     print(u2_r2)
     print(store.keys())
 
