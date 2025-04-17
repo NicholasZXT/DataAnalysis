@@ -8,26 +8,94 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 大部分模块的说明可以在该模块的 `__init__.py` 文件中找到。
 
-## `runnables`模块
+## Chain基础
+
+这部分的内容是LangChain里的基础，主要用于 Chain 的构建，并支持 LangChain Expression Language (LCEL) 语法。
+
+
+### `runnables`模块 - KEY
 
 这个模块是langchain_core模块的核心模块，基于 Runnable设计模式 和 LangChain Expression Language (LCEL) 定义了一系列的接口规范。
 也是实现 Chain 的核心模块。 
 
 这里重点介绍如下文件里定义的一些常用抽象基类。
 
-### `base.py`
+#### `base.py`
 
-- `Runnable`: LangChain里大部分对象执行的基本单元对象，定义了如下常用的调用方法:
+**`Runnable`**
+
+它是LangChain里大部分对象执行的基本单元对象，是LangChain里的核心抽象基类，
+详细介绍可以参考官方文档[Conceptual Guide -> Runnable interface](https://python.langchain.com/docs/concepts/runnables/).
+
+它重载了运算符`|`（重写了`__or__`/`__oro__`方法），并提供了`pipe`方法，为LCEL的 `|` 语法提供了支持。
+
+`Runnable`只定义了一个`name`属性，用于标识Runnable对象的名称。
+
+`Runnable`定义了如下常用的接口方法:
   - `invoke`/`ainvoke`: 输入单条，输出结果
   - `batch`/`abatch`: 批量invoke，输出结果
   - `stream`/`astream`: 流式调用invoke
+  - `batch_as_completed`/`abatch_as_completed`: 批量invoke直到完成
 
-> `Runnable`抽象基类还重载了运算符`|`（重写了`__or__`/`__oro__`方法），并提供了`pipe`方法，为LCEL的 `|` 语法提供了支持。
+此外，`Runnable`还定义了如下几个接口方法，它们均返回`RunnableBinding`对象，对当前Runnable对象进行一些封装并附加一些参数/属性：
+- `bind`: 以关键字参数附加一些参数/属性
+- `with_config`: 以`RunnableConfig` + 关键字参数附加信息
+- `with_listeners`/`with_alisteners`: 给Runnable对象，添加一些监听器，在运行开始，运行完成时，运行出错后，调用对应的监听回调函数。
+- `with_types`:
+- `with_retry`:
+- `with_fallbacks`:
+- `as_tool`:
 
-- `RunnableSerializable`: 继承了 `Serializable` + `Runnable`，是大部分LLM/ChatLLM的抽象基类
+上面的`with_listeners`/`with_alisteners`方法接受的Callable对象签名是：`Union[Callable[[Run], None], Callable[[Run, RunnableConfig], None]]`
 
 
-### `history.py`
+**`RunnableSerializable`**
+
+继承自 `load`模块的`Serializable` + `Runnable`，是大部分LLM/ChatLLM的基类，**注意，它不是抽象类，不过一般不会直接使用**。
+
+`RunnableSerializable`定义了如下两个在运行修改配置的接口方法：
+- `configurable_fields`: 
+- `configurable_alternatives`: 
+
+
+上面两个类是整个`runnable`模块的基础，除此之外，`base.py`文件里，还提供了一些Runnable的常用封装类，方便使用，列举如下：
+- `RunnableLambda`: 用于将任意Callable对象封装成Runnable对象，很常用
+- `RunnableSequence`: 组合多个Runnable对象，LCEL语法的 `|` 运算符返回的就是这个对象，也很常用
+- `RunnableBinding`: 对Runnable对象进行封装并附加一些参数/属性，**相当于 Runnable 装饰器**，LangChain框架内部很多地方都用到了它。
+- `RunnableParallel`:
+- `RunnableGenerator`:
+- `RunnableEach`:
+
+
+
+#### `config.py`和`configurable.py`
+
+`config.py`模块定义了`RunnableConfig`类——实际上就是一个Dict对象，用于封装运行时参数，可封装的参数如下：
+- run_id: UUID类型
+- run_name: str类型，Runnable对象名称
+- metadata: dict
+- tags: list[str]
+- callbacks: `Union[list[BaseCallbackHandler], BaseCallbackManager]`，回调函数/管理器配置
+- configurable: dict[str, Any]，这个参数用于**接受自定义的配置**。
+- max_concurrency
+- recursion_limit
+
+`configurable.py`里提供了如下两个常用类，
+配合上面`RunnableSerializable`的`configurable_fields`和`configurable_alternatives`方法使用：
+- `RunnableConfigurableFields`
+- `RunnableConfigurableAlternatives`
+
+
+#### `passthrough.py`
+
+定义了如下类：
+
+- `RunnablePassthrough`: 
+- `RunnableAssign`
+- `RunnablePick`
+
+
+#### `history.py`
 
 只有一个 `RunnableWithMessageHistory` 类——注意，**它不是抽象类**。
 
@@ -61,14 +129,63 @@ package名称为`langchain_core`，需要关注的有如下内容。
   它的作用是根据不同用户的身份，加载对应的消息历史，所以要采用简单工厂函数的方式。
 - `history_factory_config`: 类型是`Sequence[ConfigurableFieldSpec]`。    
   作用是说明简单工厂函数的参数，**简单工厂函数有多个参数时会用到**，如果简单工厂函数只需要一个参数，则可以省略。
-- `history_messages_key`: `Optional[str]`类型
+- `history_messages_key`: `Optional[str]`类型，用于指定 prompt 中，填充历史消息的key。 默认是None，此时就没法向对话中填充历史消息了。
 - `input_messages_key`: `Optional[str]`类型
 - `output_messages_key`: `Optional[str]`类型
 
 调用`invoke`方法执行。
 
 
-## `load`模块
+------
+### `callbacks`模块 - KEY
+
+callbacks模块一般是由`BaseLLM`/`BaseChatModel`/`Chain`对象封装，不直接和Runnable基础类配合使用。
+
+module主要内容有：
+
+- `base.py`: 定义了回调函数的 Mixin 类，回调函数通过 callback handler 定义
+  - 一系列Mixin类：`RetrieverManagerMixin`, `LLMManagerMixin`, `ChainManagerMixin`, `ToolManagerMixin`, `CallbackManagerMixin`等
+  - `BaseCallbackHandler`: 同步回调函数handler的接口类
+  - `AsyncCallbackHandler`: 异步回调函数handler的接口类
+  - `BaseCallbackManager`: 定义了回调函数管理器的基础类——它不是抽象类
+
+- `manager.py`: 定义了一系列回调管理器，常用的有如下两个：
+  - `CallbackManager`: 同步callback handler管理器，继承自`BaseCallbackManager`
+  - `AsyncCallbackManager`: 异步callback handler管理器，继承自`BaseCallbackManager`
+
+- `file.py`: 定义了一个`FileCallbackHandler`供使用，继承自`BaseCallbackHandler`
+- `stdout.py`: 定义了一个`StdOutCallbackHandler`供使用，继承自`BaseCallbackHandler`
+- `streaming_stdout.py`: 定义了一个`StreamingStdOutCallbackHandler`供使用，继承自`BaseCallbackHandler`
+
+
+**使用说明**
+
+- `base.py`中定义了一系列的Mixin类，它们定义了各个组件的事件方法，比如`on_llm_start`/`on_chat_model_start`/`on_chain_start`等方法。
+
+- `BaseCallbackHandler`组合了上述Mixin类，是所有CallbackHandler（包括`AsyncCallbackHandler`）的基类。    
+  但需要注意的是，虽然`BaseCallbackHandler`/`AsyncCallbackHandler`不是抽象类，里面的所有方法都是空的，
+  所以实际使用时，需要继承此类，并实现自己需要的方法。
+
+- `BaseCallbackManager`是回调管理器的基类，它定义并实现了一些基础方法，
+不过一般不需要直接使用此类，而是使用子类`CallbackManager`/`AsyncCallbackManager`。
+
+- `CallbackManager`/`AsyncCallbackManager`虽然有初始化方法，不过langchain框架内部一般使用它提供的classmethod `configure` 方法来初始化并返回对应的实例。
+
+- `CallbackManager`/`AsyncCallbackManager`一般**由下面的`BaseLLM`/`BaseChatModel`/`Chain`(langchain模块提供)封装**，
+这些对象都有`callbacks`/`callback_manager`属性，对应的就是这里的`BaseCallbackManager`/`AsyncCallbackManager`或者`CallbackHandler`/`AsyncCallbackHandler`对象列表。
+
+- `BaseLLM`/`BaseChatModel`/`Chain`在配置好CallbackManager后，需要自己在合适的时机调用`on_llm_start`/`on_chat_model_start`/`on_chain_start`等方法，
+  来触发配置的所有CallbackHandler。
+
+- `BaseLLM`/`BaseChatModel`/`Chain`一般**并不是在初始化时就实例化并配置 CallbackHandler 的**:
+  - 而是在`invoke`/`stream`等方法里调用`CallbackManager.configure()`生成最终要使用的 CallbackHandler 实例。
+  - 对于初始化时通过 `callbacks` 传入的回调函数，也会在被并入新的 CallbackHandler 实例。
+  - 注意这里`CallbackManager.configure()`里一般不会使用初始化时通过`callback_manager`参数传入的配置，这也是为啥这个参数被废弃的原因。
+
+
+
+------
+### `load`模块
 
 定义了LangChain里有关对象序列化/反序列化相关的内容。
 
@@ -77,7 +194,12 @@ package名称为`langchain_core`，需要关注的有如下内容。
 最重要的是 `serialization.py` 源码，提供了如下抽象类：
 - `Serializable`: 支持序列化/反序列化的抽象基类，大部分LangChain对象都基于此抽象类做序列化，它本身继承了`BaseModel`。
 
+
 ------
+### `tracers`模块
+
+
+------------
 ## Model IO相关
 ### `language_model`模块
 
@@ -97,6 +219,18 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 
 **使用说明**
+
+`BaseLanguageModel`是所有LLM的基类，它定义了如下常用属性：
+- `metadata`:
+- `tags`:
+- `verbose: bool`: 是否输出详细日志
+- `callbacks`: 回调函数设置，它是一个`Union[list[BaseCallbackHandler], BaseCallbackManager]`，既可以是回调函数列表，也可以是回调管理器。
+- `custom_get_token_ids`:
+
+`BaseLLM`/`BaseChatModel`继承自`BaseLanguageModel`，它新增了如下属性：
+- `callback_manager`: `BaseCallbackManager`类型，回调管理器。   
+  不过**这个属性和`BaseLanguageModel`的`callbacks`属性功能重复了，所以被标识为废弃的，建议使用`callback_manager`属性**。
+
 
 通常使用时，需要关注的是 `BaseLLM` 和 `BastChatModel` 提供的一些方法，列举如下：
 - `invoke`/`ainvoke`: 输入单条，输出结果
@@ -458,10 +592,6 @@ module内容如下：
 ### `agents.py`
 
 
-------
-## 回调函数
-
-### `callbacks`模块
 
 ------------
 
@@ -570,7 +700,7 @@ module名称为`langchain`，所有的模块可以分为如下6大类：
 > langchain官方建议后续直接从 `langchain_community`包里导入。
 
 ------
-## Chain 相关
+## Chain核心模块
 
 > langchain_core 没有对应的chains模块，因为chains相关的核心接口/抽象类都在 `langchain_core.runnables` 中定义好了。
 > **`chains` 模块才是 langchain 包的核心内容**。
@@ -584,13 +714,14 @@ module内容如下：
 `chains`模块提供了一系列的Chain组件实现类。
 
 **使用说明**
+
 抽象基类`Chain`里定义了如下属性（这些属性可以在初始化时传入）：
 - `metadata: Optional[Dict[str, Any]] = None`
 - `tags: Optional[List[str]] = None`
 - `verbose: bool`: 控制是否输出日志
 - `memory: Optional[BaseMemory]`: 存储 Memory 对象
-- `callbacks: Callbacks`: 回调函数
-- `callback_manager: Optional[BaseCallbackManager]`
+- `callbacks`: 回调函数配置，类型是`Union[list[BaseCallbackHandler], BaseCallbackManager]`，既可以是回调函数列表，也可以是`BaseCallbackManager`对象
+- `callback_manager: Optional[BaseCallbackManager]`: 回调管理器，和`callbacks`重复了，所以**被标识为废弃的**，建议使用`callbacks`
 
 抽象基类`Chain`定义了如下抽象方法：
 - Callable调用: 执行Chain组件
@@ -612,6 +743,11 @@ module内容如下：
 
 
 `LLMChain`
+
+
+
+### `callbacks`模块
+
 
 ------
 ## Memory 相关
@@ -705,10 +841,6 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 ### `agents`模块
 
 
-------
-## 回调函数
-
-### `callbacks`模块
 
 
 
