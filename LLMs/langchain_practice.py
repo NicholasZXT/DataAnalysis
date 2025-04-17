@@ -1,4 +1,5 @@
 import os
+from typing import Dict
 # ----------
 # from langchain import OpenAI
 # --- LLM 模型包装器 ---
@@ -33,8 +34,9 @@ from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvu
 from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
 # ----------
 from langchain_core.tracers.schemas import Run
-from langchain_core.runnables import RunnableConfig, RunnableLambda, RunnableSequence, RunnableBinding
+from langchain_core.runnables import RunnableConfig, RunnableLambda, RunnableSequence, RunnableBinding, RunnableParallel
 from langchain_core.callbacks import BaseCallbackHandler, CallbackManager, StdOutCallbackHandler
+from langchain_core.runnables.passthrough import RunnablePassthrough, RunnableAssign, RunnablePick
 # ----------
 from langchain.chains.llm import LLMChain
 from langchain_core.memory import BaseMemory
@@ -358,6 +360,57 @@ def runnable_usage():
         on_end=lambda run, config: print(f"Ending run {run.name}, config: {config}"),
     )
     run5.invoke(input=1)
+
+
+def runnable_other_usage():
+    # 展示其他一些 Runnable 对象的使用
+    # --- RunnableParallel ---
+    # 并行执行多个 Runnable，并将结果组合成一个 dict
+    task_a = RunnableLambda(lambda input: f"A-{input}")
+    task_b = RunnableLambda(lambda input: f"B-{input}")
+    task_c = RunnableLambda(lambda input: f"C-{input}")
+    nested_parallel = RunnableParallel(
+        group_1=task_a,
+        # 可以嵌套使用
+        group_2=RunnableParallel(a=task_b, c=task_c),
+    )
+    input_data = "data"
+    output_data = nested_parallel.invoke(input=input_data)
+    print(output_data)
+
+    # --------- passthrough.py 里提供的 Runnable 工具 --------
+    # --- RunnablePassthrough ---
+    # 什么 Runnable 对象都不传也可以
+    passthrough = RunnablePassthrough()
+    input_data = {"key": "value"}
+    output_data = passthrough.invoke(input=input_data)
+    print(output_data)
+    # 封装其他 Runnable 对象
+    add_prefix = RunnableLambda(lambda input_str: f"Prefix-{input_str}")
+    chain = RunnablePassthrough() | add_prefix
+    input_something = "hello"
+    output_data = chain.invoke(input=input_something)
+    print(output_data)
+
+    # --- RunnableAssign ---
+    # RunnableAssign 要求封装的 Runnable 对象的输入必须是 Dict，才能向其中添加key，所以使用 RunnableParallel 对象作为参数类型保证这一点
+    def add_ten(x: Dict[str, int]) -> int:
+        # 输入参数 x 必须要用 Dict 做一下封装
+        # 返回值就不用是 Dict 了，因为 RunnableParallel 会封装一个key的
+        return x['input'] + 10
+    mapper_run = RunnableParallel({"add_ten": RunnableLambda(add_ten)})
+    assign = RunnableAssign(mapper=mapper_run)
+    input_data = {"input": 12}
+    output_data = assign.invoke(input=input_data)
+    # 可以看到返回的 output_data 里新增了一个 RunnableParallel 里定义的key
+    print(output_data)
+
+    # RunnablePassthrough 对象还提供了一个类方法 assign，返回的就是 RunnableAssign 对象，
+    # 此方法可以用关键字参数传入 Runnable 对象，不要求是 RunnableParallel 对象，用起来方便一点，
+    # 就是不知道为啥这个 assign 方法没有放在 RunnableAssign 对象本身里面。。。
+    pass_assign = RunnablePassthrough.assign(add_ten_assign=RunnableLambda(add_ten))
+    output_data = pass_assign.invoke(input=input_data)
+    print(output_data)
 
 
 def chain_usage():
