@@ -32,6 +32,10 @@ from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvu
     SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
 from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
 # ----------
+from langchain_core.tracers.schemas import Run
+from langchain_core.runnables import RunnableConfig, RunnableLambda, RunnableSequence, RunnableBinding
+from langchain_core.callbacks import BaseCallbackHandler, CallbackManager, StdOutCallbackHandler
+# ----------
 from langchain.chains.llm import LLMChain
 from langchain_core.memory import BaseMemory
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -310,6 +314,52 @@ def retriever_usage():
 
 
 # ======================= Chain 相关模块使用 =======================
+def runnable_usage():
+    # --- Runnable 使用 ------
+    def add_one(x: int) -> int:
+        """单参函数"""
+        return x + 1
+    def add(inputs: tuple[int, int]) -> int:
+        """多参函数，必须通过 tuple 或者 dict 传入然后解包"""
+        return inputs[0] + inputs[1]
+    run1 = RunnableLambda(func=add_one, name='add_one_runnable')
+    print(run1)
+    print(run1.invoke(input=1))
+    print(run1.batch([1, 2, 3]))
+    run2 = RunnableLambda(func=add, name='add_runnable')
+    print(run2)
+    print(run2.invoke(input=(1, 2)))
+
+    # --- Runnable 带配置参数 使用 ------
+    # 参见 RunnableLambda._invoke() 方法里调用 call_func_with_variable_args() 的逻辑
+    # 要想在自定义函数中接受 RunnableConfig，则必须要定义一个名为 config 的参数；还有一个 run_manager 参数也是如此
+    def add_one_with_kwargs(x: int, config: RunnableConfig) -> int:
+        """单参函数"""
+        print(f"config: {config}")
+        return x + 1
+
+    run3 = RunnableLambda(func=add_one_with_kwargs)
+    run3.invoke(input=1, config={'run_name': 'add_one_runnable_config', 'configurable': {'k1': 1, 'k2': 2}})
+    # 下面使用了不被接受的 kwargs 也不会报错，而是会被合并进入 configurable 的 dict 里
+    run3.invoke(input=1, config={'run_name': 'add_one_runnable_config', 'random_key': 'random_value'})
+
+    # --- Runnable 监听器 使用 ------
+    # 监听器回调函数的签名是：`Union[Callable[[Run], None], Callable[[Run, RunnableConfig], None]]`
+    # 第1种：Callable[[Run], None]，此时接受的参数是 langchain_core.tracers.schemas.Run 对象
+    run4 = run1.with_listeners(
+        on_start=lambda run: print(f"Starting run {run.name}"),
+        on_end=lambda run: print(f"Ending run {run.name}"),
+    )
+    run4.invoke(input=1)
+    # 第2种：Callable[[Run], None]，此时接受的参数是 langchain_core.tracers.schemas.Run 对象
+    run5 = run1.with_listeners(
+        # 下面回调函数的参数是 langchain_core.tracers.schemas.Run 对象，所以可以获取到 run 的 id，name，config 等信息
+        on_start=lambda run, config: print(f"Starting run {run.name}, config: {config}"),
+        on_end=lambda run, config: print(f"Ending run {run.name}, config: {config}"),
+    )
+    run5.invoke(input=1)
+
+
 def chain_usage():
     client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
     client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
@@ -347,6 +397,51 @@ def chain_usage():
 
     res_chat = chain_chat.invoke(input={'adjective': 'nice', 'content': 'bird'})
     print(res_chat)
+
+
+class MyCustomHandler(BaseCallbackHandler):
+    def on_llm_start(self, serialized, prompts, **kwargs):
+        print("--->>> LLM 调用开始！")
+        print(f"--->>> 提示内容: {prompts}")
+
+    def on_llm_end(self, response, **kwargs):
+        print("<<<--- LLM 调用结束！")
+        # print(f"<<<--- 返回结果: {response}")
+def callback_usage():
+    # LangChain的Callback一般是由`BaseLLM`/`BaseChatModel`/`Chain`对象封装，不直接和Runnable基础类配合使用
+    input_str = "请解释下机器学习算法SVM的原理"
+    # 第1种方式
+    client_llm_v1 = OpenAI(
+        openai_api_key=API_KEY,
+        openai_api_base=LLM_URL,
+        model_name='Qwen2.5-32B-Instruct',
+        callbacks=[MyCustomHandler()]
+    )
+    res = client_llm_v1.invoke(input=input_str)
+    print("--------------------------------")
+    print(res)
+
+    # 第2种方式
+    callback_manager = CallbackManager(handlers=[MyCustomHandler()])
+    client_llm_v2 = OpenAI(
+        openai_api_key=API_KEY,
+        openai_api_base=LLM_URL,
+        model_name='Qwen2.5-32B-Instruct',
+        callbacks=callback_manager,
+        # 或者下面这个
+        # callback_manager=callback_manager,
+    )
+    res = client_llm_v2.invoke(input=input_str)
+    print("--------------------------------")
+    print(res)
+
+    # 第3种方式，在invoke方法里配置callback
+    client_llm_v3 = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    # res = client_llm_v3.invoke(input=input_str, config={'callbacks': [MyCustomHandler()]})
+    res = client_llm_v3.invoke(input=input_str, config={'callbacks': [MyCustomHandler()]})
+    print("--------------------------------")
+    print(res)
+
 
 
 def memory_usage():
@@ -437,6 +532,8 @@ def runnable_history_usage():
     # 1. 配置一个 Runnable 对象，Chain对象 或者 RunnableSequences对象 都可以
     template = "对话历史:\n{history}\n用户输入: {input}\n请你回复."
     prompt = PromptTemplate(template=template, input_variables=["history", "input"])
+    # template = "对话历史:\n\n用户输入: {input}\n请你回复."
+    # prompt = PromptTemplate(template=template, input_variables=["input"])
     client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
     # set_verbose(False)  # 全局 verbose 设置，不好用
     # client_llm.with_config({'callbacks': [ConsoleCallbackHandler()]})   # 设置控制台回调日志，也不好用
@@ -445,7 +542,7 @@ def runnable_history_usage():
     # print(type(chain))  # <class 'langchain_core.runnables.base.RunnableSequence'>
     chain = LLMChain(llm=client_llm, prompt=prompt, verbose=True)
 
-    # 2. 配置一个根据用户身份生成 BaseChatMessageHistory实现类的工厂函数
+    # 2. 配置一个根据用户身份生成 BaseChatMessageHistory实现类对象的工厂函数
     # 这里使用了一个全局字典作为用户会话历史记录的存储，方便观察结果，实际中对应的是数据库或者redis等
     store = {}
     # 这个工厂函数目前只有一个参数，如果有多个参数，需要更复杂的配置
@@ -464,16 +561,18 @@ def runnable_history_usage():
 
     # 4. 调用 RunnableWithMessageHistory 对象的 invoke 方法，用户身份通过 config 参数设置
     # >>> 用户1的会话
+    print("------------ user-1 -----------------")
     u1_r1 = chain_with_history.invoke(input={"input": "你好，我先和你打个招呼"}, config={"configurable": {"session_id": "user-1"}})
     print(u1_r1)
     # print(store)
-    print(store.keys())
-
+    # print(store.keys())
+    print(">>>>> user-1 chat-2")
     u1_r2 = chain_with_history.invoke(input={"input": "我们刚才聊了什么"}, config={"configurable": {"session_id": "user-1"}})
     print(u1_r2)
-    print(store.keys())
+    # print(store.keys())
 
     # >>> 用户2的会话
+    print("------------ user-2 -----------------")
     u2_r1 = chain_with_history.invoke(input={"input": "你好，我想和你聊聊历史"}, config={"configurable": {"session_id": "user-2"}})
     print(u2_r1)
     print(store.keys())
@@ -481,7 +580,6 @@ def runnable_history_usage():
     u2_r2 = chain_with_history.invoke(input={"input": "我们刚才聊了什么"}, config={"configurable": {"session_id": "user-2"}})
     print(u2_r2)
     print(store.keys())
-
 
 
 # ======================= Agent 相关模块使用 =======================
