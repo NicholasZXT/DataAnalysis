@@ -62,7 +62,8 @@ package名称为`langchain_core`，需要关注的有如下内容。
 - `RunnableLambda`: 用于将任意Callable对象封装成Runnable对象，很常用
 - `RunnableSequence`: 组合多个Runnable对象，LCEL语法的 `|` 运算符返回的就是这个对象，也很常用
 - `RunnableBinding`: 对Runnable对象进行封装并附加一些参数/属性，**相当于 Runnable 装饰器**，LangChain框架内部很多地方都用到了它。
-- `RunnableParallel`:
+- `RunnableParallel`: 用于并行执行多个 Runnable 对象。
+  它将输入数据分发给多个独立的处理步骤，并将它们的结果合并为一个输出字典。
 - `RunnableGenerator`:
 - `RunnableEach`:
 
@@ -89,9 +90,8 @@ package名称为`langchain_core`，需要关注的有如下内容。
 #### `passthrough.py`
 
 定义了如下类：
-
-- `RunnablePassthrough`: 
-- `RunnableAssign`
+- `RunnablePassthrough`: 原样返回输入，相当于一个 identity function —— 不知道这有啥用。。。
+- `RunnableAssign`: 用于在链式操作中动态地为**输入**数据添加或更新字段，允许你在key-value数据流中插入新的键值对，或者修改现有的键值对，而无需手动编写复杂的适配器函数
 - `RunnablePick`
 
 
@@ -105,28 +105,23 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 `RunnableWithMessageHistory`使用时有3个需要关注的概念：
 
-（1）Runnable对象
-
-`RunnableWithMessageHistory` 是**对一个可运行对象（如链或模型）的封装**。这个可运行对象可以是：
-
+（1）Runnable对象    
+`RunnableWithMessageHistory` 是**对一个可运行对象（比如链或模型）的封装**。这个可运行对象可以是：
 - 一个简单的语言模型（LLM）。
 - 一个复杂的链（chain），例如 ConversationChain。
 - 其他实现了 `Runnable` 接口的对象。
 
-（2）消息历史（Message History）
-
+（2）消息历史（Message History）    
 消息历史通常由 `BaseChatMessageHistory`实现类 管理。它记录了用户与助手之间的交互消息。
 
-（3）动态加载历史
-
-`RunnableWithMessageHistory` 需要通过一个函数动态加载消息历史——对应于`get_session_history`属性。
-
+（3）动态加载历史    
+`RunnableWithMessageHistory` 需要通过一个函数动态加载消息历史——对应于`get_session_history`属性。    
 这使得你可以从外部存储（如数据库）中获取历史记录，并在每次运行时动态更新。
 
 
 `RunnableWithMessageHistory`的初始化参数如下：
 - `get_session_history`: 类型是一个`Callable`对象，要求必须返回一个`BaseChatMessageHistory`——也就是一个简单工厂函数。    
-  它的作用是根据不同用户的身份，加载对应的消息历史，所以要采用简单工厂函数的方式。
+  它的作用是**根据不同用户的身份，加载对应的消息历史**，所以要采用简单工厂函数的方式。
 - `history_factory_config`: 类型是`Sequence[ConfigurableFieldSpec]`。    
   作用是说明简单工厂函数的参数，**简单工厂函数有多个参数时会用到**，如果简单工厂函数只需要一个参数，则可以省略。
 - `history_messages_key`: `Optional[str]`类型，用于指定 prompt 中，填充历史消息的key。 默认是None，此时就没法向对话中填充历史消息了。
