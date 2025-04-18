@@ -88,7 +88,7 @@ def chat_llm_usage():
         openai_api_base=LLM_URL,
         model_name='Qwen2.5-32B-Instruct',
         temperature=0.7,
-        max_tokens=512,
+        # max_tokens=512,  # ChatOpenAI 不支持此参数
         top_p=1,
         streaming=False,
         # batch_size=20,
