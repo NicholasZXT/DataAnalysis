@@ -2,7 +2,7 @@
 
 这里对 LangChain 的各个package进行简单总结。
 
-# langchain-core
+# Langchain-Core
 
 package名称为`langchain_core`，需要关注的有如下内容。  
 
@@ -621,13 +621,24 @@ module内容如下：
 - `invoke`/`ainvoke`: 对`run`/`arun`的封装，满足`RunnableSerializable`接口的要求，建议通过这两个方法调用。
 - Callable调用，不过后续可能不再支持
 
+
 ### `agents.py`
 
+定义了如下类：
 
+- `AgentAction`: 表示Agent发起的执行请求，是一个数据类，有如下属性：
+  - `tool`: 请求执行的工具名称
+  - `tool_input`: 请求执行的工具输入
+  - `log`: 附加日志信息
+- `AgentActionMessageLog`: 继承自 `AgentAction` 类，表示
+- `AgentStep`
+- `AgentFinish`
+
+langchain-core里的agents内容并没有太多，主要在langchain包里。
 
 ------------
 
-# `langchain`
+# LangChain
 
 module名称为`langchain`，所有的模块可以分为如下6大类：
 
@@ -836,6 +847,11 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 ------
 ## Agent相关
 
+> LangChain的 Agent 相关模块在 0.3 版本之后有较大改动，`langchain.agents`模块里内容是之前构建Agent的方式，已被标记为废弃的，
+> 在 1.0.0 版本之前都会被保留，参加官方文档 [How to migrate from legacy LangChain agents to LangGraph](https://python.langchain.com/docs/how_to/migrate_agent/).
+> 后续LangChain官方推荐转向使用 LangGraph 构建 Agent 应用。
+> 因此这里就**不再详细介绍 agents 模块相关内容了**。
+
 ### `tools`模块
 
 和上面类似，这个模块主要从两个地方导入内容：
@@ -870,10 +886,169 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - RequestsPostTool
 - RequestsPutTool
 
+
+
 ### `agents`模块
 
+旧版本构建Agent的方式，已经**被标记为废弃**，后续不再支持，建议使用 LangGraph 构建 Agent 应用。
 
 
+----------
+# LangGraph
+
+首先要明确的是，LangGraph并不依赖LangChain-Core或者LangChain，
+参考官方[FAQ -> Do I need to use LangChain to use LangGraph? What’s the difference?](https://langchain-ai.github.io/langgraph/concepts/faq/#do-i-need-to-use-langchain-to-use-langgraph-whats-the-difference)。
+
+LangGraph更像是一个高度抽象的基于图的Agent调度框架，参考官方文档 [LangGraph Glossary](https://langchain-ai.github.io/langgraph/concepts/low_level/)
+的说法，LangGraph的核心抽象 Graph 有如下3个概念：
+- `State`: 图的状态，这是 Graph 的核心，本质上就是一个dict，不过通常用 `TypeDict` 类或者 Pydantic的`BaseModel`类表示。
+- `Nodes`: Graph 的计算节点，本质上就是一个Python函数（更广泛一点就是一个Callable对象），可以封装各种逻辑，比如langchain里LLM/ChatModel/Chain的调用
+- `Edges`: Graph 的边，用来连接节点，本质上也是一个Python函数，用于根据当前的`State`判断并返回下一个要执行的`Node`的名称
+
+> 简单来说，Node是实际执行计算的抽象，Edge是控制逻辑的抽象。
+
+
+个人理解，LangGraph是基于图的workflow，不同于常用的图计算的场景，它主要**使用图来描述执行的 Workflow**，关注点是`State`对象。
+
+**`State`被视为整个 Graph Workflow 在某一时刻的状态快照**，原因有如下几点：
+- 它作为整个 Graph Workflow 的初始输入
+- workflow的每一步`Node`，都会接受上一个节点的 `State` 作为输入
+- 每个`Node`执行完毕后，都会更新（或者不更新）`State`里的状态
+- 最终输出也是`State`，不过此时其中的状态（也就是字段）已经是经过计算后的最终结果了
+
+> `State`里的属性字段完全是用户自己定义的，只要用户自己在Graph的Node/Edge里自己约定就行，所以非常灵活，高度可定制。
+
+在上面的 Graph Workflow 框架的基础上，LangGraph还提供了如下的功能：
+- Checkpoint机制: 对应的就是Memory，每一步（Node）执行完都会保存当前Node的`State`，以方便可以作为恢复的快照，另一方面也是作为历史消息
+- Interrupt/Command机制：也就是打断/恢复功能，可以方便的添加人工介入的步骤，校验/纠正Agent的执行过程，或者获取人工反馈以进行下一步执行
+- TimeTravel机制：可以方便的回溯到之前的某个节点，重新执行，或者重新执行整个Graph，这个依赖的就是Checkpoint机制
+
+
+------
+## `pregel`模块
+
+此模块是LangGraph 的 Runtime 实现，它基于Google的Pregel算法，该算法专门用于大规模的并行图计算。
+
+下面的 `CompiledGraph` 类就继承了此模块提供的 `Pregel` 类。
+
+这个模块应该是 LangGraph 的核心实现，研究起来难度比较高。
+
+
+## `constants.py`
+
+LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数驻留内存，避免重复创建。
+
+常用常量如下：
+- `START`
+- `END`
+
+-----
+## `graph`模块
+
+### `graph.py`
+
+无状态图的表示，定义了如下3个类：
+
+- `NodeSpec`: 继承自 `NamedTuple`，用来表示一个节点，有如下属性：
+  - `runnable`: 此Node对应的 `Runnable`对象
+  - `metadata`: 
+  - `ends`:
+
+- `Graph`: 无状态图表示
+
+- `CompiledGraph`: 继承自`pregel`模块的`Pregel`类，`Graph.compile`方法返回的就是此类的对象。
+
+
+**使用说明**
+
+`Graph`类用于表示无状态图，它使用如下属性来存储图的信息：
+- `nodes: dict[str, NodeSpec] = {}`
+- `edges = set[tuple[str, str]]()`
+
+`Graph`类提供了如下方法：
+- `add_node`
+- `add_sequence`
+- `add_edge`
+- `add_conditional_edges`
+- `set_entry_point`/`set_finish_point`: 设置起始/结束节点，快捷方法，内部调用了`add_edge`方法
+- `compile`: 编译图，返回一个`CompiledGraph`对象
+
+注意，**`Graph`类的初始化方法不接受任何参数，所以说它是无状态的**。
+
+
+`CompiledGraph`是`Graph`编译后的对象，它继承了`pregel`模块的`Pregel`类，提供了如下方法（`Pregel`定义的）：
+- `invoke`/`ainvoke`
+- `stream`/`astream`
+- `get_state`/`aget_state`
+- `update_state`/`aupdate_state`
+- `get_state_history`/`aget_state_history`
+- 
+
+
+### `state.py`
+
+有状态图的表示，定义了如下3个类：
+
+- `StateNodeSpec`: 有状态节点表示，继承自 `NamedTuple`，有如下属性：
+  - `runnable: Runnable`:
+  - `metadata`:
+  - `ends`:
+  - `input: Type[Any]`: 记录了输入，也就是状态
+  - `retry_policy`:
+
+- `StateGraph`: 继承自 `Graph`
+
+- `CompiledStateGraph`: 继承自 `CompiledGraph`
+
+**使用说明**
+
+**`StateGraph`的初始化方法里需要传入一个表示状态的对象**，其他大部分方法都和`Graph`一样。
+
+
+### `message.py`
+
+定义了如下2个类：
+
+- `MessagesState`: 继承自 `TypedDict`。    
+  定义了一个 `message` 属性，类型是`list[AnyMessage]`，并用`Annotated`注解设置了一个reducer函数`add_messages`。
+
+- `MessageGraph`: 继承自 `StateGraph`
+
+还定义了一个常用的reducer函数：`add_messages`。
+
+
+
+----
+## `checkpoint`模块
+
+**`base`子模块**
+
+- 定义了`CheckpointTuple`，继承于`NamedTuple`，用来表示一个状态快照，有如下属性：
+  - `config: RunnableConfig`
+  - `checkpoint: Checkpoint`
+  - `metadata: CheckpointMetadata`
+  - `parent_config: Optional[RunnableConfig] = None`
+  - `pending_writes: Optional[List[PendingWrite]] = None`
+
+
+- 定义了`BaseCheckpointSaver`基类，用来保存和加载状态快照。
+
+
+
+**`memory`子模块**
+
+实现了一个`InMemorySaver`，基于内存来保存checkpoint。
+
+**`serde`子模块**
+
+定义序列化/反序列化相关内容。
+
+
+
+----
+## `store`模块
+
+----
 
 
 
