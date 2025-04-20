@@ -16,6 +16,7 @@ from langgraph.graph.message import MessageGraph, MessagesState, add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.types import Command, interrupt
 
 from langchain_core.messages import BaseMessage
 from langchain_openai.chat_models import ChatOpenAI
@@ -242,7 +243,48 @@ def graph_checkpoint_usage():
 
 # ======================= Interrupt/Command机制 =======================
 def graph_interrupt_usage():
-    pass
+    def num_reducer(prev_num: List[int], curr_num: List[int]) -> List[int]:
+        return prev_num + curr_num
+
+    class HumanInterruptState(TypedDict):
+        num: Annotated[List[int], num_reducer]
+        human_msg: str
+
+    def greet_node(state: HumanInterruptState) -> Dict[str, str]:
+        print(f"--> greet_node running...")
+        if len(state["num"]) > 0:
+            value = {"state.num": state['num']}
+        else:
+            value = {"state.num": ""}
+        print(f"  ==> greet_node is waiting for human response with value: {value}")
+        human_response = interrupt(value=value)
+        print(f"  <== greet_node received human response: {human_response}")
+        print(f"<-- greet_node done...")
+        return {'human_msg': human_response["human_msg"]}
+
+    def increment_node(state: HumanInterruptState) -> Dict[str, List[int]]:
+        state_num = 0
+        if len(state["num"]) > 0:
+            state_num = state['num'][-1] + 1
+        print(f"--> increment_node running...")
+        return {'num': [state_num]}
+
+    graph = StateGraph(state_schema=HumanInterruptState)
+    graph.add_node(node="greet_node", action=greet_node)
+    graph.add_node(node="increment_node", action=increment_node)
+    graph.set_entry_point("greet_node")
+    graph.add_edge("greet_node", "increment_node")
+    graph.set_finish_point("increment_node")
+
+    memory = MemorySaver()
+    compile_graph: CompiledStateGraph = graph.compile(name='StateGraphWithHumanInterrupt', checkpointer=memory)
+
+    config_u1 = {"configurable": {"thread_id": "user-1"}}
+    u1_r1 = compile_graph.invoke(input={"messages": '', "num": []}, config=config_u1)
+    print(u1_r1)
+    u1_r1_command = Command(resume={'human_msg': "hello world"})
+    u1_r1_continue = compile_graph.invoke(input=u1_r1_command, config=config_u1)
+    print(u1_r1_continue)
 
 
 # ======================= 结合 LangChain 的 ChatBot 案例 =======================
