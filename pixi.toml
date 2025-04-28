@@ -1,0 +1,92 @@
+[workspace]
+name = "DataAnalysisEnv"
+version = "1.0.0"
+authors = ["Code-Sparks"]
+platforms = ["win-64"]
+#platforms = ["win-64", "linux-64"]
+#platforms = ["win-64", "linux-64", "osx-64"]
+channels = ["conda-forge", "nvidia", "pytorch"]   # nvidia channel需要在 pytorch channel 前面
+#channels = ["conda-forge", "pytorch", "nvidia"]
+
+# 下面这个配置不建议，不过不设置的话，pytorch-cuda==11.7 就无法安装 —— 只限于 win-64 平台时似乎不需要此配置？？？
+channel-priority = "disabled"
+
+[pypi-options]
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+
+[dependencies]
+python = "3.10.*"
+psutil = ">=5.9.0"
+
+[feature.db.dependencies]
+python-dotenv = "*"
+pydantic = ">=2.0.0"
+pydantic-settings = ">=2.0.0"
+pymysql =  "*"
+sqlalchemy = ">=1.4"
+elasticsearch = ">=7.13.0"
+requests = "*"
+httpx = "*"
+pyhive = ">=0.6.5"
+kafka-python = ">=2.0.0"
+#happybase = ">=1.2.0"
+#neo4j-python-driver = ">=5.5.0"
+#py2neo = ">=2021.2.3"
+#redis = ">=3.5.0"  # 不适用于 osx-64
+
+[feature.ml.dependencies]
+openpyxl = ">=3.0.0"
+numpy = ">=1.20.0"
+pandas = ">=1.4.0"
+scikit-learn = ">=1.0.0"
+scipy = "*"
+dataclasses = "*"
+ipython = "*"
+ipykernel = "*"
+jupyterlab = ">=3.4.0"
+xgboost = ">=2.0.0"
+optuna = ">=4.0.0"
+
+[feature.graph.dependencies]
+matplotlib = ">=3.5.0"
+seaborn = "*"
+plotly = ">=5.10.0"
+dash = "*"
+
+[feature.dl.dependencies]
+# 1.x 最后一个PyTorch版本，CUDA最高支持到 11.7
+pytorch = { version = "==1.13.1", channel = "pytorch" }
+pytorch-cuda = { version = "==11.7", channel = "pytorch" }
+torchvision = { version = "==0.14.1", channel = "pytorch" }
+torchaudio = { version = "==0.13.1", channel = "pytorch"}
+# 2.5 版本
+#pytorch = "==2.5.1"
+#pytorch-cuda = "==12.4"
+#torchvision = "==0.20.1"
+#torchaudio = "==2.5.1"
+
+#[feature.dl.pypi-dependencies]
+#torchserve = ">=0.7.0"
+
+[feature.nlp.dependencies]
+#nltk = "*"
+spacy = ">=3.4.2"
+transformers = ">=4.23.1"
+tokenizers = "*"
+
+[feature.llm.dependencies]
+openai = ">=1.0.0"
+langchain-core = ">=0.3.51"
+langchain = ">=0.3.23"
+langchain-openai = ">=0.3.12"
+langchain-community = ">=0.3.21"
+langgraph = ">=0.3.30"
+
+
+[feature.local.dependencies]
+pixi-pycharm = "*"
+
+# ------------ 环境定义 -------------
+[environments]
+default = { features = ["db", "ml", "graph", "dl", "nlp", "llm", "local"], solve-group = "main" }
+prod = { features = ["db", "ml", "graph", "dl", "nlp", "llm"], solve-group = "main" }
