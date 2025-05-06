@@ -1,0 +1,104 @@
+[project]
+name = "Data-Analysis-Project"
+version = "1.0.0"
+description = ""
+authors = [
+    {name = "Nicholas", email = "nicho@email.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+
+# 使用 dynamic 配置动态从 tool.poetry 获取依赖
+#dependencies = []
+dynamic = ["dependencies"]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.poetry]
+package-mode = false
+# 配置 清华源 为主要的 PyPI 源
+[[tool.poetry.source]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+priority = "primary"
+# 配置 pytorch 的源
+[[tool.poetry.source]]
+name = "pytorch-cuda117"
+url = "https://download.pytorch.org/whl/cu117"
+priority = "explicit"
+[[tool.poetry.source]]
+name = "pytorch-cuda124"
+url = "https://download.pytorch.org/whl/cu124"
+priority = "explicit"
+
+[tool.poetry.group.base.dependencies]
+psutil = ">=5.9.0"
+
+[tool.poetry.group.db.dependencies]
+python-dotenv = "*"
+pydantic = ">=2.0.0"
+pydantic-settings = ">=2.0.0"
+pymysql =  "*"
+sqlalchemy = ">=1.4"
+elasticsearch = ">=7.13.0"
+requests = "*"
+httpx = "*"
+pyhive = ">=0.6.5"
+kafka-python = ">=2.0.0"
+#happybase = ">=1.2.0"
+#neo4j-python-driver = ">=5.5.0"
+#py2neo = ">=2021.2.3"
+#redis = ">=3.5.0"  # 不适用于 osx-64
+
+[tool.poetry.group.ml.dependencies]
+openpyxl = ">=3.0.0"
+numpy = ">=1.20.0"
+pandas = ">=1.4.0"
+scikit-learn = ">=1.0.0"
+scipy = "*"
+dataclasses = "*"
+ipython = "*"
+ipykernel = "*"
+jupyterlab = ">=3.4.0"
+xgboost = ">=2.0.0"
+optuna = ">=4.0.0"
+
+[tool.poetry.group.graph.dependencies]
+matplotlib = ">=3.5.0"
+seaborn = "*"
+plotly = ">=5.10.0"
+dash = "*"
+
+[tool.poetry.group.dl.dependencies]
+# 1.x 最后一个PyTorch版本，CUDA最高支持到 11.7
+# pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
+torch = {version = "1.13.1+cu117", source = "pytorch-cuda117"}
+torchvision = {version = "0.14.1+cu117", source = "pytorch-cuda117"}
+torchaudio = {version = "0.13.1", source = "pytorch-cuda117"}
+# 2.5 版本
+# pip install torch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 --index-url https://download.pytorch.org/whl/cu124
+#torch = {version = "2.5.0", source = "pytorch-cuda124"}
+#torchvision = {version = "0.20.0", source = "pytorch-cuda124"}
+#torchaudio = {version = "2.5.0 ", source = "pytorch-cuda124"}
+
+[tool.poetry.group.nlp.dependencies]
+#nltk = "*"
+spacy = ">=3.4.2"
+transformers = ">=4.23.1"
+tokenizers = "*"
+
+[tool.poetry.group.llm.dependencies]
+openai = ">=1.0.0"
+langchain-core = ">=0.3.51"
+langchain = ">=0.3.23"
+langchain-openai = ">=0.3.12"
+langchain-community = ">=0.3.21"
+langgraph = ">=0.3.30"
+
+# 安装命令
+# poetry install --all-groups
+# poetry install --only dl
