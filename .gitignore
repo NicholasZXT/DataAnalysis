@@ -9,9 +9,9 @@ dataset/
 /datasets/
 /bert-pretrained-models/
 /BERT-source-codes/output/
-/DataMining-Actions/LianjiaHousePrice.xlsx
-/DeepLearning-Actions/TensorBoard-Logs/
-/DeepLearning-Actions/TensorBoard-Logs/*
+/DataMining/LianjiaHousePrice.xlsx
+/DeepLearning/TensorBoard-Logs/
+/DeepLearning/TensorBoard-Logs/*
 /Others/task_flow.py
 /local-datasets/
 
