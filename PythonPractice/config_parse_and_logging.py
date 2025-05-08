@@ -64,7 +64,7 @@ def INI_Parse():
 # ===================YAML 配置文件解析=========================
 # import yaml
 def YAML_Parse():
-    yaml_file = os.path.join(os.getcwd(), r"PythonGrammar\config.yaml")
+    yaml_file = os.path.join(os.getcwd(), r"PythonPractice\config.yaml")
     os.path.exists(yaml_file)
     with open(yaml_file, 'r+', encoding='UTF-8') as file:
         config_yaml = yaml.load(file, Loader=yaml.FullLoader)
