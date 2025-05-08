@@ -65,7 +65,9 @@ ipython = "*"
 ipykernel = "*"
 jupyterlab = ">=3.4.0"
 xgboost = ">=2.0.0"
-optuna = ">=4.0.0"
+optuna = ">=3.1.0"
+optuna-dashboard = ">=0.10.0"
+hyperopt = "==0.2.7"
 
 [tool.poetry.group.graph.dependencies]
 matplotlib = ">=3.5.0"
