@@ -51,14 +51,22 @@ from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFile
 from langchain.globals import set_verbose
 from langchain.callbacks.tracers import ConsoleCallbackHandler
 
-API_KEY = 'Random'
-LLM_URL = 'http://172.16.0.32:10086/v1'
+# --- vLLM 部署 ---
+# API_KEY = 'Empty'
+# LLM_URL = 'http://172.16.0.32:10086/v1'
+# MODEL = 'Qwen2.5-32B-Instruct'
+# --- Ollama 本地部署 ---
+API_KEY = 'Empty'
+LLM_URL = 'http://localhost:11434/v1'
+MODEL = 'qwen2.5:7b'
+# MODEL = 'qwen3:8b'
+
 # ======================= LLM + ChatLLM 模型包装器 使用 =======================
 def llm_usage():
     client_llm = OpenAI(
         openai_api_key=API_KEY,
         openai_api_base=LLM_URL,
-        model_name='Qwen2.5-32B-Instruct',
+        model_name=MODEL,
         temperature=0.7,
         max_tokens=512,
         top_p=1,
@@ -86,7 +94,7 @@ def chat_llm_usage():
     client_chat = ChatOpenAI(
         openai_api_key=API_KEY,
         openai_api_base=LLM_URL,
-        model_name='Qwen2.5-32B-Instruct',
+        model_name=MODEL,
         temperature=0.7,
         # max_tokens=512,  # ChatOpenAI 不支持此参数
         top_p=1,
@@ -333,7 +341,7 @@ def output_parser_usage():
     client_llm = OpenAI(
         openai_api_key=API_KEY,
         openai_api_base=LLM_URL,
-        model_name='Qwen2.5-32B-Instruct',
+        model_name=MODEL,
         max_tokens=512,
     )
     res = client_llm.invoke(input=prompt.format_prompt(ml='SVM'))
@@ -472,8 +480,8 @@ def runnable_other_usage():
 
 
 def chain_usage():
-    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
-    client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
+    client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
     template = "Tell me a {adjective} joke about {content}."
     prompt = PromptTemplate(template=template, input_variables=['adjective', 'content'])
     aipt = AIMessagePromptTemplate.from_template(template="you are an artist")  # 这个没有占位符
@@ -525,7 +533,7 @@ def callback_usage():
     client_llm_v1 = OpenAI(
         openai_api_key=API_KEY,
         openai_api_base=LLM_URL,
-        model_name='Qwen2.5-32B-Instruct',
+        model_name=MODEL,
         callbacks=[MyCustomHandler()]
     )
     res = client_llm_v1.invoke(input=input_str)
@@ -537,7 +545,7 @@ def callback_usage():
     client_llm_v2 = OpenAI(
         openai_api_key=API_KEY,
         openai_api_base=LLM_URL,
-        model_name='Qwen2.5-32B-Instruct',
+        model_name=MODEL,
         callbacks=callback_manager,
         # 或者下面这个
         # callback_manager=callback_manager,
@@ -547,7 +555,7 @@ def callback_usage():
     print(res)
 
     # 第3种方式，在invoke方法里配置callback
-    client_llm_v3 = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    client_llm_v3 = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
     # res = client_llm_v3.invoke(input=input_str, config={'callbacks': [MyCustomHandler()]})
     res = client_llm_v3.invoke(input=input_str, config={'callbacks': [MyCustomHandler()]})
     print("--------------------------------")
@@ -575,7 +583,7 @@ def memory_usage():
     print(cb_memory.load_memory_variables(inputs={}))
 
     # 结合 Chain 使用
-    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
     template = "Tell me a {adjective} joke about {content}."
 
     # ConversationBufferMemory 有个bug: BaseChatMemory的 _get_input_output 方法里，
@@ -612,7 +620,7 @@ def chat_history_usage():
     print(history.messages)
 
     # --- 配合 Memory 组件使用 ---
-    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
     template = "Tell me a {adjective} joke about {content}."
     prompt = PromptTemplate(template=template, input_variables=['adjective', 'content', 'nothing'])
     # ChatMessageHistory 其实就是 ConversationBufferMemory 里 chat_memory 属性的默认实现
@@ -643,12 +651,12 @@ def runnable_history_usage():
     # 1. 配置一个 Runnable 对象，Chain对象 或者 RunnableSequences对象 都可以
     # RunnableWithMessageHistory 主要是和 ChatModel + ChatPromptTemplate 配合使用的，
     # 它和 LLM + PromptTemplate 的搭配有问题：通过 history 插入的历史消息显示的是 HumanMessage/AIMessage 的字符串表示，而不是里面的 content。
-    # client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    # client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
     # template = """你是一个智能助手，负责回答用户的问题。对话历史:\n{history}\n用户输入:\n{user_input}\n请根据上下文生成回复："""
     # prompt = PromptTemplate(template=template, input_variables=["history", "user_input"])
 
     # 改为使用 ChatModel + ChatPromptTemplate
-    client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name='Qwen2.5-32B-Instruct')
+    client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
     prompt_chat = ChatPromptTemplate.from_messages(
         messages=[
             ("system", "你是一个智能助手，负责回答用户的问题。"),
@@ -722,13 +730,13 @@ def tool_usage():
     client_chat = ChatOpenAI(
         openai_api_key=API_KEY,
         openai_api_base=LLM_URL,
-        model_name='Qwen2.5-32B-Instruct',
+        model_name=MODEL,
         max_tokens=512,
     )
     # client_chat = ChatTongyi(
     #     dashscope_api_key=API_KEY,
     #     openai_api_base=LLM_URL,
-    #     model_name='Qwen2.5-32B-Instruct',
+    #     model_name=MODEL,
     #     max_tokens=512,
     # )
     # client_chat.bind()  # 这个方法是绑定运行时参数
