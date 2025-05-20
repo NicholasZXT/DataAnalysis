@@ -26,13 +26,13 @@ from langchain_openai.chat_models import ChatOpenAI
 from langchain_ollama.chat_models import ChatOllama
 from langchain_community.chat_models import ChatLlamaCpp, ChatTongyi, ChatHuggingFace
 # ----------
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.prompts import StringPromptTemplate, PromptTemplate
 from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplate, HumanMessagePromptTemplate, \
     AIMessagePromptTemplate, SystemMessagePromptTemplate, ChatPromptTemplate
 from langchain_core.prompts import FewShotPromptTemplate, FewShotChatMessagePromptTemplate, PipelinePromptTemplate
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser, PydanticOutputParser, MarkdownListOutputParser
-# from langchain_core.output_parsers import
+from langchain_core.output_parsers import JsonOutputKeyToolsParser
 # ----------
 # document_loaders, embeddings, vectorstores, retrievers 都是 langchain_community 包里的内容，官方建议直接从langchain_community包中导入
 from langchain_core.documents import Document
@@ -55,7 +55,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain_community.chat_message_histories import ChatMessageHistory, FileChatMessageHistory
 from langchain_core.runnables import RunnableWithMessageHistory
 # ----------
-from langchain_core.tools import BaseTool, StructuredTool, tool
+from langchain_core.tools import BaseTool, BaseToolkit, Tool, StructuredTool, tool
 # from langchain.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 # ----------
@@ -853,47 +853,17 @@ def runnable_history_usage():
 
 
 # ======================= Agent 相关模块使用 =======================
-@tool
-def multiply_tool(a: int, b: int) -> int:
-    """Multiply two numbers."""
-    return a * b
-
-def multiply_func(a: int, b: int) -> int:
-    """Multiply two numbers."""
-    return a * b
-
 def tool_usage():
-    # 只有 部分 ChatLLM 支持 bind_tools
-    # client_chat = ChatGLM(
-    client_chat = ChatOpenAI(
-        openai_api_key=API_KEY,
-        openai_api_base=LLM_URL,
-        model_name=MODEL,
-        max_tokens=512,
-    )
-    # client_chat = ChatTongyi(
-    #     dashscope_api_key=API_KEY,
-    #     openai_api_base=LLM_URL,
-    #     model_name=MODEL,
-    #     max_tokens=512,
-    # )
-    # client_chat.bind()  # 这个方法是绑定运行时参数
-    # client_chat.bind_functions()   # 这个方法只有 ChatOpenAI 有，对应OpenAI的 function_call 功能配置
-    # client_chat.bind_tools()  # bind_tools 方法也不是所有 ChatLLM 都有的，比如 ChatGLM 就没有，但是 ChatTongyi 有
-
-    # 检查下tool的封装
-    print(type(multiply_tool))
-    # <class 'langchain_core.tools.structured.StructuredTool'>
-    print(multiply_tool.name)
-    print(multiply_tool.description)
-    print(multiply_tool.args)
-    print(multiply_tool.args_schema)
-    print(multiply_tool.metadata)
-    print(multiply_tool.tags)
-    print(multiply_tool.response_format)
-    # 手动调用
-    print(multiply_tool.invoke({"a": 2, "b": 3}))
-
+    """
+    LangChain tool使用，参考官方文档:
+    - [Conceptual Guide -> Tools](https://python.langchain.com/docs/concepts/tools/)
+    - [Conceptual Guide -> Tool calling](https://python.langchain.com/docs/concepts/tool_calling/)
+    - [How-to guides -> How to use chat models to call tools](https://python.langchain.com/docs/how_to/tool_calling/)
+    - [How-to guides -> How to pass tool outputs to chat models](https://python.langchain.com/docs/how_to/tool_results_pass_to_model/)
+    定义工具时，和OpenAI的function calling类似，需要 name, description, schema 3个描述字段。
+    LangChain 中的
+    """
+    # ------------------------------
     # Langchain-community 提供的现成工具
     ls_tool = ListDirectoryTool()
     print(type(ls_tool))
@@ -905,17 +875,70 @@ def tool_usage():
     res = ls_tool.invoke(input={'dir_path': './LLMs'})
     print(res)
 
+    # ------------------------------
+    # 使用 @tool 装饰器定义工具
+    @tool(
+        description="使用龙球(DragonBall)算法计算两个数字的结果",
+        # args_schema={"x": int, "y": int}
+        args_schema={"x": Annotated[int, "第一个数字"], "y": Annotated[int, "第二个数字"]}
+    )
+    def dragon_ball_algorithm_tool(
+        x: Annotated[int, "第一个数字"],
+        y: Annotated[int, "第二个数字"]
+    ) -> int:
+        return x + y + 1
+
+    def dragon_ball_algorithm_func(x: int, y: int) -> int:
+        return x + y + 1
+
+    # 检查下tool的封装
+    print(type(dragon_ball_algorithm_tool))  # <class 'langchain_core.tools.structured.StructuredTool'>
+    print(dragon_ball_algorithm_tool.name)
+    print(dragon_ball_algorithm_tool.description)
+    # print(dragon_ball_algorithm_tool.args)
+    print(dragon_ball_algorithm_tool.args_schema)
+    print(dragon_ball_algorithm_tool.metadata)
+    print(dragon_ball_algorithm_tool.tags)
+    print(dragon_ball_algorithm_tool.response_format)
+    # 手动调用
+    print(dragon_ball_algorithm_tool.invoke({"x": 2, "y": 3}))
+
+    # ------------------------------------
+    # 只有 部分 ChatLLM 支持 bind_tools
+    # client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL, max_tokens=512)
+    client_chat = ChatOllama(base_url=LLM_URL, model=MODEL, keep_alive='30m')
+    # client_chat = ChatGLM(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL, max_tokens=512)
+    # client_chat = ChatTongyi(dashscope_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL, max_tokens=512)
+
+    # client_chat.bind()  # 这个方法是绑定运行时参数
+    # 这个方法只有 ChatOpenAI 有，对应OpenAI的 function_call 功能配置
+    print(getattr(client_chat, 'bind_functions'))
+    # bind_tools 方法也不是所有 ChatLLM 都有的，比如 ChatGLM 就没有，但是 ChatTongyi 有
+    print(getattr(client_chat, 'bind_tools'))
+
     # ChatOpenAI 只支持 bind_functions，不支持 bind_tools
-    # client_chat_with_tool = client_chat.bind_tools(tools=[multiply_tool])
-    # client_chat_with_tool = client_chat.bind_functions(functions=[multiply], function_call='auto')
-    client_chat_with_tool = client_chat.bind_functions(functions=[multiply_func])
+    # client_chat_with_tool = client_chat.bind_functions(functions=[dragon_ball_algorithm_func])
+    # client_chat_with_tool = client_chat.bind_functions(functions=[dragon_ball_algorithm_func], function_call='auto')
+
+    # ChatOllama 只支持 bind_tools，不支持 bind_functions
+    client_chat_with_tool = client_chat.bind_tools(tools=[dragon_ball_algorithm_tool])
+
+    # messages = [
+    #     {'role': 'system', 'content': '你是一个算术专家'},
+    #     {'role': 'user', 'content': '请使用龙球(DragonBall)算法计算一下 2019 和 2022 的结果'},
+    # ]
     messages = [
-        {'role': 'system', 'content': '你是一个算术专家'},
-        {'role': 'user', 'content': '请计算一下1024乘以1024的结果'},
+        SystemMessage(content='你是一个算术专家'),
+        HumanMessage(content='请使用龙球(DragonBall)算法计算一下 2019 和 2022 的结果'),
     ]
     res = client_chat_with_tool.invoke(input=messages)
+    res_json = res.to_json()
+    print(type(res))  # <class 'langchain_core.messages.ai.AIMessage'>
     print(res)
-    # print(res.content)
+    print(res.content)
+    # 工具调用时，会有 tool_calls 属性
+    print(res.tool_calls)
+    # 正常
 
 
 def main():
