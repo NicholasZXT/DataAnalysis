@@ -612,10 +612,20 @@ module内容如下：
 
 
 **使用说明**    
-`BaseTool`类里定义了如下属性：
+`BaseTool`类里定义了如下属性（对应于function calling所必须的3个要素）：
 - `name`: str类型，工具类的名称，用于标识工具类的唯一性，必须唯一。
 - `description`: str类型，工具类的描述，用于标识工具类的用途。
 - `args_schema`: Pydantic的`BaseModel`子类，用于定义工具类的参数，如果定义了该属性，则该工具类将支持参数校验。
+
+其他属性：
+- `return_direct`: bool类型，表示是否直接返回结果，如果为True，则直接返回结果，如果为False，则返回一个字典，字典的key为`output`，值为结果。
+- `verbose`: bool类型，表示是否打印日志，如果为True，则打印日志，如果为False，则不打印日志。
+- `callback_manager`: CallbackManager类型，用于管理回调函数，如果为None，则使用默认的回调管理器。
+- `metadata`: dict类型，表示工具类的元数据，用于标识工具类的用途。
+- `tags`:
+- `handle_tool_error`: 
+- `handle_validation_error`:
+
 定义了如下调用方法：
 - `run`/`arun`: 用于执行工具类内部原生函数的调用
 - `invoke`/`ainvoke`: 对`run`/`arun`的封装，满足`RunnableSerializable`接口的要求，建议通过这两个方法调用。
