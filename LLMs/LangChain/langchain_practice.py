@@ -26,13 +26,13 @@ from langchain_openai.chat_models import ChatOpenAI
 from langchain_ollama.chat_models import ChatOllama
 from langchain_community.chat_models import ChatLlamaCpp, ChatTongyi, ChatHuggingFace
 # ----------
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 from langchain_core.prompts import StringPromptTemplate, PromptTemplate
 from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplate, HumanMessagePromptTemplate, \
     AIMessagePromptTemplate, SystemMessagePromptTemplate, ChatPromptTemplate
 from langchain_core.prompts import FewShotPromptTemplate, FewShotChatMessagePromptTemplate, PipelinePromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser, PydanticOutputParser, MarkdownListOutputParser
-from langchain_core.output_parsers import JsonOutputKeyToolsParser
+from langchain_core.output_parsers import JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser
 # ----------
 # document_loaders, embeddings, vectorstores, retrievers 都是 langchain_community 包里的内容，官方建议直接从langchain_community包中导入
 from langchain_core.documents import Document
@@ -866,8 +866,7 @@ def tool_usage():
     # ------------------------------
     # Langchain-community 提供的现成工具
     ls_tool = ListDirectoryTool()
-    print(type(ls_tool))
-    # <class 'langchain_community.tools.file_management.list_dir.ListDirectoryTool'>
+    print(type(ls_tool))  # <class 'langchain_community.tools.file_management.list_dir.ListDirectoryTool'>
     print(ls_tool.name)
     print(ls_tool.description)
     print(ls_tool.args)
@@ -879,12 +878,27 @@ def tool_usage():
     # 使用 @tool 装饰器定义工具
     @tool(
         description="使用龙球(DragonBall)算法计算两个数字的结果",
-        # args_schema={"x": int, "y": int}
-        args_schema={"x": Annotated[int, "第一个数字"], "y": Annotated[int, "第二个数字"]}
+        # args_schema 用于设置被调用函数的参数schema，有两种形式：
+        # 1. Pydantic Model
+        # 2. JSON Schema，用dict描述，注意，不是任意dict的形式，否则下面的 .args 属性会报错
+        # 或者不设置，默认（infer_schema）会从函数参数中自动提前，此时建议参数使用 Annootated 进行注解
+        args_schema={
+            "type": "object",
+            "properties": {
+                "x": {"type": "integer", "description": "第一个数字"},
+                "y": {"type": "integer", "description": "第二个数字"}
+            },
+            "required": ["x", "y"]
+        },
+        # 是否从函数参数中自动推断参数schema，默认为 True
+        # infer_schema=True,
+        return_direct=False,
+        response_format="content",
     )
     def dragon_ball_algorithm_tool(
-        x: Annotated[int, "第一个数字"],
-        y: Annotated[int, "第二个数字"]
+        x: int, y: int
+        # x: Annotated[int, "第一个数字"],
+        # y: Annotated[int, "第二个数字"]
     ) -> int:
         return x + y + 1
 
@@ -892,16 +906,17 @@ def tool_usage():
         return x + y + 1
 
     # 检查下tool的封装
-    print(type(dragon_ball_algorithm_tool))  # <class 'langchain_core.tools.structured.StructuredTool'>
+    print(type(dragon_ball_algorithm_tool))   # <class 'langchain_core.tools.structured.StructuredTool'>
     print(dragon_ball_algorithm_tool.name)
     print(dragon_ball_algorithm_tool.description)
-    # print(dragon_ball_algorithm_tool.args)
     print(dragon_ball_algorithm_tool.args_schema)
+    print(dragon_ball_algorithm_tool.args)    # args 是 properties
+    print(dragon_ball_algorithm_tool.input_schema.model_json_schema())
     print(dragon_ball_algorithm_tool.metadata)
     print(dragon_ball_algorithm_tool.tags)
     print(dragon_ball_algorithm_tool.response_format)
     # 手动调用
-    print(dragon_ball_algorithm_tool.invoke({"x": 2, "y": 3}))
+    print(dragon_ball_algorithm_tool.invoke(input={"x": 2, "y": 3}))
 
     # ------------------------------------
     # 只有 部分 ChatLLM 支持 bind_tools
@@ -912,15 +927,17 @@ def tool_usage():
 
     # client_chat.bind()  # 这个方法是绑定运行时参数
     # 这个方法只有 ChatOpenAI 有，对应OpenAI的 function_call 功能配置
-    print(getattr(client_chat, 'bind_functions'))
+    # print(getattr(client_chat, 'bind_functions'))
     # bind_tools 方法也不是所有 ChatLLM 都有的，比如 ChatGLM 就没有，但是 ChatTongyi 有
-    print(getattr(client_chat, 'bind_tools'))
+    # print(getattr(client_chat, 'bind_tools'))
 
     # ChatOpenAI 只支持 bind_functions，不支持 bind_tools
     # client_chat_with_tool = client_chat.bind_functions(functions=[dragon_ball_algorithm_func])
     # client_chat_with_tool = client_chat.bind_functions(functions=[dragon_ball_algorithm_func], function_call='auto')
 
     # ChatOllama 只支持 bind_tools，不支持 bind_functions
+    # 查看 bind_tools 的源码可以发现，它内部（调用convert_to_openai_tool函数）其实只是提取函数的 name, description, parameters 信息
+    # 然后组织成 OpenAI API 的 function calling 形式，并不会自动执行调用
     client_chat_with_tool = client_chat.bind_tools(tools=[dragon_ball_algorithm_tool])
 
     # messages = [
@@ -932,14 +949,87 @@ def tool_usage():
         HumanMessage(content='请使用龙球(DragonBall)算法计算一下 2019 和 2022 的结果'),
     ]
     res = client_chat_with_tool.invoke(input=messages)
-    res_json = res.to_json()
     print(type(res))  # <class 'langchain_core.messages.ai.AIMessage'>
+    res_json = res.to_json()
     print(res)
     print(res.content)
-    # 工具调用时，会有 tool_calls 属性
+    # 成功触发工具调用时，会有 tool_calls 属性 —— 它是一个 list
     print(res.tool_calls)
-    # 正常
 
+    # 在调用模型之前，需要将本次请求返回的 AIMessage 追加到原始  messages 中
+    messages.append(res)
+
+    # 然后遍历 tool_calls，使用返回的信息调研工具，并追加到 messages 中
+    # for tool_call in res.tool_calls:
+    #     ...
+    #     tool_msg = selected_tool.invoke(tool_call)
+    #     messages.append(tool_msg)
+    # 这里因为只传入了一个 tool，简单起见，就直接调用了
+    tool_call = res.tool_calls[0]
+    # 注意，调用invoke时，传入的参数不是 tool_call['args']，而是 tool_call -------------- KEY
+    # 前者会返回值是内部tool的返回值，后者返回值被封装成了 ToolMessage，更方便使用一些
+    # tool_call_res = dragon_ball_algorithm_tool.invoke(input=tool_call['args'])
+    tool_call_res = dragon_ball_algorithm_tool.invoke(input=tool_call)
+    print(type(tool_call_res))  # 确保这里返回的是 ToolMessage
+    messages.append(tool_call_res)
+
+    # 然后将 messages 传递给模型，并打印出结果
+    res_final = client_chat_with_tool.invoke(input=messages)
+    print(type(res_final))  # <class 'langchain_core.messages.ai.AIMessage'>
+    print(res_final.content)
+
+def tool_parser_usage():
+    """
+    上面 tool 的返回结果，可以使用 output_parser 里提供了如下 3 个工具类来直接解析函数调用的信息：
+    - JsonOutputKeyToolsParser:  以 JSON 形式返回函数调用的参数
+    - JsonOutputToolsParser:     以 JSON 形式返回函数调用中特定键的值
+    - PydanticToolsParser:       将函数调用的参数作为 Pydantic 模型返回
+    """
+    @tool(description="使用龙球(DragonBall)算法计算两个数字的结果")
+    def dragon_ball_algorithm_tool(
+        x: Annotated[int, "第一个数字"],
+        y: Annotated[int, "第二个数字"]
+    ) -> int:
+        return x + y + 1
+
+    print(dragon_ball_algorithm_tool.name)
+    print(dragon_ball_algorithm_tool.description)
+    print(dragon_ball_algorithm_tool.args_schema)
+    print(dragon_ball_algorithm_tool.args)
+
+    client_chat = ChatOllama(base_url=LLM_URL, model=MODEL, keep_alive='30m')
+    client_chat_with_tool = client_chat.bind_tools(tools=[dragon_ball_algorithm_tool])
+
+    # 实例化 JsonOutputKeyToolsParser，并指定要解析的 key_name，也就是 tool 的 name；使用 LECL 语法连接
+    client_chat_tool_parser = client_chat_with_tool | JsonOutputKeyToolsParser(key_name="dragon_ball_algorithm_tool", first_tool_only=True)
+
+    messages = [
+        SystemMessage(content='你是一个算术专家'),
+        HumanMessage(content='请使用龙球(DragonBall)算法计算一下 2019 和 2022 的结果'),
+    ]
+    res = client_chat_tool_parser.invoke(input=messages)
+    print(type(res))  # 此时 res 不再是 ToolMessage，而是一个 dict，其中直接存放了 dragon_ball_algorithm_tool 的参数
+    print(res)
+
+    res_call_result = dragon_ball_algorithm_tool.invoke(input=res)
+    print(res_call_result)
+    # 不过此时要想将函数调用结果传递回模型的话，感觉比较麻烦
+
+    # 个人感觉可以采用下面手动调用 JsonOutputKeyToolsParser 的方式
+    res = client_chat_with_tool.invoke(input=messages)
+    print(type(res))
+    print(res)
+    json_tool_parser = JsonOutputKeyToolsParser(key_name="dragon_ball_algorithm_tool", first_tool_only=True)
+    res_tool_call = json_tool_parser.invoke(input=res)
+    print(res_tool_call)
+    res_tool_call_res = dragon_ball_algorithm_tool.invoke(input=res_tool_call)
+    print(res_tool_call_res)
+
+    messages.append(res)
+    messages.append( ToolMessage(content=res_tool_call_res, tool_call_id=res.tool_calls[0]['id']))
+    final_res = client_chat_with_tool.invoke(input=messages)
+    print(type(final_res))
+    print(final_res.content)
 
 def main():
     # llm_usage()
@@ -953,7 +1043,9 @@ def main():
     # structured_output_usage()
     # memory_usage()
     # chat_history_usage()
-    runnable_history_usage()
+    # runnable_history_usage()
+    tool_usage()
+    tool_parser_usage()
 
 
 if __name__ == '__main__':

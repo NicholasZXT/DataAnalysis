@@ -124,14 +124,8 @@ def function_calling_usage():
         "parameters": {
             "type": "object",
             "properties": {
-                "x": {
-                    "type": "integer",
-                    "description": "第一个数字"
-                },
-                "y": {
-                    "type": "integer",
-                    "description": "第二个数字"
-                }
+                "x": {"type": "integer", "description": "第一个数字"},
+                "y": {"type": "integer", "description": "第二个数字"}
             },
             "required": ["x", "y"]
         }
