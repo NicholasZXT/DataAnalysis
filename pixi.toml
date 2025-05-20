@@ -81,10 +81,13 @@ tokenizers = "*"
 openai = ">=1.0.0"
 langchain-core = ">=0.3.51"
 langchain = ">=0.3.23"
-langchain-openai = ">=0.3.12"
 langchain-community = ">=0.3.21"
 langgraph = ">=0.3.30"
+langchain-openai = ">=0.3.12"
 
+[feature.llm.pypi-dependencies]
+# conda源里暂时没有
+langchain-ollama = ">=0.3.0"
 
 [feature.local.dependencies]
 pixi-pycharm = "*"

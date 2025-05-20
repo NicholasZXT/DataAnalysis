@@ -1,37 +1,46 @@
 import os
-from typing import Dict
-# ----------
-# from langchain import OpenAI
+from typing import Optional, Dict, List, Union
+from typing_extensions import Annotated, TypedDict
+from pydantic import BaseModel, Field
+# --- 模型包装器的基类 ---
+from langchain_core.language_models.base import BaseLanguageModel
+from langchain_core.language_models.llms import BaseLLM, LLM
+from langchain_core.language_models.chat_models import BaseChatModel, SimpleChatModel
 # --- LLM 模型包装器 ---
-# from langchain.llms import OpenAI, ChatGLM, Tongyi  # 这个用法过时了，它只是从下面的 langchain_community.llms 中导入对应对象
-# from langchain_community.llms import OpenAI, ChatGLM, Tongyi
+# from langchain.llms import OpenAI, ChatGLM, Tongyi, Ollama, VLLM  # 这个用法过时了，它只是从下面的 langchain_community.llms 中导入对应对象
+# from langchain_community.llms import OpenAI, ChatGLM, Tongyi, Ollama, VLLM
 # 上面的导入其实是从下面位置导入的包装器对象
-from langchain_community.llms.openai import OpenAI
-# 但是官方文档又提示OpenAI后续建议直接从下面的包里导入
-# from langchain_openai.llms import OpenAI
-from langchain_community.llms.chatglm import ChatGLM
-from langchain_community.llms.tongyi import Tongyi
+# from langchain_community.llms.openai import OpenAI
+# 不过对于 OpenAI 客户端，官方文档又建议后续直接从下面单独的 langchain-openai 包里导入
+from langchain_openai.llms import OpenAI
+# from langchain_community.llms.ollama import Ollama
+from langchain_ollama.llms import OllamaLLM
 from langchain_community.llms.vllm import VLLM
+from langchain_community.llms.tongyi import Tongyi
+from langchain_community.llms.chatglm import ChatGLM
 # --- ChatLLM 模型包装器 ---
-from langchain.chat_models import init_chat_model
-from langchain_community.chat_models import ChatOpenAI, ChatHuggingFace, ChatLlamaCpp, ChatTongyi
-# ChatOpenAI 官方文档建议直接从 langchain_openai 包中导入
-# from langchain_openai.chat_models import ChatOpenAI
+from langchain.chat_models import init_chat_model    # 模型初始化函数，根据名称自动选择模型
+# from langchain_community.chat_models import ChatOpenAI, ChatOllama
+# 对于 ChatOpenAI、ChatOllama，官方文档建议后续从 langchain_openai、langchain_ollama 包中导入
+from langchain_openai.chat_models import ChatOpenAI
+from langchain_ollama.chat_models import ChatOllama
+from langchain_community.chat_models import ChatLlamaCpp, ChatTongyi, ChatHuggingFace
 # ----------
 from langchain_core.prompts import StringPromptTemplate, PromptTemplate
 from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplate, HumanMessagePromptTemplate, \
     AIMessagePromptTemplate, SystemMessagePromptTemplate, ChatPromptTemplate
 from langchain_core.prompts import FewShotPromptTemplate, FewShotChatMessagePromptTemplate, PipelinePromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain_core.output_parsers import MarkdownListOutputParser, JsonOutputParser, CommaSeparatedListOutputParser
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser, PydanticOutputParser, MarkdownListOutputParser
+# from langchain_core.output_parsers import
 # ----------
-# document_loaders, embeddings, vectorstores, retrievers 都是从 langchain_community 包里的内容，官方建议直接从langchain_community包中导入
+# document_loaders, embeddings, vectorstores, retrievers 都是 langchain_community 包里的内容，官方建议直接从langchain_community包中导入
 from langchain_core.documents import Document
 from langchain_community.document_loaders import TextLoader, CSVLoader, JSONLoader, WebBaseLoader
 from langchain_community.embeddings import OpenAIEmbeddings, OllamaEmbeddings, HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvus, OpenSearchVectorSearch, \
-    SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
-from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
+# from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvus, OpenSearchVectorSearch, \
+#     SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
+# from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
 # ----------
 from langchain_core.tracers.schemas import Run
 from langchain_core.runnables import RunnableConfig, RunnableLambda, RunnableSequence, RunnableBinding, RunnableParallel
@@ -41,7 +50,9 @@ from langchain_core.runnables.passthrough import RunnablePassthrough, RunnableAs
 from langchain.chains.llm import LLMChain
 from langchain_core.memory import BaseMemory
 from langchain_core.chat_history import BaseChatMessageHistory
-from langchain.memory import ConversationBufferMemory, ChatMessageHistory, FileChatMessageHistory
+from langchain.memory import ConversationBufferMemory
+# from langchain.memory import ChatMessageHistory, FileChatMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory, FileChatMessageHistory
 from langchain_core.runnables import RunnableWithMessageHistory
 # ----------
 from langchain_core.tools import BaseTool, StructuredTool, tool
@@ -57,22 +68,32 @@ from langchain.callbacks.tracers import ConsoleCallbackHandler
 # MODEL = 'Qwen2.5-32B-Instruct'
 # --- Ollama 本地部署 ---
 API_KEY = 'Empty'
-LLM_URL = 'http://localhost:11434/v1'
+LLM_URL = 'http://localhost:11434'
 MODEL = 'qwen2.5:7b'
 # MODEL = 'qwen3:8b'
 
 # ======================= LLM + ChatLLM 模型包装器 使用 =======================
 def llm_usage():
-    client_llm = OpenAI(
-        openai_api_key=API_KEY,
-        openai_api_base=LLM_URL,
-        model_name=MODEL,
+    # client_llm = OpenAI(
+    #     openai_api_key=API_KEY,
+    #     openai_api_base=LLM_URL,
+    #     model_name=MODEL,
+    #     temperature=0.7,
+    #     max_tokens=512,
+    #     top_p=1,
+    #     streaming=False,
+    #     batch_size=20,
+    # )
+    # Ollama 的初始化参数不太一样
+    # client_llm = Ollama(
+    client_llm = OllamaLLM(
+        base_url=LLM_URL,
+        model=MODEL,
         temperature=0.7,
-        max_tokens=512,
         top_p=1,
-        streaming=False,
-        batch_size=20,
+        keep_alive='30m'
     )
+
     input_str = "请解释下机器学习算法SVM的原理"
     res = client_llm.invoke(input=input_str)
     print(res)
@@ -91,15 +112,21 @@ def llm_usage():
 
 
 def chat_llm_usage():
-    client_chat = ChatOpenAI(
-        openai_api_key=API_KEY,
-        openai_api_base=LLM_URL,
-        model_name=MODEL,
+    # client_chat = ChatOpenAI(
+    #     openai_api_key=API_KEY,
+    #     openai_api_base=LLM_URL,
+    #     model_name=MODEL,
+    #     temperature=0.7,
+    #     # max_tokens=512,  # ChatOpenAI 不支持此参数
+    #     top_p=1,
+    #     streaming=False,
+    # )
+    client_chat = ChatOllama(
+        base_url=LLM_URL,
+        model=MODEL,
         temperature=0.7,
-        # max_tokens=512,  # ChatOpenAI 不支持此参数
         top_p=1,
-        streaming=False,
-        # batch_size=20,
+        keep_alive='30m'
     )
     messages = [
         {'role': 'system', 'content': '你是一个机器学习方面的专家'},
@@ -112,11 +139,44 @@ def chat_llm_usage():
     for res in client_chat.stream(input=messages):
         print(res.content, end='')
 
-    # Callable调用，不过只支持 List[BaseMessage] 参数
+    # Callable调用，不过只支持 List[BaseMessage] 参数，并且被标记为deprecated
     msg = [SystemMessage(content='你是一个机器学习方面的专家'), HumanMessage(content='请问什么是SVM算法')]
     res = client_chat(messages=msg)
     print(res.content)
 
+
+def get_client_llm() -> Union[BaseLLM, LLM]:
+    # client_llm = OpenAI(
+    #     openai_api_key=API_KEY,
+    #     openai_api_base=LLM_URL,
+    #     model_name=MODEL,
+    #     max_tokens=512
+    # )
+    # client_llm = Ollama(
+    client_llm = OllamaLLM(
+        base_url=LLM_URL,
+        model=MODEL,
+        keep_alive='30m'
+    )
+    return client_llm
+
+def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
+    # client_chat = ChatOpenAI(
+    #     openai_api_key=API_KEY,
+    #     openai_api_base=LLM_URL,
+    #     model_name=MODEL,
+    #     # temperature=0.7,
+    #     # top_p=1,
+    #     # streaming=False,
+    # )
+    client_chat = ChatOllama(
+        base_url=LLM_URL,
+        model=MODEL,
+        # temperature=0.7,
+        # top_p=1,
+        keep_alive='30m'
+    )
+    return client_chat
 
 # ======================= PromptTemplate + Message 使用 =======================
 def prompt_template_usage():
@@ -130,7 +190,7 @@ def prompt_template_usage():
     pt1 = PromptTemplate(input_variables=["adjective", "content"], template=template)
     pt1.format(adjective="funny", content="chickens")
 
-    # 第2种：使用from_template方法——推荐这个
+    # 第2种：使用类方法 from_template —— 推荐这种方式
     pt2 = PromptTemplate.from_template(template=template)
     pt2.format(adjective="nice", content="dog")
     print(pt2.template)
@@ -171,7 +231,7 @@ def chat_prompt_template_usage():
     # HumanMessage 没有 role 属性！
     # print(hmpt_msg.role)
 
-    # --- ChatPromptTemplate 用于组合多个ChatMessagePromptTemplate ---
+    # --- ChatPromptTemplate 用于组合多个 ChatMessagePromptTemplate ---
     # 使用 from_messages() 方法，此方法接收一个 List
     # 其中的元素可以是：Union[BaseMessagePromptTemplate, BaseMessage, BaseChatPromptTemplate]
     # 使用 List[BaseChatPromptTemplate] 创建时，后续的 format方法会起作用
@@ -317,40 +377,119 @@ def pipeline_prompt_usage():
 # ======================= Output Parser 使用 =======================
 # LangChain的输出解析器是和提示词配合使用的，它会在提示词的末尾增加一段要求大模型输出指定格式的指令。
 def output_parser_usage():
-    # 先实例化一个 parser 对象
-    markdown_parser = MarkdownListOutputParser()
-    # 可以查看该Parser的格式化提示词指令
-    markdown_format_instructions = markdown_parser.get_format_instructions()
-    # print(markdown_format_instructions)
+    """
+    常用的有如下几种Parser:
+    - StrOutputParser: 原样返回
+    - JsonOutputParser: 以JSON格式返回
+    - PydanticOutputParser: 以Pydantic对象返回，它继承自JsonOutputParser
+    - MarkdownListOutputParser: 以MarkDown列表形式返回
+    """
+    class MyModel(BaseModel):
+        name: str
+        age: int
+        position: str
+        achievements: List[str]
+    # 先实例化一个 parser 对象，可以通过 get_format_instructions 查看该Parser的格式化提示词指令
+    # parser = StrOutputParser() # 注意，StrOutputParser没有提示词，因为它原样输出
+    # parser = JsonOutputParser(pydantic_object=MyModel)
+    parser = PydanticOutputParser(pydantic_object=MyModel)
+    format_instructions = parser.get_format_instructions()
+    print(format_instructions)
     # 注意模版最后的 {format_instructions}，它并不在 input_variables 中填充
-    template = "请解释下列机器学习算法的原理: {ml}\n{format_instructions}"
+
+    template = "请简单介绍下{person}的履历，需要包含姓名，年龄，职位，成就等信息\n{format_instructions}"
     prompt = PromptTemplate(
-        input_variables=['ml'],
+        input_variables=['person'],
         template=template,
         # 设置 output_parser 参数，将 parser 对象传入到模板中
-        output_parser=markdown_parser,
+        output_parser=parser,
         # 通过 partial_variables 参数，将 parser 对象传入到模板中
-        partial_variables={'format_instructions': markdown_format_instructions},
+        partial_variables={'format_instructions': format_instructions},
     )
-    r1 = prompt.format(ml='SVM')
+    r1 = prompt.format(person='雷军')
     print(r1)
-    r2 = prompt.format_prompt(ml='SVM')
+    r2 = prompt.format_prompt(person='雷军')
     print(r2.text)
     print(prompt.partial_variables)
 
-    client_llm = OpenAI(
-        openai_api_key=API_KEY,
-        openai_api_base=LLM_URL,
-        model_name=MODEL,
-        max_tokens=512,
-    )
-    res = client_llm.invoke(input=prompt.format_prompt(ml='SVM'))
+    client_llm = get_client_llm()
+    res = client_llm.invoke(input=prompt.format_prompt(person='雷军'))
     print(res)
 
     # 调用模型之后，使用如下方式解析模型输出
-    res_parse = markdown_parser.parse(text=res)
-    for line in res_parse:
-        print(line)
+    res_parse = parser.parse(text=res)
+    print(type(res_parse))
+    print(res_parse)
+
+    # --- 另一个例子 ----
+    parser = MarkdownListOutputParser()
+    format_instructions = parser.get_format_instructions()
+    template = "请简单介绍下机器学习领域{ml}算法的步骤.\n{format_instructions}"
+    prompt = PromptTemplate(
+        input_variables=['ml'],
+        template=template,
+        output_parser=parser,
+        partial_variables={'format_instructions': format_instructions},
+    )
+    res = client_llm.invoke(input=prompt.format_prompt(ml='SVM'))
+    print(res)
+    res_parse = parser.parse(text=res)
+    print(type(res_parse))
+    for item in res_parse:
+        print(item)
+
+
+def structured_output_usage():
+    """
+    展示如何输出结构化的内容，参考官方文档：
+    [How-to-Guides -> How to return structured data from a model](https://python.langchain.com/docs/how_to/structured_output/)
+    这里主要是使用 BaseLanguageModel 定义的抽象方法 with_structured_output，该方法接受一个 schema，用于描述模型输出的字段，返回一个 Runnable 对象。
+    一般有 3 种指定 schema 的方式：
+    1. TypedDict
+    2. JSON Schema
+    3. Pydantic Model
+    使用 1和2 返回的是一个 dict，使用 3 返回的是对应 Pydantic Model 的对象
+    with_structured_output 方法的实现交给了具体的模型类，但不是所有的模型类都实现了此方法。
+    **一般只有 ChatModel 有此方法，因为 BaseChatModel 提供了一个默认实现**。
+    具体有哪些模型实现了， 可以参考 https://python.langchain.com/docs/integrations/chat/#featured-providers 表格。
+    """
+
+    class JokeDict(TypedDict):
+        """Joke to tell user."""
+        setup: Annotated[str, ..., "The setup of the joke"]
+        # Alternatively, we could have specified setup as:
+        # setup: str                    # no default, no description
+        # setup: Annotated[str, ...]    # no default, no description
+        # setup: Annotated[str, "foo"]  # default, no description
+        punchline: Annotated[str, ..., "The punchline of the joke"]
+        rating: Annotated[Optional[int], None, "How funny the joke is, from 1 to 10"]
+
+    class JokeModel(BaseModel):
+        """Joke to tell user."""
+        setup: str = Field(description="The setup of the joke")
+        punchline: str = Field(description="The punchline to the joke")
+        rating: Optional[int] = Field(default=None, description="How funny the joke is, from 1 to 10")
+
+    client_chat = get_client_chat()
+    print(type(client_chat))
+    print(getattr(client_chat, 'with_structured_output'))
+    print(getattr(client_chat, 'bind_tools'))
+    # 如果使用 ChatOllama，不要使用从 langchain_community.chat_models 导入的 ChatOllama，
+    # 而是使用 langchain_ollama.chat_models 里的 ChatOllama，因为前者没有实现自己的 bind_tools 方法，会报错
+
+    structured_chat_dict = client_chat.with_structured_output(schema=JokeDict)
+    # structured_chat_dict = client_chat.with_structured_output(schema=JokeDict, include_raw=True)
+    res_dict = structured_chat_dict.invoke("Tell me a joke about cats")
+    print(type(res_dict))
+    print(res_dict)
+
+    structured_chat_model = client_chat.with_structured_output(schema=JokeModel)
+    # 如果使用了 include_raw=True，那么返回的 res_model 是一个 dict，而不是一个 Pydantic Model
+    # structured_chat_model = client_chat.with_structured_output(schema=JokeModel, include_raw=True)
+    res_model = structured_chat_model.invoke("Tell me a joke about cats")
+    print(type(res_model))
+    print(res_model)
+
 
 # ======================= 数据检索相关模块使用 =======================
 def document_loader_usage():
@@ -480,8 +619,8 @@ def runnable_other_usage():
 
 
 def chain_usage():
-    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
-    client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
+    client_llm = get_client_llm()
+    client_chat = get_client_chat()
     template = "Tell me a {adjective} joke about {content}."
     prompt = PromptTemplate(template=template, input_variables=['adjective', 'content'])
     aipt = AIMessagePromptTemplate.from_template(template="you are an artist")  # 这个没有占位符
@@ -562,7 +701,6 @@ def callback_usage():
     print(res)
 
 
-
 def memory_usage():
     # ----- 早期版本基于 BaseMemory 实现的使用 -----
     cb_memory = ConversationBufferMemory()
@@ -583,7 +721,7 @@ def memory_usage():
     print(cb_memory.load_memory_variables(inputs={}))
 
     # 结合 Chain 使用
-    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
+    client_llm = get_client_llm()
     template = "Tell me a {adjective} joke about {content}."
 
     # ConversationBufferMemory 有个bug: BaseChatMemory的 _get_input_output 方法里，
@@ -620,7 +758,7 @@ def chat_history_usage():
     print(history.messages)
 
     # --- 配合 Memory 组件使用 ---
-    client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
+    client_llm = get_client_llm()
     template = "Tell me a {adjective} joke about {content}."
     prompt = PromptTemplate(template=template, input_variables=['adjective', 'content', 'nothing'])
     # ChatMessageHistory 其实就是 ConversationBufferMemory 里 chat_memory 属性的默认实现
@@ -656,7 +794,7 @@ def runnable_history_usage():
     # prompt = PromptTemplate(template=template, input_variables=["history", "user_input"])
 
     # 改为使用 ChatModel + ChatPromptTemplate
-    client_chat = ChatOpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
+    client_chat = get_client_chat()
     prompt_chat = ChatPromptTemplate.from_messages(
         messages=[
             ("system", "你是一个智能助手，负责回答用户的问题。"),
@@ -781,6 +919,15 @@ def tool_usage():
 
 
 def main():
+    # llm_usage()
+    # chat_llm_usage()
+    # prompt_template_usage()
+    # chat_prompt_template_usage()
+    # placeholder_usage()
+    # fewshot_prompt_template_usage()
+    # pipeline_prompt_usage()
+    # output_parser_usage()
+    # structured_output_usage()
     # memory_usage()
     # chat_history_usage()
     runnable_history_usage()
