@@ -17,8 +17,12 @@ from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent, In
 # from langgraph.prebuilt.chat_agent_executor import AgentState
 from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.base import BaseStore
+from langgraph.store.memory import InMemoryStore
+from langgraph.config import get_store
 from langgraph.types import Command, interrupt, StreamMode
 # --- langchain 依赖 ---
+from langchain_core.runnables import RunnableConfig
 from langchain_core.language_models.chat_models import BaseChatModel, SimpleChatModel
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage, ToolMessage
 from langchain_openai.chat_models import ChatOpenAI
@@ -149,6 +153,33 @@ def stateful_graph_usage():
     print(f"final state: {res}")
 
 
+def message_graph_usage():
+    """
+    对于LLM场景，LangGraph 还提供了 MessageState 和 MessageGraph，方便直接使用。
+    - MessageState 就是一个 TypedDict，含有一个 messages 的key，存放了 List[BaseMessage].
+    - MessageGraph 也有一个存放了 List[BaseMessage]的状态，但是似乎是匿名的，不能指定key。
+    """
+    def some_node(state):
+        print("--> some_node start...")
+        print(f"  state: {state}")
+        print("<-- some_node end...")
+        # 不能返回 dict，只能返回 List[BaseMessage]
+        # return {'messages': [HumanMessage(content="some-node")]}
+        return [HumanMessage(content="some-node")]
+
+    graph = MessageGraph()
+    graph.add_node(node="some_node", action=some_node)
+    graph.set_entry_point("some_node")
+    graph.set_finish_point("some_node")
+    compile_graph = graph.compile(name='MessageGraph')
+
+    # 同样，input_msg 也不能是 dict，而是 List[BaseMessage]
+    # input_msg = {"messages": [HumanMessage(content="Hello World!")]}
+    input_msg = [HumanMessage(content="Hello World!")]
+    res = compile_graph.invoke(input=input_msg)
+    print(res)
+
+
 # ======================= 基于条件动态执行有状态图 =======================
 def graph_conditional_usage():
     class SimpleState(TypedDict):
@@ -193,7 +224,7 @@ def graph_conditional_usage():
     print(res2)
 
 
-# ======================= Graph Checkpoint 使用 =======================
+# ======================= Graph Checkpoint（短期记忆） 使用 =======================
 def graph_checkpoint_usage():
     # 为了展示 checkpoint 的效果，定义的 state 对象里，每个属性需要有一个 reducer 函数，这里使用了两种：
     # 1. 自定义 reducer
@@ -307,6 +338,62 @@ def graph_checkpoint_usage():
         # print('  checkpoint.parent_config: ', checkpoint.parent_config)
 
 
+# ======================= Graph Store（长期记忆） 使用 =======================
+def graph_store_usage():
+    """
+    LangGraph的长期记忆存储的抽象基类是 langgraph.store.base.BaseStore。
+    它采用 namespace + key + value 的层次来组织存储：
+    - namespace: 支持多层次命名空间，使用 Tuple[str,...]来表示，比如 (user_id, application_name)
+    - key: 对应命名空间下存储的 key
+    - value: JSON结构，以dict形式存储
+    """
+    memory_store = InMemoryStore()
+    memory_store.put(
+        namespace=("user-1", "web"),
+        key="web-k-1",
+        value={"some": "some-value"}
+    )
+    memory_store.put(
+        namespace=("user-1", "db"),
+        key="db-k-1",
+        value={"some": "some-value"}
+    )
+    print(memory_store.list_namespaces())
+    print(memory_store.get(namespace=("user-1", "web"),  key="web-k-1"))
+    print("----------------------------")
+
+    def some_node(state: MessagesState, config: RunnableConfig):
+        # 这里还通过 RunnableConfig 类型拿到了运行时的配置
+        print("--> some_node start...")
+        print(f"  state: {state}")
+        # 可以从 config 对象中获取 invoke 里传入的 config 参数信息，比如其中的 user_id 的内容，之后再查询用户相关的信息
+        # print(f"  config: {config}")
+        print(f"  use_id: {config.get('configurable', {}).get('user_id', '')}")
+        # 在节点内部，可以通过 store = get_store() 来获取 store 对象  ----------- KEY
+        store = get_store()
+        store_namespaces = []
+        for item in store.list_namespaces():
+            store_namespaces.append('.'.join(item))
+        store_namespaces = ';'.join(store_namespaces)
+        print(f"  store-namespaces: {store_namespaces}")
+        print("<-- some_node end...")
+        return {'messages': [HumanMessage(content=store_namespaces)]}
+
+    graph = StateGraph(MessagesState)
+    graph.add_node(node="some_node", action=some_node)
+    graph.set_entry_point("some_node")
+    graph.set_finish_point("some_node")
+    compile_graph = graph.compile(name='GraphWithStore', store=memory_store)
+
+    # input_msg = {"messages": [{"role": "user", "content": "请列出当前Store的namespace"}]}
+    input_msg = {"messages": [HumanMessage(content="请列出当前Store的namespace")]}
+    config = {"configurable": {"user_id": "user-1"}}
+    res = compile_graph.invoke(input=input_msg, config=config)
+    # print(res)
+    for msg in res['messages']:
+        msg.pretty_print()
+
+
 # ======================= Interrupt/Command机制 =======================
 def graph_interrupt_usage():
     def num_reducer(prev_num: List[int], curr_num: List[int]) -> List[int]:
@@ -366,7 +453,6 @@ def chatbot_example():
         messages: Annotated[list[Union[str, BaseMessage]], add_messages]
 
     graph = StateGraph(MsgState)
-    # 对于上面这种常用的 state 定义和图，LangGraph 还提供了 MessageState 和 MessageGraph，方便直接使用
 
     client_chat = get_client_chat()
     # res = client_chat.invoke(input=[{'role': 'user', 'content': '你好，可以和我聊聊历史吗？'}])
@@ -650,14 +736,16 @@ def graph_stream_usage():
 
 def main():
     # stateful_graph_usage()
+    # message_graph_usage()
     # graph_conditional_usage()
     # graph_checkpoint_usage()
+    graph_store_usage()
     # graph_interrupt_usage()
     # chatbot_example()
     # chatbot_tool_usage_manual()
     # chatbot_tool_usage_prebuilt()
     # react_agent_usage()
-    graph_stream_usage()
+    # graph_stream_usage()
 
 
 if __name__ == '__main__':

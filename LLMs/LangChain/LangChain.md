@@ -1031,7 +1031,9 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 ----
 ## `checkpoint`模块
 
-**`base`子模块**
+此模块对应的是LangGraph里的短期记忆机制，只维护每次会话内的历史消息记录。
+
+### `base`子模块
 
 - 定义了`CheckpointTuple`，继承于`NamedTuple`，用来表示一个状态快照，有如下属性：
   - `config: RunnableConfig`
@@ -1040,14 +1042,15 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
   - `parent_config: Optional[RunnableConfig] = None`
   - `pending_writes: Optional[List[PendingWrite]] = None`
 
+
 - 定义了`BaseCheckpointSaver`基类，用来保存和加载状态快照。
 
 
-**`memory`子模块**
+### `memory`子模块
 
 实现了一个`InMemorySaver`，基于内存来保存checkpoint。
 
-**`serde`子模块**
+### `serde`子模块
 
 定义序列化/反序列化相关内容。
 
@@ -1055,6 +1058,22 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 ----
 ## `store`模块
+
+此模块对应于 LangGraph 的长期记忆机制，用于保存和加载长期记忆。
+
+### `base`子模块
+
+- `BaseStore`: 所有Store类的抽象基类，定义了如下方法：
+- `put`/`aput`
+- `get`/`aget`
+- `list_namespaces`/`alist_namespaces`
+- `search`/`asearch`
+- `batch`/`abatch`
+- `delete`/`adelete`
+
+### `memory`子模块
+
+定义了一个`InMemoryStore`，基于内存来保存长期记忆。
 
 ----
 ## `prebuilt`模块
