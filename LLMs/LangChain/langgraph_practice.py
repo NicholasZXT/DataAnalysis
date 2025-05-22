@@ -558,6 +558,9 @@ def react_agent_usage():
         return x + y + 1 == z
 
     tools = [dragon_ball_algorithm, dragon_ball_check]
+    # 可以试下不传入检查结果的工具，模型会给出不一样的回答
+    # tools = [dragon_ball_algorithm]
+
     tool_node = ToolNode(tools=tools)
     client_chat = get_client_chat()
     client_chat_tool = client_chat.bind_tools(tools=tools)
