@@ -17,7 +17,7 @@ from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent, In
 # from langgraph.prebuilt.chat_agent_executor import AgentState
 from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.types import Command, interrupt
+from langgraph.types import Command, interrupt, StreamMode
 # --- langchain 依赖 ---
 from langchain_core.language_models.chat_models import BaseChatModel, SimpleChatModel
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage, ToolMessage
@@ -572,15 +572,81 @@ def react_agent_usage():
     print(type(agent))
     print(agent.name)
 
-    # 调用
+    # 输入
     input_msgs = [
         SystemMessage(content='你是一个算术专家'),
         HumanMessage(content='请使用龙球(DragonBall)算法计算一下 2019 和 2022 的结果，并检查算法的结果是否正确'),
     ]
     config = {"configurable": {"thread_id": "1"}}
+
+    # 调用
     res = agent.invoke(input={"messages": input_msgs}, config=config)
+    print(f"type(res): {type(res)}")    # <class 'langgraph.pregel.io.AddableValuesDict'>
+    print(res.keys())    # dict_keys(['messages'])
+    print(res)
+    print("-------------------------------")
     for msg in res['messages']:
         msg.pretty_print()
+
+def graph_stream_usage():
+    @tool(description="使用龙球(DragonBall)算法计算两个数字的结果")
+    def dragon_ball_algorithm(x: Annotated[int, "第一个数字"], y: Annotated[int, "第二个数字"]) -> int:
+        return x + y + 1
+    @tool(description="检查龙球(DragonBall)算法的结果是否正确")
+    def dragon_ball_check(x: Annotated[int, "第一个数字"], y: Annotated[int, "第二个数字"], z: Annotated[int, "结果数字"]) -> int:
+        return x + y + 1 == z
+
+    tools = [dragon_ball_algorithm, dragon_ball_check]
+    tool_node = ToolNode(tools=tools)
+    client_chat = get_client_chat()
+    client_chat_tool = client_chat.bind_tools(tools=tools)
+    memory = MemorySaver()
+    agent = create_react_agent(name='ReAct-Agent', model=client_chat_tool, tools=tool_node, checkpointer=memory)
+
+    # 输入
+    input_msgs = [
+        SystemMessage(content='你是一个算术专家'),
+        HumanMessage(content='请使用龙球(DragonBall)算法计算一下 2019 和 2022 的结果，并检查算法的结果是否正确'),
+    ]
+    config = {"configurable": {"thread_id": "1"}}
+
+    # Stream调用
+    # 可接受的模式有：["values", "updates", "debug", "messages", "custom"]，参见 langgraph.types.StreamMode
+
+    # None：也是默认模式，此时每次输出一个 Message
+    print("------- Stream with None -------")
+    for chunk in agent.stream(input={"messages": input_msgs}, config=config):
+        # print(f"type(chunk): {type(chunk)}")   # <class 'langgraph.pregel.io.AddableUpdatesDict'>
+        print(chunk.keys())
+        print(chunk)
+
+    # values 模式：在图中的每个步骤之后流式传输状态的完整值
+    print("\n------- Stream with values -------")
+    for chunk in agent.stream(input={"messages": input_msgs}, config=config, stream_mode="values"):
+        print(chunk.keys())
+        print(chunk)
+
+    # updates 模式：在图中的每个步骤之后将更新流式传输到状态。
+    print("\n------- Stream with update -------")
+    for chunk in agent.stream(input={"messages": input_msgs}, config=config, stream_mode="updates"):
+        print(chunk.keys())
+        print(chunk)
+
+    # messages 模式：记录每个 messages 中的增量 token。
+    print("\n------- Stream with messages -------")
+    for token, metadata in agent.stream(input={"messages": input_msgs}, config=config, stream_mode="messages"):
+        print("Token: ", token)
+        print("Metadata: ", metadata)
+
+    # debug 模式：在整个图的执⾏过程中流式传输尽可能多的信息，主要⽤于调试程序。
+    # print("------- Stream with debug -------")
+    # for chunk in agent.stream(input={"messages": input_msgs}, config=config, stream_mode="debug"):
+    #     print(chunk)
+
+    # custom 模式：⾃定义流，通过 LangGraph 的 StreamWriter ⽅法
+    # print("------- Stream with custom -------")
+    # for chunk in agent.stream(input={"messages": input_msgs}, config=config, stream_mode="custom"):
+    #     print(chunk)
 
 def main():
     # stateful_graph_usage()
@@ -590,7 +656,8 @@ def main():
     # chatbot_example()
     # chatbot_tool_usage_manual()
     # chatbot_tool_usage_prebuilt()
-    react_agent_usage()
+    # react_agent_usage()
+    graph_stream_usage()
 
 
 if __name__ == '__main__':
