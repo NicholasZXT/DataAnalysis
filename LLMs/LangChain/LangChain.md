@@ -1040,9 +1040,7 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
   - `parent_config: Optional[RunnableConfig] = None`
   - `pending_writes: Optional[List[PendingWrite]] = None`
 
-
 - 定义了`BaseCheckpointSaver`基类，用来保存和加载状态快照。
-
 
 
 **`memory`子模块**
@@ -1059,6 +1057,29 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 ## `store`模块
 
 ----
+## `prebuilt`模块
+
+这个模块提供了一些用于构建Agent的预制组件。
+
+**`ToolNode`**
+
+封装tool的节点。
+
+**`tools_condition`**
+
+封装 tool 的条件边，源码里内部逻辑比较简单，就是判断 state 里有没有 messages，并且messages 最后一条是不是 AIMessage，是就调用 Tool,
+否则转向 END。
+
+
+**`create_react_agent`**
+
+用于快速创建一个React Agent。
+
+
+此外，还定义了一些注解类型，用于在 tool 函数中访问图的状态和存储。
+- `InjectedState`
+- `InjectedStore`
+
 
 
 
