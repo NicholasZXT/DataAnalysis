@@ -14,6 +14,7 @@ from langgraph.graph.graph import CompiledGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.graph.message import MessageGraph, MessagesState, add_messages
 from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent, InjectedState, InjectedStore
+# from langgraph.prebuilt.chat_agent_executor import AgentState
 from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command, interrupt
@@ -72,7 +73,7 @@ def stateless_graph_usage():
     graph.set_finish_point('bye')
 
     # 编译并执行
-    compile_graph = graph.compile(name='StatelessGraph')
+    compile_graph: CompiledGraph = graph.compile(name='StatelessGraph')
     print(compile_graph.config_specs)
     print(compile_graph.config_type)
     result = compile_graph.invoke(input={'key1': 'value1', 'key2': 'value2'})
@@ -361,17 +362,18 @@ def graph_interrupt_usage():
 
 # ======================= 结合 LangChain 的 ChatBot 案例 =======================
 def chatbot_example():
-    client_chat = get_client_chat()
-    # res = client_chat.invoke(input=[{'role': 'user', 'content': '你好，可以和我聊聊历史吗？'}])
-    # print(res.content)
-
     class MsgState(TypedDict):
         messages: Annotated[list[Union[str, BaseMessage]], add_messages]
 
+    graph = StateGraph(MsgState)
+    # 对于上面这种常用的 state 定义和图，LangGraph 还提供了 MessageState 和 MessageGraph，方便直接使用
+
+    client_chat = get_client_chat()
+    # res = client_chat.invoke(input=[{'role': 'user', 'content': '你好，可以和我聊聊历史吗？'}])
+    # print(res.content)
     def chatbot(state: MsgState):
         return {"messages": [client_chat.invoke(input=state["messages"])]}
 
-    graph = StateGraph(MsgState)
     graph.add_node(node='chatbot', action=chatbot)
     graph.set_entry_point('chatbot')
     graph.set_finish_point('chatbot')
@@ -543,6 +545,40 @@ def chatbot_tool_usage_prebuilt():
         msg.pretty_print()
 
 
+# ======================= ReAct Agent 生成 =======================
+def react_agent_usage():
+    """
+    API文档: [create_react_agent](https://langchain-ai.github.io/langgraph/reference/agents/#langgraph.prebuilt.chat_agent_executor.create_react_agent)
+    """
+    @tool(description="使用龙球(DragonBall)算法计算两个数字的结果")
+    def dragon_ball_algorithm(x: Annotated[int, "第一个数字"], y: Annotated[int, "第二个数字"]) -> int:
+        return x + y + 1
+    @tool(description="检查龙球(DragonBall)算法的结果是否正确")
+    def dragon_ball_check(x: Annotated[int, "第一个数字"], y: Annotated[int, "第二个数字"], z: Annotated[int, "结果数字"]) -> int:
+        return x + y + 1 == z
+
+    tools = [dragon_ball_algorithm, dragon_ball_check]
+    tool_node = ToolNode(tools=tools)
+    client_chat = get_client_chat()
+    client_chat_tool = client_chat.bind_tools(tools=tools)
+    memory = MemorySaver()
+
+    # 创建 Agent 的图，这里使用默认的 AgentState，当然也可以自定义
+    # tools 参数可以使用 ToolNode，也可以直接使用 List[Tool]
+    agent = create_react_agent(name='ReAct-Agent', model=client_chat_tool, tools=tool_node, checkpointer=memory)
+    print(type(agent))
+    print(agent.name)
+
+    # 调用
+    input_msgs = [
+        SystemMessage(content='你是一个算术专家'),
+        HumanMessage(content='请使用龙球(DragonBall)算法计算一下 2019 和 2022 的结果，并检查算法的结果是否正确'),
+    ]
+    config = {"configurable": {"thread_id": "1"}}
+    res = agent.invoke(input={"messages": input_msgs}, config=config)
+    for msg in res['messages']:
+        msg.pretty_print()
+
 def main():
     # stateful_graph_usage()
     # graph_conditional_usage()
@@ -550,7 +586,8 @@ def main():
     # graph_interrupt_usage()
     # chatbot_example()
     # chatbot_tool_usage_manual()
-    chatbot_tool_usage_prebuilt()
+    # chatbot_tool_usage_prebuilt()
+    react_agent_usage()
 
 
 if __name__ == '__main__':
