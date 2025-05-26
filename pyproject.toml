@@ -1,3 +1,12 @@
+[build-system]
+# 使用Pixi
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+# 使用 Poetry
+#requires = ["poetry-core>=2.0.0,<3.0.0"]
+#build-backend = "poetry.core.masonry.api"
+
+# ------------------------------------ Project 配置 ------------------------------------
 [project]
 name = "Data-Analysis-Project"
 version = "1.0.0"
@@ -5,19 +14,272 @@ description = ""
 authors = [
     {name = "Nicholas", email = "nicho@email.com"}
 ]
-readme = "README.md"
-requires-python = ">=3.10,<4.0"
+#readme = "README.md"
+
+# 指定 Python 版本，对 Poetry, Pixi, UV 都生效
+#requires-python = ">=3.10,<4.0"
+requires-python = "==3.10.*"
 
 # 使用 dynamic 配置动态从 tool.poetry 获取依赖
-#dependencies = []
-dynamic = ["dependencies"]
+#dynamic = ["dependencies"]
+# 项目依赖，在 pyproject.toml 的规范里，这里配置的依赖在打wheel包时会被一起上传到 PyPI 中
+# 此处的依赖配置，可以被 Poetry, Pixi, UV 识别并生效
+dependencies = [
+    "setuptools",
+    "wheel",
+    "pip"
+]
+
+# 可选依赖，此处的依赖可以通过 pip install package[opt_name] 选择安装
+# Poetry 会忽略此处依赖定义；Pixi 会将此处依赖识别成 pypy-dependencies 的 feature；UV 会识别此处依赖定义为可选依赖
+[project.optional-dependencies]
+
+# 分组依赖，此处的依赖处理方式视第三方工具而定，pyproject.toml 虽然提供了此定义，但并未提供标准处理方法
+# Poetry 会忽略此处依赖定义；Pixi 会将此处依赖识别成 pypy-dependencies 的 feature；UV 会将此处的依赖识别成对应 group
+[dependency-groups]
+# 以下的配置主要是给 UV 使用，因此分组前加上了一个 uv_ 前缀，否则会和下面 Pixi 的 feature 命名冲突，导致Pixi解析有问题
+uv_db = [
+	"python-dotenv",
+	"pydantic >=2.0.0",
+	"pydantic-settings >=2.0.0",
+	"pymysql",
+	"sqlalchemy >=1.4",
+	"elasticsearch >=7.13.0",
+	"requests",
+	"httpx",
+	"pyhive >=0.6.5",
+	"kafka-python >=2.0.0",
+	# "happybase >=1.2.0",
+	# "neo4j-python-driver >=5.5.0",
+	# "py2neo >=2021.2.3",
+	# "redis >=3.5.0",
+]
+uv_ml = [
+	"openpyxl >=3.0.0",
+	"numpy >=1.20.0",
+	"pandas >=1.4.0",
+	"scikit-learn >=1.0.0",
+	"scipy",
+	"dataclasses",
+	"ipython",
+	"ipykernel",
+	"ipywidgets >=8.0.0",
+	"jupyterlab >=3.4.0",
+	"xgboost >=2.0.0",
+	"optuna >=3.1.0",
+	"optuna-dashboard >=0.10.0",
+	"hyperopt ==0.2.7",
+]
+uv_graph = [
+	"matplotlib >=3.5.0",
+	"seaborn",
+	"plotly >=5.10.0",
+	"dash",
+]
+uv_dl = [
+	# 1.x 最后一个PyTorch版本，CUDA最高支持到 11.7
+	"torch == 1.13.1+cu117",
+	"torchvision == 0.14.1+cu117",
+#    "torch == 1.13.1",
+#	"torchvision == 0.14.1",
+	"torchaudio == 0.13.1"
+	# 2.5 版本
+]
+uv_nlp = [
+	# "nltk",
+	"spacy >=3.4.2 ",
+	"transformers >=4.23.1 ",
+	"tokenizers",
+]
+uv_llm = [
+	"openai >=1.0.0",
+	"langchain-core >=0.3.51",
+	"langchain >=0.3.23",
+	"langchain-community >=0.3.21",
+	"langgraph >=0.3.30",
+	"langchain-openai >=0.3.12",
+	"langchain-ollama >=0.3.0",
+]
 
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+# ------------------------------------ UV 配置 ------------------------------------
+# 使用方式1： uv sync
+# 使用方式2： uv export --format pylock.toml -o pylock.toml  &&  uv pip sync pylock.toml
+[tool.uv]
+managed = true
+package = false
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+python-downloads = "manual"
+python-preference = "system"
+#python-preference = "managed"
+#link-mode = "copy"
+
+default-groups = ["uv_db", "uv_ml", "uv_graph", "uv_dl", "uv_nlp", "uv_llm"]
+# PyTorch 的安装比较麻烦
+#default-groups = ["uv_dl"]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cuda117"},
+#  { index = "pytorch-cuda117", marker = "sys_platform == 'windows'" },
+#  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+]
+torchvision = [
+  { index = "pytorch-cuda117" },
+#  { index = "pytorch-cuda117", marker = "sys_platform == 'windows'" },
+#  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+]
+torchaudio = [
+  { index = "pytorch-cuda117"},
+#  { index = "pytorch-cuda117", marker = "sys_platform == 'windows'" },
+#  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+]
+
+# PyTorch 使用的index配置
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+[[tool.uv.index]]
+name = "pytorch-cuda117"
+url = "https://download.pytorch.org/whl/cu117"
+explicit = true
+[[tool.uv.index]]
+name = "pytorch-cuda118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+[[tool.uv.index]]
+name = "pytorch-cuda121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+[[tool.uv.index]]
+name = "pytorch-cuda124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+# 适用于 uv pip 系列命令的配置
+[tool.uv.pip]
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+extra-index-url = [
+	"https://download.pytorch.org/whl/cpu",
+	"https://download.pytorch.org/whl/cu117"
+]
+system = true
+break-system-packages = true
+all-extras = true
+# group 配置对于 uv pip sync 命令不生效
+group = ["uv_db", "uv_ml", "uv_graph", "uv_dl", "uv_nlp", "uv_llm"]
+#group = ["uv_dl"]
+# PyTorch index 设置
+#torch-backend = "auto"
+#torch-backend = "cpu"
+torch-backend = "cu117"
+#torch-backend = "cu118"
+#torch-backend = "cu124"
 
 
+
+# ------------------------------------ Pixi 配置 ------------------------------------
+[tool.pixi.workspace]
+#platforms = ["win-64", "linux-64", "osx-64"]
+platforms = ["win-64"]
+channels = ["conda-forge", "nvidia", "pytorch"]   # nvidia channel需要在 pytorch channel 前面
+
+# 下面这个配置不建议，不过不设置的话，pytorch-cuda==11.7 就无法安装 —— 只限于 win-64 平台时似乎不需要此配置？？？
+channel-priority = "disabled"
+
+[tool.pixi.pypi-options]
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+
+[tool.pixi.dependencies]
+#python = "3.10.*"
+psutil = ">=5.9.0"
+
+[tool.pixi.feature.db.dependencies]
+python-dotenv = "*"
+pydantic = ">=2.0.0"
+pydantic-settings = ">=2.0.0"
+pymysql =  "*"
+sqlalchemy = ">=1.4"
+elasticsearch = ">=7.13.0"
+requests = "*"
+httpx = "*"
+pyhive = ">=0.6.5"
+kafka-python = ">=2.0.0"
+#happybase = ">=1.2.0"
+#neo4j-python-driver = ">=5.5.0"
+#py2neo = ">=2021.2.3"
+#redis = ">=3.5.0"  # 不适用于 osx-64
+
+[tool.pixi.feature.ml.dependencies]
+openpyxl = ">=3.0.0"
+numpy = ">=1.20.0"
+pandas = ">=1.4.0"
+scikit-learn = ">=1.0.0"
+scipy = "*"
+dataclasses = "*"
+ipython = "*"
+ipykernel = "*"
+ipywidgets = ">=8.0.0"
+jupyterlab = ">=3.4.0"
+xgboost = ">=2.0.0"
+optuna = ">=3.1.0"
+optuna-dashboard = ">=0.10.0"
+hyperopt = "==0.2.7"
+
+[tool.pixi.feature.graph.dependencies]
+matplotlib = ">=3.5.0"
+seaborn = "*"
+plotly = ">=5.10.0"
+dash = "*"
+
+[tool.pixi.feature.dl.dependencies]
+# 1.x 最后一个PyTorch版本，CUDA最高支持到 11.7
+pytorch = { version = "==1.13.1", channel = "pytorch" }
+pytorch-cuda = { version = "==11.7", channel = "pytorch" }   # 只有 conda 源才需要 pytorch-cuda，PyPI没有
+torchvision = { version = "==0.14.1", channel = "pytorch" }
+torchaudio = { version = "==0.13.1", channel = "pytorch"}
+# 2.5 版本
+#pytorch = "==2.5.1"
+#pytorch-cuda = "==12.4"
+#torchvision = "==0.20.1"
+#torchaudio = "==2.5.1"
+
+#[tool.pixi.feature.dl.pypi-dependencies]
+#torchserve = ">=0.7.0"
+
+[tool.pixi.feature.nlp.dependencies]
+#nltk = "*"
+spacy = ">=3.4.2"
+transformers = ">=4.23.1"
+tokenizers = "*"
+
+[tool.pixi.feature.llm.dependencies]
+openai = ">=1.0.0"
+langchain-core = ">=0.3.51"
+langchain = ">=0.3.23"
+langchain-community = ">=0.3.21"
+langgraph = ">=0.3.30"
+langchain-openai = ">=0.3.12"
+
+[tool.pixi.feature.llm.pypi-dependencies]
+# conda源里暂时没有
+langchain-ollama = ">=0.3.0"
+
+[tool.pixi.feature.local.dependencies]
+pixi-pycharm = "*"
+
+# ------ Pixi环境定义 ------
+[tool.pixi.environments]
+default = { features = ["db", "ml", "graph", "dl", "nlp", "llm", "local"], solve-group = "main" }
+prod = { features = ["db", "ml", "graph", "dl", "nlp", "llm"], solve-group = "main" }
+
+
+
+# ------------------------------------ Poetry 配置 ------------------------------------
+# 安装命令
+# poetry install --all-groups
+# poetry install --only dl
 [tool.poetry]
 package-mode = false
 # 配置 清华源 为主要的 PyPI 源
@@ -25,7 +287,8 @@ package-mode = false
 name = "tsinghua"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 priority = "primary"
-# 配置 pytorch 的源
+
+# 配置 PyTorch 的源
 [[tool.poetry.source]]
 name = "pytorch-cuda117"
 url = "https://download.pytorch.org/whl/cu117"
@@ -102,7 +365,3 @@ langchain-community = ">=0.3.21"
 langgraph = ">=0.3.30"
 langchain-openai = ">=0.3.12"
 langchain-ollama = ">=0.3.0"
-
-# 安装命令
-# poetry install --all-groups
-# poetry install --only dl
