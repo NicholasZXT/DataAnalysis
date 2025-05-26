@@ -3,10 +3,8 @@ name = "DataAnalysisEnv"
 version = "1.0.0"
 authors = ["Code-Sparks"]
 platforms = ["win-64"]
-#platforms = ["win-64", "linux-64"]
 #platforms = ["win-64", "linux-64", "osx-64"]
 channels = ["conda-forge", "nvidia", "pytorch"]   # nvidia channel需要在 pytorch channel 前面
-#channels = ["conda-forge", "pytorch", "nvidia"]
 
 # 下面这个配置不建议，不过不设置的话，pytorch-cuda==11.7 就无法安装 —— 只限于 win-64 平台时似乎不需要此配置？？？
 channel-priority = "disabled"

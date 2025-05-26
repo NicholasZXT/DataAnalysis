@@ -413,6 +413,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-hbeecb71_2.conda
       - pypi: https://pypi.tuna.tsinghua.edu.cn/packages/3a/a7/d0fff871a353e6f602fe94912576219b47639db5a08ad454ea914cc11c8d/langchain_ollama-0.3.2-py3-none-any.whl
       - pypi: https://pypi.tuna.tsinghua.edu.cn/packages/33/3f/164de150e983b3a16e8bf3d4355625e51a357e7b3b1deebe9cc1f7cb9af8/ollama-0.4.8-py3-none-any.whl
+      - pypi: https://pypi.tuna.tsinghua.edu.cn/packages/29/a2/d40fb2460e883eca5199c62cfc2463fd261f760556ae6290f88488c362c0/pip-25.1.1-py3-none-any.whl
+      - pypi: https://pypi.tuna.tsinghua.edu.cn/packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl
   prod:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
@@ -825,6 +827,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-hbeecb71_2.conda
       - pypi: https://pypi.tuna.tsinghua.edu.cn/packages/3a/a7/d0fff871a353e6f602fe94912576219b47639db5a08ad454ea914cc11c8d/langchain_ollama-0.3.2-py3-none-any.whl
       - pypi: https://pypi.tuna.tsinghua.edu.cn/packages/33/3f/164de150e983b3a16e8bf3d4355625e51a357e7b3b1deebe9cc1f7cb9af8/ollama-0.4.8-py3-none-any.whl
+      - pypi: https://pypi.tuna.tsinghua.edu.cn/packages/29/a2/d40fb2460e883eca5199c62cfc2463fd261f760556ae6290f88488c362c0/pip-25.1.1-py3-none-any.whl
+      - pypi: https://pypi.tuna.tsinghua.edu.cn/packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl
 packages:
 - conda: https://conda.anaconda.org/conda-forge/win-64/_openmp_mutex-4.5-2_gnu.conda
   build_number: 8
@@ -4479,6 +4483,11 @@ packages:
   - pkg:pypi/pillow?source=hash-mapping
   size: 46239849
   timestamp: 1675488598263
+- pypi: https://pypi.tuna.tsinghua.edu.cn/packages/29/a2/d40fb2460e883eca5199c62cfc2463fd261f760556ae6290f88488c362c0/pip-25.1.1-py3-none-any.whl
+  name: pip
+  version: 25.1.1
+  sha256: 2913a38a2abf4ea6b64ab507bd9e967f3b53dc1ede74b01b0931e1ce548751af
+  requires_python: '>=3.9'
 - conda: https://conda.anaconda.org/conda-forge/noarch/pixi-pycharm-0.0.8-win_1234567_0.conda
   sha256: 6ee9dbad2c363faefea73e21370301e16290a2a88230787267e4f34b67ca40e8
   md5: 352a583506f7ac90d984e9a501e500f7
@@ -6178,6 +6187,14 @@ packages:
   - pkg:pypi/werkzeug?source=hash-mapping
   size: 243546
   timestamp: 1733160561258
+- pypi: https://pypi.tuna.tsinghua.edu.cn/packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl
+  name: wheel
+  version: 0.45.1
+  sha256: 708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248
+  requires_dist:
+  - pytest>=6.0.0 ; extra == 'test'
+  - setuptools>=65 ; extra == 'test'
+  requires_python: '>=3.8'
 - conda: https://conda.anaconda.org/conda-forge/noarch/widgetsnbextension-4.0.14-pyhd8ed1ab_0.conda
   sha256: 7df3620c88343f2d960a58a81b79d4e4aa86ab870249e7165db7c3e2971a2664
   md5: 2f1f99b13b9d2a03570705030a0b3e7c
