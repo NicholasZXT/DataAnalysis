@@ -287,59 +287,15 @@ module主要内容有：
 
 因此在**实际使用过程中，需要关注的是：`invoke`/`ainvoke`、`batch`/`abatch`、`stream`/`astream` 这3对方法**。
 
-
-### `prompts`模块
-
-主要内容有：
-- `base.py`
-  - `BasePromptTemplate`, 所有prompt模板的基类，这是个**抽象类**，不能直接使用。
-
-- `string.py`
-  - `StringPromptTemplate`，继承自`BasePromptTemplate`，也是个**抽象类**，不能直接使用。
-
-- `prompt.py`
-  - `PromptTemplate`, 继承自`StringPromptTemplate`，这个类是最基础的prompt模板。
-
-- `few_shot.py`
-  - `FewShotPromptTemplate`
-  - `FewShotChatMessagePromptTemplate`
-
-- `few_shot_with_templates.py`
-  - `FewShotPromptWithTemplates`
-
-- `pipeline.py`
-  - `PipelinePromptTemplate`
-
-  
-ChatModel使用的Prompt在`chat.py`中定义，它和上面基于`base.py`里的`BasePromptTemplate`不太一样。
-
-主要类如下（缩进表示继承关系）：
-- `BaseMessagePromptTemplate`: 大部分 Chat 相关 Template 的抽象基类。
-  - `MessagesPlaceholder`: 占位符，用于在 ChatPrompt 中插入一个变量，这个变量是一个列表，列表中的每个元素都是一个 `BaseMessage` 对象。
-  - `BaseStringMessagePromptTemplate`: 抽象类，以下才是常用的 Prompt Template 实现类。
-    - `ChatMessagePromptTemplate`: 专门用于生成符合对话格式的消息（如用户消息、AI 回复、系统提示等）.
-      - 主要用于生成**单个**对话消息模板
-      - 返回的是 `ChatMessage` 对象
-      - **通用**模板类，用于创建包含特定角色（如用户、AI或系统）的消息模板。它允许你指定消息的角色，并通过占位符动态插入变量内容。
-    - `HumanMessagePromptTemplate`
-      - 生成**单个**对话消息模板，专门为创建用户（人类）消息而设计的一个特化版本的模板类，返回的是 `HumanMessage` 对象
-    - `AIMessagePromptTemplate`
-    - `SystemMessagePromptTemplate`
-
-> 注意，`ChatMessagePromptTemplate`返回的是`ChatMessage`，有 role 属性，type属性是'chat';
-> `HumanMessagePromptTemplate`返回的是`HumanMessage`，type属性是'human'，**没有 role 属性**。
-
-- `BaseChatPromptTemplate`: 继承`BasePromptTemplate`，也是抽象类
-  - `ChatPromptTemplate`: 用于组合 多个ChatMessagePromptTemplate 或者其他类型的提示模板（例如文本提示模板），形成一个完整的对话上下文。
-    - 持有一个 `messages` 属性，类型是`List[BaseMessage]` 
-
-
-**使用说明**
+如果想基于`BaseLLM`/`BastChatModel`实现自己的模型，或者想看具体模型的实现，需要重点关注的是模型实现类里的如下方法：
+- `_llm_type`：property，用户返回模型的唯一标识，必须要实现
+- `_generate`/`_agenerate`: 必须要实现的模型调用方法
+- `_stream`/`_astream`: 可选方法
 
 
 ### `messages`模块
 
-用于封装 prompts 和 chat conversations中的信息。
+用于封装 prompts 和 chat conversations 中的信息。
 
 主要是和 prompts 模块中的 ChatMessagePromptTemplate 和 ChatPromptTemplate 搭配使用。
 
@@ -353,6 +309,10 @@ ChatModel使用的Prompt在`chat.py`中定义，它和上面基于`base.py`里�
 
 > 实际上 `BaseMessage` 是 pydantic的`BaseModel`子类。
 
+- `chat.py`, 通用 Message 类
+  - `ChatMessage`
+  - `ChatMessageChunk`
+
 - `human.py`
   - `HumanMessage`，继承自`BaseMessage`
   - `HumanMessageChunk`，继承自`BaseMessageChunk`
@@ -361,9 +321,9 @@ ChatModel使用的Prompt在`chat.py`中定义，它和上面基于`base.py`里�
   - `SystemMessage`,
   - `SystemMessageChunk`
 
-- `chat.py`
-  - `ChatMessage`
-  - `ChatMessageChunk`
+- `ai.py`
+  - `AIMessage` 
+  - `AIMessageChunk`
 
 - `function.py`
   - `FunctionMessage`
@@ -389,21 +349,77 @@ ChatModel使用的Prompt在`chat.py`中定义，它和上面基于`base.py`里�
   - `pretty_repr(html: bool = False)`:
   - `pretty_print()`:
 
+需要注意的是，`ChatMessage` 是通用 Message 封装类，有一个 `role` 属性，而 `SystemMessage`/`HumanMessage`等子类没有这个属性，这一点不知道为啥。
+
+
+### `prompts`模块
+
+主要内容有：
+- `base.py`
+  - `BasePromptTemplate`, 所有Completion prompt模板的基类，这是个**抽象类**，不能直接使用。
+
+- `message.py`
+  - `BaseMessagePromptTemplate`，所有ChatModel的 Message prompt模板的基类，这是个**抽象类**，不能直接使用。
+
+- `string.py`
+  - `StringPromptTemplate`，继承自`BasePromptTemplate`，也是个**抽象类**，不能直接使用。
+
+- `prompt.py`
+  - `PromptTemplate`, 继承自`StringPromptTemplate`，这个类是最基础的prompt模板，**适用于Completion任务（普通的LLM模型）**。
+
+- `few_shot.py`
+  - `FewShotPromptTemplate`
+  - `FewShotChatMessagePromptTemplate`
+
+- `few_shot_with_templates.py`
+  - `FewShotPromptWithTemplates`
+
+- `pipeline.py`
+  - `PipelinePromptTemplate`
+
+- `chat.py`, 定义了ChatModel使用的Prompt模板
+  - `BaseStringMessagePromptTemplate`: 继承了`message.py`里的`BaseMessagePromptTemplate`抽象类，它本身也是抽象类。      
+    以下是常用实现类：
+    - `ChatMessagePromptTemplate`: 专门用于生成符合对话格式的消息（如用户消息、AI 回复、系统提示等）.
+      - 主要用于生成**单个**对话消息模板
+      - 返回的是 `ChatMessage` 对象
+      - **通用**模板类，用于创建包含特定角色（如用户、AI或系统）的消息模板。它允许你指定消息的角色，并通过占位符动态插入变量内容。
+    - `HumanMessagePromptTemplate`
+      - 生成**单个**对话消息模板，专门为创建用户（人类）消息而设计的一个特化版本的模板类，返回的是 `HumanMessage` 对象
+    - `AIMessagePromptTemplate`
+    - `SystemMessagePromptTemplate`
+  - `MessagesPlaceholder`: 占位符，用于在 ChatPrompt 中插入一个变量，这个变量是一个列表，列表中的每个元素都是一个 `BaseMessage` 对象。
+  - `BaseChatPromptTemplate`: 它继承自 `base.py` 的 `BasePromptTemplate`，也是抽象类，只有下面一个实现类
+    - `ChatPromptTemplate`: 用于组合 多个ChatMessagePromptTemplate 或者其他类型的提示模板（例如文本提示模板），形成一个完整的对话上下文。
+      - 持有一个 `messages` 属性，类型是`List[Union[BaseMessagePromptTemplate, BaseMessage, BaseChatPromptTemplate]]` 
+
+> 注意，`ChatMessagePromptTemplate`返回的是`ChatMessage`，有 role 属性，type属性是'chat';
+> `HumanMessagePromptTemplate`返回的是`HumanMessage`，type属性是'human'，**没有 role 属性**。
+
+**使用说明**
+
 
 
 ### `prompt_values.py`
 
-定义了 PromptTemplate 的输出值。
+定义了 Prompt Template 的输出值。
 
 内容如下：
-- `PromptValue`: 封装了 prompt 的输出值，这个类是一个抽象类，继承自`Serializable`——也是pydantic的`BaseModel`子类。
+- `PromptValue`: 封装了 prompt 的输出值，这个类是一个**抽象类**
+  - 它继承自`Serializable`——也是pydantic的`BaseModel`子类，它也是下面所有类的基类。
+  - 主要定义了两个方法：`def to_messages(self) -> list[BaseMessage]` 和 `def to_string(self) -> str`
+
 - `StringPromptValue`: 继承自`PromptValue`，用于封装字符串类型的 prompt 输出值。     
-  有如下属性：
-  - `type`: str类型，固定为`StringPromptValue`
-  - `text`: str类型，存放具体提示文本
+  - 有如下属性：
+    - `type`: str类型，固定为`StringPromptValue`
+    - `text`: str类型，存放具体提示文本
+  - `to_message()` 方法返回的是 `List[HumanMessage]`
+
 - `ChatPromptValue`: 继承自`PromptValue`，用于封装ChatMessage类型的 prompt 输出值。    
-  有如下属性：
-  - `messages`: List[BaseMessage]类型，存放具体提示消息
+  - 有如下属性：
+    - `messages`: `List[BaseMessage]`类型，存放具体提示消息
+  - `to_messages()` 方法直接返回上面的 `messages` 属性
+
 - `ChatPromptValueConcrete`: 继承自`ChatPromptValue`
 
 
