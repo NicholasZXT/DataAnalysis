@@ -26,7 +26,7 @@ from langchain_openai.chat_models import ChatOpenAI
 from langchain_ollama.chat_models import ChatOllama
 from langchain_community.chat_models import ChatLlamaCpp, ChatTongyi, ChatHuggingFace
 # ----------
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import ChatMessage, SystemMessage, HumanMessage, AIMessage, ToolMessage, FunctionMessage
 from langchain_core.prompts import StringPromptTemplate, PromptTemplate
 from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplate, HumanMessagePromptTemplate, \
     AIMessagePromptTemplate, SystemMessagePromptTemplate, ChatPromptTemplate
@@ -69,8 +69,8 @@ from langchain.callbacks.tracers import ConsoleCallbackHandler
 # --- Ollama 本地部署 ---
 API_KEY = 'Empty'
 LLM_URL = 'http://localhost:11434'
-MODEL = 'qwen2.5:7b'
-# MODEL = 'qwen3:8b'
+# MODEL = 'qwen2.5:7b'
+MODEL = 'qwen3:8b'
 
 # ======================= LLM + ChatLLM 模型包装器 使用 =======================
 def llm_usage():
@@ -183,7 +183,7 @@ def prompt_template_usage():
     # StringPromptTemplate含有抽象方法，不能实例化
     # pt = StringPromptTemplate(input_variables=["p1", "p2"], template="content-1: {p1}, content-2: {p2}")
 
-    # PromptTemplate 使用
+    # PromptTemplate 是 Completion 模型使用的基础模版
     template = "Tell me a {adjective} joke about {content}."
 
     # 第1种：直接实例化
@@ -202,60 +202,111 @@ def prompt_template_usage():
     print(type(pv2))
     print(pv2)
 
+
+def message_usage():
+    """
+    官方文档[Messages](https://python.langchain.com/docs/concepts/messages/)
+    展示各类 Message 封装类的使用
+    """
+    # ----- ChatMessage 使用 -----
+    chat_msg = ChatMessage(role='user', content='Hello ChatGPT')
+    print(chat_msg)
+    # content='Hello ChatGPT' additional_kwargs={} response_metadata={} role='user'
+    print(chat_msg.type)
+    print(chat_msg.role)
+    print(chat_msg.content)
+    print(chat_msg.json())
+    # {"content":"Hello ChatGPT","additional_kwargs":{},"response_metadata":{},"type":"chat","name":null,"id":null,"role":"user"}
+    print(chat_msg.pretty_repr())
+    chat_msg.pretty_print()
+
+    # ----- SystemMessage/HumanMessage/AIMessage 等 使用 -----
+    sys_msg = SystemMessage(content='You are a helpful assistant.')
+    print(sys_msg)
+    # content='You are a helpful assistant.' additional_kwargs={} response_metadata={}
+    print(sys_msg.type)  # system
+    print(sys_msg.content)
+    # print(sys_msg.role)  # 它没有 role 属性
+    print(sys_msg.json())
+    # {"content":"You are a helpful assistant.","additional_kwargs":{},"response_metadata":{},"type":"system","name":null,"id":null}
+
+    print(sys_msg.pretty_repr())
+    sys_msg.pretty_print()
+
+
 def chat_prompt_template_usage():
+    """
+    聊天模型（ChatModel）使用的 PromptTemplate 模版主要有如下几个：
+    - 单条消息（抽象类 BaseStringMessagePromptTemplate 的子类）：
+      - ChatMessagePromptTemplate，通用消息模版，下面3个是专用的
+      - HumanMessagePromptTemplate
+      - AIMessagePromptTemplate
+      - SystemMessagePromptTemplate
+    - 多条消息，使用 ChatPromptTemplate 对上面的单条消息进行 List 封装
+    """
     # ----- ChatMessagePromptTemplate 使用 -----
     template1 = "Tell me a {adjective} joke about {content}."
     # ChatMessagePromptTemplate 必须要指定 template 和 role
     cmpt = ChatMessagePromptTemplate.from_template(template=template1, role="user")
+    # format 方法返回的是 ChatMessage 对象
     cmpt_msg = cmpt.format(adjective="nice", content="fish")
-    print(type(cmpt_msg))
-    # <class 'langchain_core.messages.chat.ChatMessage'>
+    print(type(cmpt_msg))  # <class 'langchain_core.messages.chat.ChatMessage'>
     print(cmpt_msg)
     print(cmpt_msg.content)
     print(cmpt_msg.type)  # chat
     print(cmpt_msg.role)  # user
-    # 还有一个 format_messages 方法
-    cmpt_msg_2 = cmpt.format_messages(adjective="nice", content="fish")
-    # print(type(cmpt_msg_2))  # <class 'list'>
-    print(type(cmpt_msg_2[0]))
-    # <class 'langchain_core.messages.chat.ChatMessage'>
+    print(cmpt_msg)  # content='Tell me a nice joke about fish.' additional_kwargs={} response_metadata={} role='user'
+    print(cmpt_msg.json())
+    print(cmpt_msg.pretty_repr())
+    cmpt_msg.pretty_print()
+    # 还有一个 format_messages 方法，返回的是 List[ChatMessage]
+    cmpt_msgs = cmpt.format_messages(adjective="nice", content="cat")
+    print(type(cmpt_msgs))     # <class 'list'>
+    print(type(cmpt_msgs[0]))  # <class 'langchain_core.messages.chat.ChatMessage'>
 
+    # ----- HumanMessagePromptTemplate/AIMessagePromptTemplate/SystemMessagePromptTemplate 使用 -----
     template2 = "Tell me a {desc} joke about {something}."
     hmpt = HumanMessagePromptTemplate.from_template(template=template2)
     hmpt_msg = hmpt.format(desc="good", something="dog")
     print(type(hmpt_msg))
     # <class 'langchain_core.messages.human.HumanMessage'>
     print(hmpt_msg)
+    # content='Tell me a good joke about dog.' additional_kwargs={} response_metadata={}
     print(hmpt_msg.content)
     print(hmpt_msg.type)   # human
     # HumanMessage 没有 role 属性！
     # print(hmpt_msg.role)
 
-    # --- ChatPromptTemplate 用于组合多个 ChatMessagePromptTemplate ---
-    # 使用 from_messages() 方法，此方法接收一个 List
-    # 其中的元素可以是：Union[BaseMessagePromptTemplate, BaseMessage, BaseChatPromptTemplate]
-    # 使用 List[BaseChatPromptTemplate] 创建时，后续的 format方法会起作用
+    # --- ChatPromptTemplate 用于组合多条消息的 PromptTemplate ---
+    # 使用 __init__ 方法或者 from_messages() 方法实例化对象，实际上 from_messages() 方法底层就是直接调用的 __init__() 方法，
+    # 接收一个 List，其中的元素可以是：Union[BaseMessagePromptTemplate, BaseMessage, BaseChatPromptTemplate]
+    # 使用 List[BaseMessagePromptTemplate]/List[BaseChatPromptTemplate] 创建时，后续的 format方法会起作用
+    # print(type(cmpt), type(hmpt))
     cpt = ChatPromptTemplate.from_messages(messages=[cmpt, hmpt])
     # 使用 List[BaseMessage] 创建时，后续的 format方法就没啥用了
-    cpt = ChatPromptTemplate.from_messages(messages=[cmpt_msg, hmpt_msg])  # List[BaseMessage]
-    # --- format 方法 ---
-    cpt_r1 = cpt.format(adjective="fantastic", content="cat", desc="laugh", something="rabbit")
-    print(cpt_r1)
+    cpt = ChatPromptTemplate.from_messages(messages=[cmpt_msg, hmpt_msg])
+    print(cpt.messages)
+    print(cpt.pretty_repr())
+    # cpt.pretty_repr()
+
+    # 主要有 3 个方法：format_message, format_prompt, format
+    # --- format_messages 方法，返回 list[BaseMessage] ---
+    cpt_r1 = cpt.format_messages(adjective="fantastic", content="cat", desc="laugh", something="rabbit")
+    for msg in cpt_r1:
+        print(msg.pretty_repr())
+        print(msg)
+    # --- format 方法，返回 str ---
+    cpt_r2 = cpt.format(adjective="fantastic", content="cat", desc="laugh", something="rabbit")
+    print(cpt_r2)
     # user: Tell me a nice joke about fish.
     # Human: Tell me a good joke about dog.
-    # --- format_prompt 方法 ---
-    cpt_r2 = cpt.format_prompt(adjective="fantastic", content="cat", desc="laugh", something="rabbit")
-    print(type(cpt_r2))
+    # --- format_prompt 方法，返回 PromptValue ---
+    cpt_r3 = cpt.format_prompt(adjective="fantastic", content="cat", desc="laugh", something="rabbit")
+    print(type(cpt_r3))
     # <class 'langchain_core.prompt_values.ChatPromptValue'>
-    print(cpt_r2)
-    for msg in cpt_r2.messages:
-        print(msg)
-    # --- format_messages 方法 ---
-    cpt_r3 = cpt.format_messages(adjective="fantastic", content="cat", desc="laugh", something="rabbit")
-    print(type(cpt_r3))  # <class 'list'>
-    print(type(cpt_r3[0]))
-    # <class 'langchain_core.messages.chat.ChatMessage'>
-    for msg in cpt_r3:
+    print(cpt_r3)
+    for msg in cpt_r3.messages:
+        print(msg.pretty_repr())
         print(msg)
 
 
@@ -372,7 +423,22 @@ def fewshot_prompt_template_usage():
         print(msg.content)
 
 def pipeline_prompt_usage():
-    pass
+    """
+    PipelinePromptTemplate 被标识为 Deprecated 了，所以不做研究
+    """
+    ...
+
+
+def simple_chat():
+    client_chat = get_client_chat()
+    msg = [
+        HumanMessage(content='RTX 5060 Ti 16GB跑本地大模型怎么样？'),
+    ]
+    res = client_chat.invoke(input=msg)
+    print(res)
+    # for chunk in client_chat.stream(input=msg):
+    #     print(chunk.content, end='')
+
 
 # ======================= Output Parser 使用 =======================
 # LangChain的输出解析器是和提示词配合使用的，它会在提示词的末尾增加一段要求大模型输出指定格式的指令。
@@ -1039,13 +1105,14 @@ def main():
     # placeholder_usage()
     # fewshot_prompt_template_usage()
     # pipeline_prompt_usage()
+    simple_chat()
     # output_parser_usage()
     # structured_output_usage()
     # memory_usage()
     # chat_history_usage()
     # runnable_history_usage()
-    tool_usage()
-    tool_parser_usage()
+    # tool_usage()
+    # tool_parser_usage()
 
 
 if __name__ == '__main__':
