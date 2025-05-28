@@ -179,17 +179,24 @@ callbacks模块一般是由`BaseLLM`/`BaseChatModel`/`Chain`对象封装，不�
 module主要内容有：
 
 - `base.py`: 定义了回调函数的 Mixin 类，回调函数通过 callback handler 定义
-  - 一系列Mixin类：`RetrieverManagerMixin`, `LLMManagerMixin`, `ChainManagerMixin`, `ToolManagerMixin`, `CallbackManagerMixin`等
-  - `BaseCallbackHandler`: 同步回调函数handler的接口类
+  - 一系列Mixin类，大致可以分为如下几类：
+    - `RetrieverManagerMixin`, `LLMManagerMixin`, `ChainManagerMixin`, `ToolManagerMixin`
+    - `CallbackManagerMixin`
+    - `RunManagerMixin`   
+    这些Mixin类分别定义了各种类型事件的调用方法，比如`on_llm_start`/`on_chat_model_start`/`on_chain_start`等。
+  - `BaseCallbackHandler`: 同步回调函数handler的接口类，继承了上面大部分的 Mixin 类
   - `AsyncCallbackHandler`: 异步回调函数handler的接口类
-  - `BaseCallbackManager`: 定义了回调函数管理器的基础类——它不是抽象类
+  - `BaseCallbackManager`: 回调函数管理器的基础类
+    - 它提供了一系列注册、管理 `BaseCallbackHandler`/`AsyncCallbackHandler` 的方法，以列表的形式存放所有的 callbackhandler
+    - 它继承了`CallbackManagerMixin`，但是**并没有实现其中的事件方法**，所以应当看做抽象类
 
-- `manager.py`: 定义了一系列回调管理器，常用的有如下两个：
-  - `CallbackManager`: 同步callback handler管理器，继承自`BaseCallbackManager`
+- `manager.py`: 实现了一系列回调管理器的类和方法，需要关注的有如下几个：
+  - `CallbackManager`: 同步callback handler管理器，继承自`BaseCallbackManager`，实现了其中的事件方法，在对应事件方法里依次调用注册的callbackhandler。
   - `AsyncCallbackManager`: 异步callback handler管理器，继承自`BaseCallbackManager`
+  - `handle_event()`函数：具体执行调用回调函数的地方
 
-- `file.py`: 定义了一个`FileCallbackHandler`供使用，继承自`BaseCallbackHandler`
-- `stdout.py`: 定义了一个`StdOutCallbackHandler`供使用，继承自`BaseCallbackHandler`
+- `file.py`: 定义了一个`FileCallbackHandler`供使用，继承自`BaseCallbackHandler`，实现了部分事件方法
+- `stdout.py`: 定义了一个`StdOutCallbackHandler`供使用，继承自`BaseCallbackHandler`，实现了部分事件方法
 - `streaming_stdout.py`: 定义了一个`StreamingStdOutCallbackHandler`供使用，继承自`BaseCallbackHandler`
 
 
@@ -197,12 +204,20 @@ module主要内容有：
 
 - `base.py`中定义了一系列的Mixin类，它们定义了各个组件的事件方法，比如`on_llm_start`/`on_chat_model_start`/`on_chain_start`等方法。
 
+> 注意，这些事件方法一般不建议有返回值，因为Langchain框架似乎没有明确处理这些返回值。
+
 - `BaseCallbackHandler`组合了上述Mixin类，是所有CallbackHandler（包括`AsyncCallbackHandler`）的基类。    
-  但需要注意的是，虽然`BaseCallbackHandler`/`AsyncCallbackHandler`不是抽象类，里面的所有方法都是空的，
-  所以实际使用时，需要继承此类，并实现自己需要的方法。
+  - 需要注意的是，虽然`BaseCallbackHandler`/`AsyncCallbackHandler`不是抽象类，但所有事件方法都是空的
+  - 所以实际使用时，需要继承此类，并实现自己需要的方法。
 
 - `BaseCallbackManager`是回调管理器的基类，它定义并实现了一些基础方法，
-不过一般不需要直接使用此类，而是使用子类`CallbackManager`/`AsyncCallbackManager`。
+不过一般不需要直接使用此类，而是使用子类`CallbackManager`/`AsyncCallbackManager`等
+
+> 特别要注意的是，LangChain里提供的 CallbackManager 是有层级的，有的是在 Chain 级别调用，有的是在 LLM/ChatModel 级别，最细的级别是 Token 级别.
+> 比如 `CallbackManager` 就是在 LLM/ChatModel 级别调用的，所以它实现了 `on_llm_start`/`on_chat_model_start`等方法，
+> 这些方法会对每一条 Message 调用一次。
+> 方法的返回值是 `list[CallbackManagerForLLMRun]`，其中的 `CallbackManagerForLLMRun` 对应于每一条 Message。
+> 而`CallbackManagerForLLMRun` 中实现了 `on_llm_new_token`/`on_llm_new_token`等方法，对应的是 Token 级别。
 
 - `CallbackManager`/`AsyncCallbackManager`虽然有初始化方法，不过langchain框架内部一般使用它提供的classmethod `configure` 方法来初始化并返回对应的实例。
 
