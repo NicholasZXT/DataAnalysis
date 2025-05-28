@@ -8,6 +8,7 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 大部分模块的说明可以在该模块的 `__init__.py` 文件中找到。
 
+---------------------------------------------------
 ## Chain基础
 
 这部分的内容是LangChain里的基础，主要用于 Chain 的构建，并支持 LangChain Expression Language (LCEL) 语法。
@@ -36,6 +37,8 @@ package名称为`langchain_core`，需要关注的有如下内容。
   - `batch`/`abatch`: 批量invoke，输出结果
   - `stream`/`astream`: 流式调用invoke
   - `batch_as_completed`/`abatch_as_completed`: 批量invoke直到完成
+
+> 上述所有方法中，只有 `invoke` 方法是抽象方法，其他方法都有默认实现，所以如果要继承 `Runnable` 时，必须要实现的方法只有 `invoke`。
 
 此外，`Runnable`还定义了如下几个接口方法，它们均返回`RunnableBinding`对象，对当前Runnable对象进行一些封装并附加一些参数/属性：
 - `bind`: 以关键字参数附加一些参数/属性
@@ -231,7 +234,7 @@ module主要内容有：
 ### `tracers`模块
 
 
-------------
+---------------------------------------------------
 ## Model IO相关
 ### `language_model`模块
 
@@ -450,7 +453,7 @@ module主要内容有：
   - `MarkdownListOutputParser`
 - `openai_function.py`
 
-------
+---------------------------------------------------
 ## 数据检索相关
 
 构建LEDVR工作流相关的模块:
@@ -553,7 +556,7 @@ module内容如下：
 module内容如下：
 - `BaseRetriever`类
 
-------
+---------------------------------------------------
 ## Memory相关
 
 从langchain v0.3.3 版本开始，memory模块被表示为废弃。  
@@ -609,7 +612,7 @@ LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 上面的`InMemoryChatMessageHistory`实现类其实就是`BaseChatMemory`里的`chat_memory`默认实现。
 
-------
+---------------------------------------------------
 ## Agent相关
 
 ### `tools`模块
@@ -662,12 +665,16 @@ module内容如下：
 
 langchain-core里的agents内容并没有太多，主要在langchain包里。
 
-------------
+
+
+
+---------------------------------------------------
 
 # LangChain
 
 module名称为`langchain`，所有的模块可以分为如下6大类：
 
+---------------------------------------------------
 ## Model IO
 
 > `langchain`模块的`llm`和`chat_models`模块里都只是提供了模型定义、加载初始化的内容，
@@ -708,7 +715,7 @@ module名称为`langchain`，所有的模块可以分为如下6大类：
 
 这个模块也是把 `langchain_core.output_parsers` 里的内容导入过来。
 
-------
+---------------------------------------------------
 ## 数据增强
 
 ### `document_loaders`模块
@@ -768,7 +775,7 @@ module名称为`langchain`，所有的模块可以分为如下6大类：
 
 > langchain官方建议后续直接从 `langchain_community`包里导入。
 
-------
+---------------------------------------------------
 ## Chain核心模块
 
 > langchain_core 没有对应的chains模块，因为chains相关的核心接口/抽象类都在 `langchain_core.runnables` 中定义好了。
@@ -818,7 +825,7 @@ module内容如下：
 ### `callbacks`模块
 
 
-------
+---------------------------------------------------
 ## Memory 相关
 
 ### `memeory`模块
@@ -870,7 +877,7 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `ElasticsearchChatMessageHistory`
 
 
-------
+---------------------------------------------------
 ## Agent相关
 
 > LangChain的 Agent 相关模块在 0.3 版本之后有较大改动，`langchain.agents`模块里内容是之前构建Agent的方式，已被标记为废弃的，
@@ -919,7 +926,8 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 旧版本构建Agent的方式，已经**被标记为废弃**，后续不再支持，建议使用 LangGraph 构建 Agent 应用。
 
 
-----------
+
+---------------------------------------------------
 # LangGraph
 
 首先要明确的是，LangGraph并不依赖LangChain-Core或者LangChain，
@@ -950,7 +958,7 @@ LangGraph更像是一个高度抽象的基于图的Agent调度框架，参考官
 - TimeTravel机制：可以方便的回溯到之前的某个节点，重新执行，或者重新执行整个Graph，这个依赖的就是Checkpoint机制
 
 
-------
+---------------------------------------------------
 ## `pregel`模块
 
 此模块是LangGraph 的 Runtime 实现，它基于Google的Pregel算法，该算法专门用于大规模的并行图计算。
@@ -960,6 +968,7 @@ LangGraph更像是一个高度抽象的基于图的Agent调度框架，参考官
 这个模块应该是 LangGraph 的核心实现，研究起来难度比较高。
 
 
+---------------------------------------------------
 ## `constants.py`
 
 LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数驻留内存，避免重复创建。
@@ -968,7 +977,10 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 - `START`
 - `END`
 
------
+
+## `config.py`
+
+---------------------------------------------------
 ## `graph`模块
 
 ### `graph.py`
@@ -1044,7 +1056,12 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 
 
-----
+---------------------------------------------------
+## `channels`模块
+
+
+
+---------------------------------------------------
 ## `checkpoint`模块
 
 此模块对应的是LangGraph里的短期记忆机制，只维护每次会话内的历史消息记录。
@@ -1072,7 +1089,7 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 
 
-----
+---------------------------------------------------
 ## `store`模块
 
 此模块对应于 LangGraph 的长期记忆机制，用于保存和加载长期记忆。
@@ -1091,7 +1108,8 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 定义了一个`InMemoryStore`，基于内存来保存长期记忆。
 
-----
+
+---------------------------------------------------
 ## `prebuilt`模块
 
 这个模块提供了一些用于构建Agent的预制组件。
@@ -1115,7 +1133,24 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 - `InjectedState`
 - `InjectedStore`
 
+---------------------------------------------------
+## `utils`模块
+
+定义了一些LangGraph里的工具函数。
+
+### `runnable.py`
+
+基于 `langchain_core.runnables.base` 里的 `Runnable`设计模式，定义了LangGraph里的 `Runnable`类。
+
+主要有如下两个类：
+
+- `RunnableCallable`
+  - 继承自 `langchain_core.runnables.base` 里的 `Runnable` 抽象类
 
 
+- `RunnableSequence`
 
+
+---------------------------------------------------
+## `managed`模块
 
