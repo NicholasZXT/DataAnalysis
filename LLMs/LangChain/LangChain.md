@@ -367,7 +367,12 @@ module主要内容有：
   - `pretty_repr(html: bool = False)`:
   - `pretty_print()`:
 
-需要注意的是，`ChatMessage` 是通用 Message 封装类，有一个 `role` 属性，而 `SystemMessage`/`HumanMessage`等子类没有这个属性，这一点不知道为啥。
+需要注意的是，`ChatMessage` 是通用 Message 封装类，有一个 `role` 属性。   
+而 `SystemMessage`/`HumanMessage`等专用Message封装类没有这个属性，也能正常调用，   
+是因为根据 `SystemMessage`/`HumanMessage` 来判断 role 类型的逻辑放在了具体的 `BastChatModel` 实现类中。    
+举例来说：
+- `ChatOllama._generate()` 方法里，最终会调用 `_convert_messages_to_ollama_messages()` 方法，其中就有 role 的判断逻辑；
+- `ChatOpenAI._generate()` 方法里，最终会调用 `_convert_message_to_dict()` 方法，其中有 role 的判断逻辑。
 
 
 ### `prompts`模块
