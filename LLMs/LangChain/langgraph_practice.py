@@ -14,6 +14,7 @@ from langgraph.graph.graph import CompiledGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.graph.message import MessageGraph, MessagesState, add_messages
 from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent, InjectedState, InjectedStore
+from langgraph.utils.runnable import RunnableCallable
 # from langgraph.prebuilt.chat_agent_executor import AgentState
 from langgraph.checkpoint.base import CheckpointTuple
 from langgraph.checkpoint.memory import MemorySaver
@@ -734,18 +735,64 @@ def graph_stream_usage():
     # for chunk in agent.stream(input={"messages": input_msgs}, config=config, stream_mode="custom"):
     #     print(chunk)
 
+
+def graph_custom_node_usage():
+    """
+    展示如何自定义 Graph 里的node。
+    参考官方文档[Graph API concepts](https://langchain-ai.github.io/langgraph/concepts/low_level/).
+    LangGraph 里的 Node，一般是一个 Python function，入参是自定义的 State，返回的是更新后的 State 或者 State 里的某个key的值。
+    但是有时候为了执行一些复杂逻辑，Node 也可以定义成一个 class，此时有两种做法：
+    1. 类似于 chatbot_tool_usage_manual 示例中那样，定义一个 class，需要实现其中的 __call__ 方法，使其称为一个 Callable 对象，这种方式比较简单
+    2. 类似于 chatbot_tool_usage_prebuilt 示例中那样，参考其中 ToolNode 类的实现，继承 langgraph 提供的 RunnableCallable 抽象类，实现
+    """
+    class State(TypedDict):
+        messages: Annotated[list, add_messages]
+
+    class CustomNode:
+        def __init__(self, name: str) -> None:
+            self.name = f"<CustomNode:{name}>"
+
+        def __call__(self, inputs: State):
+            print(f"{self.name} called with inputs: {inputs}")
+            return {"messages": [f"{self.name} says: Hello!"]}
+
+    class RunnableNode(RunnableCallable):
+        def __init__(self, name: str) -> None:
+            name = f"<RunnableNode:{name}>"
+            # RunnableCallable 的 __init__ 方法里，只有 func 参数是必须的，其他都可选，这里是仿照的 ToolsNode 的实现
+            super().__init__(func=self._func, name=name)
+            self.name = name
+
+        def _func(self, inputs: State):
+            """同步调用函数"""
+            print(f"{self.name} called with inputs: {inputs}")
+            return {"messages": [f"{self.name} says: Welcome!"]}
+
+    graph = StateGraph(state_schema=State)
+    graph.add_node(node="custom_node", action=CustomNode(name="SomeNode"))
+    graph.add_node(node="runnable_node", action=RunnableNode(name="SomeRunNode"))
+    graph.set_entry_point("custom_node")
+    graph.add_edge("custom_node", "runnable_node")
+    graph.set_finish_point("runnable_node")
+    compile_graph: CompiledStateGraph = graph.compile(name='GraphWithCustomNode')
+
+    res = compile_graph.invoke(input={"messages": [HumanMessage(content="Hi")]})
+    print(res)
+
+
 def main():
     # stateful_graph_usage()
     # message_graph_usage()
     # graph_conditional_usage()
     # graph_checkpoint_usage()
-    graph_store_usage()
+    # graph_store_usage()
     # graph_interrupt_usage()
     # chatbot_example()
     # chatbot_tool_usage_manual()
     # chatbot_tool_usage_prebuilt()
     # react_agent_usage()
     # graph_stream_usage()
+    graph_custom_node_usage()
 
 
 if __name__ == '__main__':
