@@ -98,7 +98,8 @@ uv_llm = [
 	"langchain-community >=0.3.21",
 	"langgraph >=0.3.30",
 	"langchain-openai >=0.3.12",
-	"langchain-ollama >=0.3.0",
+#	"langchain-ollama >=0.3.0",
+	"langchain-ollama >=0.3.3",
 ]
 
 
@@ -264,7 +265,7 @@ langchain-openai = ">=0.3.12"
 
 [tool.pixi.feature.llm.pypi-dependencies]
 # conda源里暂时没有
-langchain-ollama = ">=0.3.0"
+langchain-ollama = ">=0.3.3"
 
 [tool.pixi.feature.local.dependencies]
 pixi-pycharm = "*"
@@ -364,4 +365,4 @@ langchain = ">=0.3.23"
 langchain-community = ">=0.3.21"
 langgraph = ">=0.3.30"
 langchain-openai = ">=0.3.12"
-langchain-ollama = ">=0.3.0"
+langchain-ollama = ">=0.3.3"
