@@ -71,6 +71,8 @@ API_KEY = 'Empty'
 LLM_URL = 'http://localhost:11434'
 # MODEL = 'qwen2.5:7b'
 MODEL = 'qwen3:8b'
+# MODEL = 'qwen2.5:14b'
+# MODEL = 'qwen3:14b'
 
 # ======================= LLM + ChatLLM 模型包装器 使用 =======================
 def llm_usage():
@@ -156,8 +158,10 @@ def get_client_llm() -> Union[BaseLLM, LLM]:
     client_llm = OllamaLLM(
         base_url=LLM_URL,
         model=MODEL,
-        keep_alive='30m'
+        keep_alive='30m',
+        think=False
     )
+    print(f"\n===> Using model '{MODEL}' with {client_llm.get_name()}\n")
     return client_llm
 
 def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
@@ -174,8 +178,11 @@ def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
         model=MODEL,
         # temperature=0.7,
         # top_p=1,
-        keep_alive='30m'
+        keep_alive='30m',
+        # 控制模型是否进行think，只对支持think的模型有效，但是似乎对 qwen3 的think模式无效
+        think=False
     )
+    print(f"\n===> Using model '{MODEL}' with {client_chat.get_name()}\n")
     return client_chat
 
 # ======================= PromptTemplate + Message 使用 =======================
@@ -232,6 +239,11 @@ def message_usage():
 
     print(sys_msg.pretty_repr())
     sys_msg.pretty_print()
+
+    # -------- 在Message中加入额外信息 --------
+    msg_add = ChatMessage(role='user', content='Hello ChatGPT', thinking=True, additional_kwargs={'some': 'something'})
+    msg_add = SystemMessage(content='You are a helpful assistant.', thinking=True, additional_kwargs={'some': 'something'})
+    print(msg_add)
 
 
 def chat_prompt_template_usage():
@@ -432,12 +444,14 @@ def pipeline_prompt_usage():
 def simple_chat():
     client_chat = get_client_chat()
     msg = [
-        HumanMessage(content='RTX 5060 Ti 16GB跑本地大模型怎么样？'),
+        # HumanMessage(content='RTX 4060 Ti 16GB跑本地大模型怎么样？'),
+        # 只有手动在消息前面加上 /no_think，对于 qwen3 的think模式才会有效，但是此时仍然会输出一个空的 <think></think> 块
+        HumanMessage(content='/no_think RTX 4060 Ti 16GB跑本地大模型怎么样？'),
     ]
-    res = client_chat.invoke(input=msg)
-    print(res)
-    # for chunk in client_chat.stream(input=msg):
-    #     print(chunk.content, end='')
+    # res = client_chat.invoke(input=msg)
+    # print(res)
+    for chunk in client_chat.stream(input=msg):
+        print(chunk.content, end='')
 
 
 # ======================= Output Parser 使用 =======================
