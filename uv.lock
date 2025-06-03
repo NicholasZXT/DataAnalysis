@@ -117,9 +117,9 @@ source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
 dependencies = [
     { name = "argon2-cffi-bindings" },
 ]
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/31/fa/57ec2c6d16ecd2ba0cf15f3c7d1c3c2e7b5fcb83555ff56d7ab10888ec8f/argon2_cffi-23.1.0.tar.gz", hash = "sha256:879c3e79a2729ce768ebb7d36d4609e3a78a4ca2ec3a9f12286ca057e3d0db08" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/31/fa/57ec2c6d16ecd2ba0cf15f3c7d1c3c2e7b5fcb83555ff56d7ab10888ec8f/argon2_cffi-23.1.0.tar.gz", hash = "sha256:879c3e79a2729ce768ebb7d36d4609e3a78a4ca2ec3a9f12286ca057e3d0db08", size = 42798, upload-time = "2023-08-15T14:13:12.711Z" }
 wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/a4/6a/e8a041599e78b6b3752da48000b14c8d1e8a04ded09c88c714ba047f34f5/argon2_cffi-23.1.0-py3-none-any.whl", hash = "sha256:c670642b78ba29641818ab2e68bd4e6a78ba53b7eff7b4c3815ae16abf91c7ea" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/a4/6a/e8a041599e78b6b3752da48000b14c8d1e8a04ded09c88c714ba047f34f5/argon2_cffi-23.1.0-py3-none-any.whl", hash = "sha256:c670642b78ba29641818ab2e68bd4e6a78ba53b7eff7b4c3815ae16abf91c7ea", size = 15124, upload-time = "2023-08-15T14:13:10.752Z" },
 ]
 
 [[package]]
@@ -504,6 +504,8 @@ uv-db = [
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "sqlalchemy" },
+    { name = "thrift" },
+    { name = "thrift-sasl" },
 ]
 uv-dl = [
     { name = "torch" },
@@ -567,6 +569,8 @@ uv-db = [
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "sqlalchemy", specifier = ">=1.4" },
+    { name = "thrift", specifier = ">=0.20.0" },
+    { name = "thrift-sasl", specifier = ">=0.4.3" },
 ]
 uv-dl = [
     { name = "torch", specifier = "==1.13.1+cu117", index = "https://download.pytorch.org/whl/cu117" },
@@ -2227,6 +2231,12 @@ wheels = [
 ]
 
 [[package]]
+name = "pure-sasl"
+version = "0.6.2"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/83/b7/a0d688f86c869073cc28c0640899394a1cf68a6d87ee78a09565e9037da6/pure-sasl-0.6.2.tar.gz", hash = "sha256:53c1355f5da95e2b85b2cc9a6af435518edc20c81193faa0eea65fdc835138f4", size = 11617, upload-time = "2019-10-14T21:43:57.13Z" }
+
+[[package]]
 name = "py4j"
 version = "0.10.9.9"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
@@ -2897,6 +2907,26 @@ source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
 sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/b7/4d/08c89e34946fce2aec4fbb45c9016efd5f4d7f24af8e5d93296e935631d8/threadpoolctl-3.6.0.tar.gz", hash = "sha256:8ab8b4aa3491d812b623328249fab5302a68d2d71745c8a4c719a2fcaba9f44e", size = 21274, upload-time = "2025-03-13T13:49:23.031Z" }
 wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/32/d5/f9a850d79b0851d1d4ef6456097579a9005b31fea68726a4ae5f2d82ddd9/threadpoolctl-3.6.0-py3-none-any.whl", hash = "sha256:43a0b8fd5a2928500110039e43a5eed8480b918967083ea48dc3ab9f13c4a7fb", size = 18638, upload-time = "2025-03-13T13:49:21.846Z" },
+]
+
+[[package]]
+name = "thrift"
+version = "0.22.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/b2/c2/db648cc10dd7d15560f2eafd92a27cd280811924696e0b4a87175fb28c94/thrift-0.22.0.tar.gz", hash = "sha256:42e8276afbd5f54fe1d364858b6877bc5e5a4a5ed69f6a005b94ca4918fe1466", size = 62303, upload-time = "2025-05-23T20:49:33.309Z" }
+
+[[package]]
+name = "thrift-sasl"
+version = "0.4.3"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+dependencies = [
+    { name = "pure-sasl" },
+    { name = "six" },
+    { name = "thrift" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/fa/fb/5d9ba73be60b32f6fda080a5556cff25e15daf33bafe043c226404b39b25/thrift_sasl-0.4.3.tar.gz", hash = "sha256:5bdd5b760d90a13d9b3abfce873db0425861aa8d6bf25912d3cc0467a4f773da", size = 3962, upload-time = "2021-05-26T12:40:20.875Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c3/9e/636c24ce1c0d46ce3020c5836c5a375d8e862fa81a240e0e352cc991dcf8/thrift_sasl-0.4.3-py2.py3-none-any.whl", hash = "sha256:d24b49140115e6e2a96d08335cff225a27a28ea71866fb1b2bdb30ca5afca64e", size = 8304, upload-time = "2021-05-26T12:40:19.425Z" },
 ]
 
 [[package]]
