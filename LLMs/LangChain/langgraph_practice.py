@@ -151,7 +151,19 @@ def stateful_graph_usage():
     input = {"messages": [], "count": 0}
     print(f"Graph input: {input}")
     res = compile_graph.invoke(input=input)
+    # print(type(res))  # <class 'langgraph.pregel.io.AddableValuesDict'>
+    # Graph 返回的 AddableValuesDict 只是一个对 dict 进行简单封装，重写了 __add__ 方法的dict, key 和 state 里定义的完全一样
+    print(f"res.keys: {res.keys()}")
     print(f"final state: {res}")
+
+    # 批量调用
+    inputs = [{"messages": [], "count": 0}, {"messages": ["Hi"], "count": 1}]
+    res_batch = compile_graph.batch(inputs=inputs)
+    # print(f"{type(res_batch)}, {len(res_batch)}, {type(res_batch[0])}")
+    # <class 'list'>, 2, <class 'langgraph.pregel.io.AddableValuesDict'>
+    # batch 调用时，返回的是 List[AddableValuesDict]
+    for item in res_batch:
+        print(f"final state: {item}")
 
 
 def message_graph_usage():
