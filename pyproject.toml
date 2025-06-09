@@ -70,6 +70,7 @@ uv_ml = [
 	"ipywidgets >=8.0.0",
 	"jupyterlab >=3.4.0",
 	"xgboost >=2.0.0",
+	"lightgbm >=4.0.0",
 	"optuna >=3.1.0",
 	"optuna-dashboard >=0.10.0",
 	"hyperopt ==0.2.7",
@@ -210,6 +211,8 @@ elasticsearch = ">=7.13.0"
 requests = "*"
 httpx = "*"
 pyhive = ">=0.6.5"
+thrift = ">= 0.20.0"
+thrift_sasl = ">= 0.4.3"
 kafka-python = ">=2.0.0"
 #happybase = ">=1.2.0"
 #neo4j-python-driver = ">=5.5.0"
@@ -228,6 +231,7 @@ ipykernel = "*"
 ipywidgets = ">=8.0.0"
 jupyterlab = ">=3.4.0"
 xgboost = ">=2.0.0"
+lightgbm = ">=4.0.0"
 optuna = ">=3.1.0"
 optuna-dashboard = ">=0.10.0"
 hyperopt = "==0.2.7"
@@ -316,6 +320,8 @@ elasticsearch = ">=7.13.0"
 requests = "*"
 httpx = "*"
 pyhive = ">=0.6.5"
+thrift = ">= 0.20.0"
+thrift_sasl = ">= 0.4.3"
 kafka-python = ">=2.0.0"
 #happybase = ">=1.2.0"
 #neo4j-python-driver = ">=5.5.0"
@@ -334,6 +340,7 @@ ipykernel = "*"
 ipywidgets = ">=8.0.0"
 jupyterlab = ">=3.4.0"
 xgboost = ">=2.0.0"
+lightgbm = ">=4.0.0"
 optuna = ">=3.1.0"
 optuna-dashboard = ">=0.10.0"
 hyperopt = "==0.2.7"
