@@ -105,6 +105,7 @@ uv_llm = [
 	"langchain-openai >=0.3.12",
 #	"langchain-ollama >=0.3.0",
 	"langchain-ollama >=0.3.3",
+	"mcp[cli] >= 1.12.0"
 ]
 
 
