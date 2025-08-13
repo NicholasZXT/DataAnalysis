@@ -64,6 +64,7 @@ uv_ml = [
 	"pandas >=1.4.0",
 	"scikit-learn >=1.0.0",
 	"scipy",
+	"statsmodels",
 	"dataclasses",
 	"ipython",
 	"ipykernel",
