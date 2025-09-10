@@ -1,3 +1,6 @@
+"""
+LangChain 入门使用练习
+"""
 import os
 from typing import Optional, Dict, List, Union
 from typing_extensions import Annotated, TypedDict
@@ -195,7 +198,16 @@ def prompt_template_usage():
 
     # 第1种：直接实例化
     pt1 = PromptTemplate(input_variables=["adjective", "content"], template=template)
+    # 一般使用如下两个方法：
+    # 1. format方法直接返回字符串
     pt1.format(adjective="funny", content="chickens")
+    # 2. format_prompt方法返回 <class 'langchain_core.prompt_values.StringPromptValue'>
+    pv1 = pt1.format_prompt(adjective="funny", content="chickens")
+    print(type(pv1))
+    print(pv1)  # text='Tell me a funny joke about chickens.'
+    # StringPromptValue 只需要关注如下两个方法：
+    print(pv1.to_string())
+    print(pv1.to_messages())
 
     # 第2种：使用类方法 from_template —— 推荐这种方式
     pt2 = PromptTemplate.from_template(template=template)
@@ -203,11 +215,6 @@ def prompt_template_usage():
     print(pt2.template)
     print(pt2.template_format)
     print(pt2.input_variables)
-
-    # 下面返回的是 <class 'langchain_core.prompt_values.StringPromptValue'>
-    pv2 = pt2.format_prompt(adjective="fantastic", content="fish")
-    print(type(pv2))
-    print(pv2)
 
 
 def message_usage():
@@ -260,21 +267,25 @@ def chat_prompt_template_usage():
     template1 = "Tell me a {adjective} joke about {content}."
     # ChatMessagePromptTemplate 必须要指定 template 和 role
     cmpt = ChatMessagePromptTemplate.from_template(template=template1, role="user")
-    # format 方法返回的是 ChatMessage 对象
+
+    # 1. format 方法返回的是 ChatMessage 对象
     cmpt_msg = cmpt.format(adjective="nice", content="fish")
     print(type(cmpt_msg))  # <class 'langchain_core.messages.chat.ChatMessage'>
-    print(cmpt_msg)
+    print(cmpt_msg)  # content='Tell me a nice joke about fish.' additional_kwargs={} response_metadata={} role='user'
     print(cmpt_msg.content)
     print(cmpt_msg.type)  # chat
     print(cmpt_msg.role)  # user
-    print(cmpt_msg)  # content='Tell me a nice joke about fish.' additional_kwargs={} response_metadata={} role='user'
-    print(cmpt_msg.json())
-    print(cmpt_msg.pretty_repr())
-    cmpt_msg.pretty_print()
-    # 还有一个 format_messages 方法，返回的是 List[ChatMessage]
+
+    # 2. format_messages 方法，返回的是 List[ChatMessage]
     cmpt_msgs = cmpt.format_messages(adjective="nice", content="cat")
     print(type(cmpt_msgs))     # <class 'list'>
     print(type(cmpt_msgs[0]))  # <class 'langchain_core.messages.chat.ChatMessage'>
+    print(cmpt_msgs)
+
+    # 3. 其他有用方法
+    print(cmpt_msg.json())
+    print(cmpt_msg.pretty_repr())
+    cmpt_msg.pretty_print()
 
     # ----- HumanMessagePromptTemplate/AIMessagePromptTemplate/SystemMessagePromptTemplate 使用 -----
     template2 = "Tell me a {desc} joke about {something}."
@@ -290,7 +301,7 @@ def chat_prompt_template_usage():
     # print(hmpt_msg.role)
 
     # --- ChatPromptTemplate 用于组合多条消息的 PromptTemplate ---
-    # 使用 __init__ 方法或者 from_messages() 方法实例化对象，实际上 from_messages() 方法底层就是直接调用的 __init__() 方法，
+    # 使用 __init__ 方法 或者 from_messages() 方法实例化对象，实际上 from_messages() 方法底层就是直接调用的 __init__() 方法，
     # 接收一个 List，其中的元素可以是：Union[BaseMessagePromptTemplate, BaseMessage, BaseChatPromptTemplate]
     # 使用 List[BaseMessagePromptTemplate]/List[BaseChatPromptTemplate] 创建时，后续的 format方法会起作用
     # print(type(cmpt), type(hmpt))
@@ -602,6 +613,9 @@ def retriever_usage():
 
 # ======================= Chain 相关模块使用 =======================
 def runnable_usage():
+    """
+    Runnable 相关底层类使用
+    """
     # --- Runnable 使用 ------
     def add_one(x: int) -> int:
         """单参函数"""
@@ -648,7 +662,9 @@ def runnable_usage():
 
 
 def runnable_other_usage():
-    # 展示其他一些 Runnable 对象的使用
+    """
+    展示其他一些 Runnable 对象的使用
+    """
     # --- RunnableParallel ---
     # 并行执行多个 Runnable，并将结果组合成一个 dict
     task_a = RunnableLambda(lambda input: f"A-{input}")
@@ -714,7 +730,7 @@ def chain_usage():
     print(type(chain_chat))
     # <class 'langchain.chains.llm.LLMChain'>
 
-    # Callable调用，run调用，invoke调用——后续推荐使用invoke方法
+    # Callable调用，run调用，invoke调用 —— 后续推荐使用invoke方法
     res_llm = chain_llm(inputs={'adjective': 'happy', 'content': 'dog'})
     res_llm = chain_llm.run(adjective='happy', content='dog')  # 多个输入以关键字参数传入，并且返回的是 str，不是dict
     res_llm = chain_llm.invoke(input={'adjective': 'happy', 'content': 'dog'})
@@ -745,6 +761,7 @@ class MyCustomHandler(BaseCallbackHandler):
     def on_llm_end(self, response, **kwargs):
         print("<<<--- LLM 调用结束！")
         # print(f"<<<--- 返回结果: {response}")
+
 def callback_usage():
     # LangChain的Callback一般是由`BaseLLM`/`BaseChatModel`/`Chain`对象封装，不直接和Runnable基础类配合使用
     input_str = "请解释下机器学习算法SVM的原理"
@@ -961,7 +978,7 @@ def tool_usage():
         # args_schema 用于设置被调用函数的参数schema，有两种形式：
         # 1. Pydantic Model
         # 2. JSON Schema，用dict描述，注意，不是任意dict的形式，否则下面的 .args 属性会报错
-        # 或者不设置，默认（infer_schema）会从函数参数中自动提前，此时建议参数使用 Annootated 进行注解
+        # 或者不设置，默认（infer_schema）会从函数参数中自动提取，此时建议参数使用 Annotated 进行注解
         args_schema={
             "type": "object",
             "properties": {
