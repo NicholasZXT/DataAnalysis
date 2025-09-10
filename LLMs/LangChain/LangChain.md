@@ -74,7 +74,7 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 #### `config.py`和`configurable.py`
 
-`config.py`模块定义了`RunnableConfig`类——实际上就是一个Dict对象，用于封装运行时参数，可封装的参数如下：
+`config.py`模块定义了`RunnableConfig`类 —— 实际上就是一个Dict对象，用于封装运行时参数，可封装的参数如下：
 - run_id: UUID类型
 - run_name: str类型，Runnable对象名称
 - metadata: dict
@@ -388,7 +388,7 @@ module主要内容有：
   - `StringPromptTemplate`，继承自`BasePromptTemplate`，也是个**抽象类**，不能直接使用。
 
 - `prompt.py`
-  - `PromptTemplate`, 继承自`StringPromptTemplate`，这个类是最基础的prompt模板，**适用于Completion任务（普通的LLM模型）**。
+  - `PromptTemplate`, 继承自`StringPromptTemplate`，这个类是**最基础的prompt模板，适用于Completion任务（普通的LLM模型）**。
 
 - `few_shot.py`
   - `FewShotPromptTemplate`
@@ -419,8 +419,19 @@ module主要内容有：
 > 注意，`ChatMessagePromptTemplate`返回的是`ChatMessage`，有 role 属性，type属性是'chat';
 > `HumanMessagePromptTemplate`返回的是`HumanMessage`，type属性是'human'，**没有 role 属性**。
 
+
 **使用说明**
 
+所有继承`BasePromptTemplate`的类，需要关注如下方法：
+- `invoke`/`ainvoke`: 返回值是`PromptValue`及其子类。
+- `format_prompt`/`afomat_prompt`: 返回值是`PromptValue`及其子类。
+- `format`/`afomat`: 直接返回字符串
+- `save`
+
+`BaseMessagePromptTemplate`类虽然是ChatModel的模板基类，但是一般主要使用它的子类`BaseStringMessagePromptTemplate`，需要关注如下方法：
+- `format_messages`/`afomat_messages`: 返回值是`List[BaseMessage]`
+- `format`/`afomat`: 返回值是`BaseMessage`
+- `pretty_repr`/`pretty_print`
 
 
 ### `prompt_values.py`
@@ -444,6 +455,12 @@ module主要内容有：
   - `to_messages()` 方法直接返回上面的 `messages` 属性
 
 - `ChatPromptValueConcrete`: 继承自`ChatPromptValue`
+
+**使用说明**
+
+`PromptValue` 类及其子类的作用是封装提示词模板的输出，以便适用于不同的任务，使用时主要关注两个方法：
+- `to_string() -> str`: 将提示模板转换为一个纯字符串，这是大多数基础 LLM 期望的输入格式。
+- `to_messages() -> List[BaseMessage]`: 将提示模板转换为一个消息对象列表。这是聊天模型期望的输入格式。
 
 
 ### `output` 和 `output_parsers` 模块
