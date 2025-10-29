@@ -1,8 +1,33 @@
 [TOC]
 
-这里对 LangChain 的各个package进行简单总结。
+LangChain框架于 2025-10-18 正式发布了 v1.0 版本，相比与之前的 v0.3 版本，有了不少重大升级——也是破坏性的升级。
 
-# Langchain-Core
+LangChain框架 v1.0 的官方（Python）文档地址也变更为 [LangChain Docs](https://docs.langchain.com/).
+
+> 从 v0.3 到 v1.0，LangChain 和 LangGraph 的关系发生了重大的转变，从“相对独立”演变为“深度集成、紧密耦合”。
+> 更确切地说，是 LangChain v1.0 的高层抽象现在直接构建在 LangGraph 的运行时引擎之上。
+
+LangChain v1.0 的发布说明和从 v0.3 版本的迁移说明参见：
+- [LangChain Release Notes](https://docs.langchain.com/oss/python/releases/langchain-v1)
+- [LangChain v1 migration guide](https://docs.langchain.com/oss/python/migrate/langchain-v1)
+
+> 简单看了下，LangChain v1.0 的官方文档现在倾向于之间从顶层的Agent应用开始介绍——可能说明 LangChain v1.0 开始重点在Agent应用的开发。
+> 整个文档主要从应用角度进行说明，对于LangChain底层模块和概念的介绍（比如`Runnable`接口）基本删减掉了，因此要想深入研究下LangChain，
+> 还是 LangChain v0.3 的文档好一点。
+
+
+# LangChain-Core
+
+# LangChain
+
+# LangGraph
+
+
+---------------------------------------------------
+
+以下是对 LangChain v0.3版本 的各个package进行简单总结。
+
+# LangChain-Core-v0.3
 
 package名称为`langchain_core`，需要关注的有如下内容。  
 
@@ -707,7 +732,7 @@ langchain-core里的agents内容并没有太多，主要在langchain包里。
 
 ---------------------------------------------------
 
-# LangChain
+# LangChain-v0.3
 
 module名称为`langchain`，所有的模块可以分为如下6大类：
 
@@ -965,7 +990,7 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 
 
 ---------------------------------------------------
-# LangGraph
+# LangGraph-v0.3
 
 首先要明确的是，LangGraph并不依赖LangChain-Core或者LangChain，
 参考官方[FAQ -> Do I need to use LangChain to use LangGraph? What’s the difference?](https://langchain-ai.github.io/langgraph/concepts/faq/#do-i-need-to-use-langchain-to-use-langgraph-whats-the-difference)。
