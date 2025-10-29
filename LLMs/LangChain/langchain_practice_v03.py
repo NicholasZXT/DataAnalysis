@@ -1,5 +1,5 @@
 """
-LangChain 入门使用练习
+LangChain 入门使用练习 —— 基于 v0.3.x 版本
 """
 import os
 from typing import Optional, Dict, List, Union
