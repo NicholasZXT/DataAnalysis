@@ -1,26 +1,43 @@
 [TOC]
 
-LangChain框架于 2025-10-18 正式发布了 v1.0 版本，相比与之前的 v0.3 版本，有了不少重大升级——也是破坏性的升级。
+LangChain框架于 2025-10-18 正式发布了 v1.0 版本，相比与之前的 v0.3 版本，有了不少重大升级。
 
 LangChain框架 v1.0 的官方（Python）文档地址也变更为 [LangChain Docs](https://docs.langchain.com/).
 
-> 从 v0.3 到 v1.0，LangChain 和 LangGraph 的关系发生了重大的转变，从“相对独立”演变为“深度集成、紧密耦合”。
-> 更确切地说，是 LangChain v1.0 的高层抽象现在直接构建在 LangGraph 的运行时引擎之上。
 
 LangChain v1.0 的发布说明和从 v0.3 版本的迁移说明参见：
 - [LangChain Release Notes](https://docs.langchain.com/oss/python/releases/langchain-v1)
 - [LangChain v1 migration guide](https://docs.langchain.com/oss/python/migrate/langchain-v1)
+
+# V1.0升级说明
+
+
+> 从 v0.3 到 v1.0，LangChain 和 LangGraph 的关系发生了重大的转变，从“相对独立”演变为“深度集成、紧密耦合”。
+> 更确切地说，是 LangChain v1.0 的高层抽象现在直接构建在 LangGraph 的运行时引擎之上。
 
 > 简单看了下，LangChain v1.0 的官方文档现在倾向于之间从顶层的Agent应用开始介绍——可能说明 LangChain v1.0 开始重点在Agent应用的开发。
 > 整个文档主要从应用角度进行说明，对于LangChain底层模块和概念的介绍（比如`Runnable`接口）基本删减掉了，因此要想深入研究下LangChain，
 > 还是 LangChain v0.3 的文档好一点。
 
 
+
+------
+
 # LangChain-Core
+
+
+
+------
 
 # LangChain
 
+
+
+------
+
 # LangGraph
+
+
 
 
 ---------------------------------------------------
@@ -28,6 +45,8 @@ LangChain v1.0 的发布说明和从 v0.3 版本的迁移说明参见：
 以下是对 LangChain v0.3版本 的各个package进行简单总结。
 
 # LangChain-Core-v0.3
+
+> LangChain v0.3 版本的文档现在只能在Github历史提交记录里看到了https://github.com/langchain-ai/langchain/tree/v0.3/docs/docs。
 
 package名称为`langchain_core`，需要关注的有如下内容。  
 
@@ -167,16 +186,16 @@ package名称为`langchain_core`，需要关注的有如下内容。
    `self._enter_history` -> `RunnablePassthrough.assign` -> `Chain` -> `self._exit_history`
 
 2. 在 `self._enter_history` 里，     
-  2.1 从RunnableConfig里获取`BaseChatMessageHistory`对象，读取其中**所有**历史消息；    
-  2.2 如果没有设置`history_messages_key`和`input_messages_key`，则直接将所有历史消息作为输入；   
-  2.3 如果没有设置`history_messages_key`，但设置了`input_messages_key`，则调用`self._get_input_messages`，
+    2.1 从RunnableConfig里获取`BaseChatMessageHistory`对象，读取其中**所有**历史消息；    
+    2.2 如果没有设置`history_messages_key`和`input_messages_key`，则直接将所有历史消息作为输入；   
+    2.3 如果没有设置`history_messages_key`，但设置了`input_messages_key`，则调用`self._get_input_messages`，
       从输入中获取指定key消息，封装成`HumanMessage`追加到2.1中的历史消息列表里    
-  2.4 返回历史消息列表，进入下一个Runnable
+    2.4 返回历史消息列表，进入下一个Runnable
 
 3. 只要`history_messages_key`或者`input_messages_key`有一个存在，则使用`RunnablePassthrough.assign`封装 步骤2 中的 Runnable 对象    
-  3.1 在 input 中新增一个key，存放步骤2返回的历史消息列表   
-  3.2 这个key的名称优先使用 `history_messages_key`，没有则使用 `input_messages_key`   
-  如果`history_messages_key`和`input_messages_key`都没有设置，那么就不会在input中新增存放历史消息的key。
+    3.1 在 input 中新增一个key，存放步骤2返回的历史消息列表   
+    3.2 这个key的名称优先使用 `history_messages_key`，没有则使用 `input_messages_key`   
+    如果`history_messages_key`和`input_messages_key`都没有设置，那么就不会在input中新增存放历史消息的key。
 
 > 这一步其实很重要，如果`history_messages_key`和`input_messages_key`都没有设置，不执行`RunnablePassthrough.assign`封装的话，
 > 那么首先执行就是步骤2中的`self._enter_history`，但是该方法返回值是 `list[BaseMessage]`；
@@ -186,10 +205,10 @@ package名称为`langchain_core`，需要关注的有如下内容。
 4. 执行`Chain`
 
 5. `self._exit_history`作为`Chain.with_listeners(on_end= ... )`监听器调用，在Chain执行完时触发：    
-  5.1 从RunnableConfig里获取`BaseChatMessageHistory`对象    
-  5.2 调用`self._get_input_messages(inputs)`，尝试从input中以`input_messages_key`（没有则使用'input'作为默认key）获取消息，封装为`HumanMessage`
-  5.3 获取步骤4中的output，调用`self._get_output_messages(outpus)`，尝试以`output_messages_key`为key从output中获取消息，封装为`AIMessage`
-  5.4 向 `BaseChatMessageHistory`对象中追加 [`HumanMessage`, `AIMessage`]
+    5.1 从RunnableConfig里获取`BaseChatMessageHistory`对象    
+    5.2 调用`self._get_input_messages(inputs)`，尝试从input中以`input_messages_key`（没有则使用'input'作为默认key）获取消息，封装为`HumanMessage`
+    5.3 获取步骤4中的output，调用`self._get_output_messages(outpus)`，尝试以`output_messages_key`为key从output中获取消息，封装为`AIMessage`
+    5.4 向 `BaseChatMessageHistory`对象中追加 [`HumanMessage`, `AIMessage`]
 
 > `input_messages_key`和`output_messages_key`这两个参数的最大作用是在`self._exit_history`中，此时Chain调用结束，
 > 需要使用这两个key分别从 input和output中 获取 用户的输入 和 模型的输出，并存入`BaseChatMessageHistory`对象中。
