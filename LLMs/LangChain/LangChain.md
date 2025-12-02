@@ -1,50 +1,122 @@
 [TOC]
 
-LangChain框架于 2025-10-18 正式发布了 v1.0 版本，相比与之前的 v0.3 版本，有了不少重大升级。
-
-LangChain框架 v1.0 的官方（Python）文档地址也变更为 [LangChain Docs](https://docs.langchain.com/).
-
-
-LangChain v1.0 的发布说明和从 v0.3 版本的迁移说明参见：
-- [LangChain Release Notes](https://docs.langchain.com/oss/python/releases/langchain-v1)
-- [LangChain v1 migration guide](https://docs.langchain.com/oss/python/migrate/langchain-v1)
-
 # V1.0升级说明
 
+LangChain & LangGraph 框架于 2025-10-18 **同时正式发布了 v1.0 版本**，相比与之前的 v0.3/v0.6 版本，有了不少重大升级。
 
-> 从 v0.3 到 v1.0，LangChain 和 LangGraph 的关系发生了重大的转变，从“相对独立”演变为“深度集成、紧密耦合”。
-> 更确切地说，是 LangChain v1.0 的高层抽象现在直接构建在 LangGraph 的运行时引擎之上。
+LangChain & LangGraph 框架 v1.0 的官方（Python）文档地址也变更为 [LangChain Docs](https://docs.langchain.com/).
 
-> 简单看了下，LangChain v1.0 的官方文档现在倾向于之间从顶层的Agent应用开始介绍——可能说明 LangChain v1.0 开始重点在Agent应用的开发。
-> 整个文档主要从应用角度进行说明，对于LangChain底层模块和概念的介绍（比如`Runnable`接口）基本删减掉了，因此要想深入研究下LangChain，
-> 还是 LangChain v0.3 的文档好一点。
+| 版本             | LangChain-Core | LangChain | LangGraph |
+| ---------------- | -------------- | --------- | --------- |
+| v0.x最后一个版本 | 0.3.80         | 0.3.27    | 0.6.11    |
+
+`langchain-community`包目前还没有升级到v1.x版本，好像变化不大。
+
+## LangChain
+
+
+官方文档：
+
+- [Release -> What's new in LangChain v1](https://docs.langchain.com/oss/python/releases/langchain-v1)，LangChain v1.0 的发布说明
+- [LangChain v1 migration guide](https://docs.langchain.com/oss/python/migrate/langchain-v1)，从 v0.3 版本的迁移说明
+
+LangChain v0.3版本，官方文档介绍时的第一句话是：
+
+> **LangChain** is a framework for developing applications powered by large language models (LLMs).
+
+而到了LangChain v1.0版本，官方文档介绍的第一句话是：
+
+> LangChain is the easiest way to start building agents and applications powered by LLMs.
+
+可以看出，**LangChain v1.0 版本的重心应该是向Agent开发框架倾斜了**。
+
+根据官方文档的说明，LangChain v1.0 的重大改变如下：
+
+**一、核心架构变化**
+
+**（1）LangGraph 成为基石**
+
+- LangChain-v0.3.x和 LangGraph-v0.6.x版本是相对独立的两个项目，两者没有太多交集和耦合，这也导致LangChain/LangGraph里分别有各自构建Agent的API，过于复杂；
+- 但是从v1.0版本开始，LangChain 和 LangGraph 这两个项目就统一到一起了，**LangGraph正式退居幕后，成为LangChain构建Agent的底层基石**。
+- 随着LangGraph成为LangChain构建Agent的底层基石，Agent相关的API也得到了统一
+
+因此LangChain v1.0和LangGraph v1.0 需要相互搭配使用，两者均不适用于 0.x 版本。
+
+**（2）Agent构建引入了Middleware**
+
+新的Agent架构支持Middleware机制，可以更加方便的控制Agent流程中每步的操作
+
+**（3）改进了结构化输出（Structured output）的能力**
+
+结构化输出的生成现在直接在 Agent 的主执行循环中完成，**不再需要额外的 LLM 调用来解析结果**，从而降低了延迟和成本。
+
+**二、统一模型输出**
+
+- 引入`.content_block`属性，统一了不同模型提供商的消息内容
+
+**三、简化包结构**
+
+精简了`langchain`包的命名空间，`langchain`包现在聚焦如下几个子module：
+
+- `langchain.messages`
+- `langchain.chat_models`
+- `langchain.tools`
+- `langchian.embeddings`
+- `langchain.agents`
+
+顶层的`__init__.py`里没有引入任何内容。
+
+`langchain-core`包依然存在，并且依旧定义了`langchain`所有抽象组件，包括v0.3版本的`Runnable`接口抽象。
+
+`langchain-community`包也依旧存在，不过一个重要变化是：之前在langchain-v0.3版本，会直接导入`langchain-community`里的内容，v1.0版本不再直接导出了，需要用户手动显式直接从`langchain-community`里导入。
+
+## LangGraph
+
+官方文档：
+
+- [Release -> What's new in LangGraph v1](https://docs.langchain.com/oss/python/releases/langgraph-v1)
+- [LangGraph v1 migration guide](https://docs.langchain.com/oss/python/migrate/langgraph-v1)
+
+对于LangGraph来说，从v0.6.11版本升级到 v1.0.0 版本，核心架构和组件基本没有什么变化。
+
+最大的改动就是`langgraph.prebuilt`模块里的`create_react_agent()`函数被标记为废弃，由`langchain.agents`模块统一Agent函数`create_agent()`代替了。
+
+不过**由于v1.0的LangChain已经以LangGraph为基石进行了核心组件的重写，官方建议一般直接使用LangChain-v1.0即可，不太需要直接基于LangGraph来构建Agent**。
+
+## Deep-Agents
+
+Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 
 
 
 ------
 
-# LangChain-Core
+# LangChain-Core:v1.0
+
+简单看了下v1.0版本的`langchain-core`模块源码，感觉大体上相比v0.3.x变化不大，核心还是基于`Runnable`接口抽象实现。
 
 
 
 ------
 
-# LangChain
+# LangChain:v1.0
 
+- `langchain.messages`
+- `langchain.chat_models`
+- `langchain.tools`
+- `langchian.embeddings`
+- `langchain.agents`
 
-
-------
-
-# LangGraph
+> 删除了v0.3版本里的`langchain.chains`、`langchain.memory`等模块。
 
 
 
 
 ---------------------------------------------------
 
-以下是对 LangChain v0.3版本 的各个package进行简单总结。
+# LangChain-Core:v0.3
 
-# LangChain-Core-v0.3
+以下是对 LangChain v0.3版本 的各个package进行简单总结。
 
 > LangChain v0.3 版本的文档现在只能在Github历史提交记录里看到了https://github.com/langchain-ai/langchain/tree/v0.3/docs/docs。
 
@@ -60,7 +132,7 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 ### `runnables`模块 - KEY
 
-这个模块是langchain_core模块的核心模块，基于 Runnable设计模式 和 LangChain Expression Language (LCEL) 定义了一系列的接口规范。
+这个模块是langchain_core模块的核心模块，基于 Runnable设计模式 和 *LangChain Expression Language (LCEL)* 定义了一系列的接口规范。
 也是实现 Chain 的核心模块。 
 
 这里重点介绍如下文件里定义的一些常用抽象基类。
@@ -130,6 +202,7 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 `configurable.py`里提供了如下两个常用类，
 配合上面`RunnableSerializable`的`configurable_fields`和`configurable_alternatives`方法使用：
+
 - `RunnableConfigurableFields`
 - `RunnableConfigurableAlternatives`
 
@@ -751,12 +824,68 @@ langchain-core里的agents内容并没有太多，主要在langchain包里。
 
 ---------------------------------------------------
 
-# LangChain-v0.3
+# LangChain:v0.3
 
 module名称为`langchain`，所有的模块可以分为如下6大类：
 
+
+
+## Chain核心模块
+
+> langchain_core 没有对应的chains模块，因为chains相关的核心接口/抽象类都在 `langchain_core.runnables` 中定义好了。
+> **`chains` 模块才是 langchain 包的核心内容**。
+
+### `chains`模块-KEY
+
+module内容如下：
+
+- `base.py`:
+  - `Chain`: Chain组件的抽象基类，它继承了 `RunnableSerializable`，所以也是一个Pydantic的`BaseModel`子类。
+
+`chains`模块提供了一系列的Chain组件实现类。
+
+**使用说明**
+
+抽象基类`Chain`里定义了如下属性（这些属性可以在初始化时传入）：
+
+- `metadata: Optional[Dict[str, Any]] = None`
+- `tags: Optional[List[str]] = None`
+- `verbose: bool`: 控制是否输出日志
+- `memory: Optional[BaseMemory]`: 存储 Memory 对象
+- `callbacks`: 回调函数配置，类型是`Union[list[BaseCallbackHandler], BaseCallbackManager]`，既可以是回调函数列表，也可以是`BaseCallbackManager`对象
+- `callback_manager: Optional[BaseCallbackManager]`: 回调管理器，和`callbacks`重复了，所以**被标识为废弃的**，建议使用`callbacks`
+
+抽象基类`Chain`定义了如下抽象方法：
+
+- Callable调用: 执行Chain组件
+  - 已被标记为废弃，后续不再支持，代替方法是`invoke`/`ainvoke`。
+  - 输入的`inputs`是一个`Union[Dict[str, Any], Any]`，应当包含`Chain.input_keys`里的所有key（Memory使用的key除外），如果只有一个参数，则可以直接传入。
+  - 返回值是`Dict[str, Any]`，A dict of named outputs，包含了`Chain.output_keys`属性指定的所有key
+- `run`/`arun`: 执行Chain组件
+  - 已被标记为废弃，后续不再支持，代替方法是`invoke`/`ainvoke`。
+  - 和Callable调用的区别是，它接受的输入不是像`__call__`中那样的`Dict[str, Any]`，而是必须拆开以关键字参数的形式传入，如果只有一个参数，则采用位置参数（第1个）传入.
+  - 返回值是`Any`，要看具体的`Chain`和配置的LLM
+- `save`: 保存Chain，可以传入一个`file_path`
+- `dict`: 以dict的形式返回Chain的表示
+
+此外，`Chain`还定义了如下两个抽象property需要子类实现：
+
+- `input_keys`: `List[str]`类型，指定Chain组件的输入key
+- `output_keys`: `List[str]`类型，指定Chain组件的输出key
+- `_chain_type`: `str`类型，指定Chain组件的类型，不过这个属性一般是内部使用的
+
+
+
+`LLMChain`
+
+
+
+### `callbacks`模块
+
+
+
 ---------------------------------------------------
-## Model IO
+## Model IO模块
 
 > `langchain`模块的`llm`和`chat_models`模块里都只是提供了模型定义、加载初始化的内容，
 > 返回的模型都是 `langchain_core.language_model`模块里抽象类的子类，
@@ -796,114 +925,9 @@ module名称为`langchain`，所有的模块可以分为如下6大类：
 
 这个模块也是把 `langchain_core.output_parsers` 里的内容导入过来。
 
----------------------------------------------------
-## 数据增强
-
-### `document_loaders`模块
-
-这个模块主要从两个地方导入内容：
-- `langchain_core.document_loaders`里导入 `BaseLoader` 和 `BaseBlobParser`
-- `langchain_community.document_loaders`里导入各种类型的 Loader 实现类
-
-> langchain官方建议后续直接从 `langchain_community`包里导入。
-
-个人感觉常用的有如下Loader实现类：
-- TextLoader
-- CSVLoader
-- JSONLoader
-- WebBaseLoader
-- DataFrameLoader
-- HuggingFaceDatasetLoader
-- PyMuPDFLoader
-- PyPDFDirectoryLoader
-- PyPDFium2Loader
-- PyPDFLoader
-- BiliBiliLoader, 居然还有B站
-
-### `document_transformers`模块
-
-### `embeddings`模块
-
-这个模块主要从两个地方导入内容：
-- `langchain_core.embeddings`里导入 `Embeddings` 抽象基类
-- `langchain_community.embeddings`里导入各种类型的 Embeddings 实现类
-
-> langchain官方建议后续直接从 `langchain_community`包里导入。
-
-每一个Embeddings实现类都继承自 `Embeddings`抽象基类，并且继承了 Pydantic的 `BaseModel`子类。
-
-不过每个Embeddings实现类初始化时配置模型的参数好像都不太一样，具体需要参考对应的实现类的文档或源码。
-
-常用的Embeddings实现类：
-- OpenAIEmbeddings
-- HuggingFaceEmbeddings
-- OllamaEmbeddings
-
-
-### `vectorstores`模块
-
-和上面类似，这个模块主要从两个地方导入内容：
-- `langchain_core.vectorstores`里导入 `VectorStore` 抽象基类
-- `langchain_community.vectorstores`里导入各种类型的 VectorStore 实现类
-
-> langchain官方建议后续直接从 `langchain_community`包里导入。
-
-### `retriever` 模块
-
-和上面类似，这个模块主要从两个地方导入内容：
-- `langchain_core.retriever`里导入 `BaseRetriever` 抽象基类
-- `langchain_community.retriever`里导入各种类型的 BaseRetriever 实现类
-
-> langchain官方建议后续直接从 `langchain_community`包里导入。
-
----------------------------------------------------
-## Chain核心模块
-
-> langchain_core 没有对应的chains模块，因为chains相关的核心接口/抽象类都在 `langchain_core.runnables` 中定义好了。
-> **`chains` 模块才是 langchain 包的核心内容**。
-
-### `chains`模块
-
-module内容如下：
-- `base.py`:
-  - `Chain`: Chain组件的抽象基类，它继承了 `RunnableSerializable`，所以也是一个Pydantic的`BaseModel`子类。
-
-`chains`模块提供了一系列的Chain组件实现类。
-
-**使用说明**
-
-抽象基类`Chain`里定义了如下属性（这些属性可以在初始化时传入）：
-- `metadata: Optional[Dict[str, Any]] = None`
-- `tags: Optional[List[str]] = None`
-- `verbose: bool`: 控制是否输出日志
-- `memory: Optional[BaseMemory]`: 存储 Memory 对象
-- `callbacks`: 回调函数配置，类型是`Union[list[BaseCallbackHandler], BaseCallbackManager]`，既可以是回调函数列表，也可以是`BaseCallbackManager`对象
-- `callback_manager: Optional[BaseCallbackManager]`: 回调管理器，和`callbacks`重复了，所以**被标识为废弃的**，建议使用`callbacks`
-
-抽象基类`Chain`定义了如下抽象方法：
-- Callable调用: 执行Chain组件
-  - 已被标记为废弃，后续不再支持，代替方法是`invoke`/`ainvoke`。
-  - 输入的`inputs`是一个`Union[Dict[str, Any], Any]`，应当包含`Chain.input_keys`里的所有key（Memory使用的key除外），如果只有一个参数，则可以直接传入。
-  - 返回值是`Dict[str, Any]`，A dict of named outputs，包含了`Chain.output_keys`属性指定的所有key
-- `run`/`arun`: 执行Chain组件
-  - 已被标记为废弃，后续不再支持，代替方法是`invoke`/`ainvoke`。
-  - 和Callable调用的区别是，它接受的输入不是像`__call__`中那样的`Dict[str, Any]`，而是必须拆开以关键字参数的形式传入，如果只有一个参数，则采用位置参数（第1个）传入.
-  - 返回值是`Any`，要看具体的`Chain`和配置的LLM
-- `save`: 保存Chain，可以传入一个`file_path`
-- `dict`: 以dict的形式返回Chain的表示
-
-此外，`Chain`还定义了如下两个抽象property需要子类实现：
-- `input_keys`: `List[str]`类型，指定Chain组件的输入key
-- `output_keys`: `List[str]`类型，指定Chain组件的输出key
-- `_chain_type`: `str`类型，指定Chain组件的类型，不过这个属性一般是内部使用的
 
 
 
-`LLMChain`
-
-
-
-### `callbacks`模块
 
 
 ---------------------------------------------------
@@ -958,6 +982,75 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `ElasticsearchChatMessageHistory`
 
 
+
+## 数据增强
+
+### `document_loaders`模块
+
+这个模块主要从两个地方导入内容：
+
+- `langchain_core.document_loaders`里导入 `BaseLoader` 和 `BaseBlobParser`
+- `langchain_community.document_loaders`里导入各种类型的 Loader 实现类
+
+> langchain官方建议后续直接从 `langchain_community`包里导入。
+
+个人感觉常用的有如下Loader实现类：
+
+- TextLoader
+- CSVLoader
+- JSONLoader
+- WebBaseLoader
+- DataFrameLoader
+- HuggingFaceDatasetLoader
+- PyMuPDFLoader
+- PyPDFDirectoryLoader
+- PyPDFium2Loader
+- PyPDFLoader
+- BiliBiliLoader, 居然还有B站
+
+### `document_transformers`模块
+
+### `embeddings`模块
+
+这个模块主要从两个地方导入内容：
+
+- `langchain_core.embeddings`里导入 `Embeddings` 抽象基类
+- `langchain_community.embeddings`里导入各种类型的 Embeddings 实现类
+
+> langchain官方建议后续直接从 `langchain_community`包里导入。
+
+每一个Embeddings实现类都继承自 `Embeddings`抽象基类，并且继承了 Pydantic的 `BaseModel`子类。
+
+不过每个Embeddings实现类初始化时配置模型的参数好像都不太一样，具体需要参考对应的实现类的文档或源码。
+
+常用的Embeddings实现类：
+
+- OpenAIEmbeddings
+- HuggingFaceEmbeddings
+- OllamaEmbeddings
+
+
+### `vectorstores`模块
+
+和上面类似，这个模块主要从两个地方导入内容：
+
+- `langchain_core.vectorstores`里导入 `VectorStore` 抽象基类
+- `langchain_community.vectorstores`里导入各种类型的 VectorStore 实现类
+
+> langchain官方建议后续直接从 `langchain_community`包里导入。
+
+### `retriever` 模块
+
+和上面类似，这个模块主要从两个地方导入内容：
+
+- `langchain_core.retriever`里导入 `BaseRetriever` 抽象基类
+- `langchain_community.retriever`里导入各种类型的 BaseRetriever 实现类
+
+> langchain官方建议后续直接从 `langchain_community`包里导入。
+
+
+
+
 ---------------------------------------------------
 ## Agent相关
 
@@ -1009,13 +1102,14 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 
 
 ---------------------------------------------------
-# LangGraph-v0.3
+# LangGraph
 
 首先要明确的是，LangGraph并不依赖LangChain-Core或者LangChain，
 参考官方[FAQ -> Do I need to use LangChain to use LangGraph? What’s the difference?](https://langchain-ai.github.io/langgraph/concepts/faq/#do-i-need-to-use-langchain-to-use-langgraph-whats-the-difference)。
 
 LangGraph更像是一个高度抽象的基于图的Agent调度框架，参考官方文档 [LangGraph Glossary](https://langchain-ai.github.io/langgraph/concepts/low_level/)
 的说法，LangGraph的核心抽象 Graph 有如下3个概念：
+
 - `State`: 图的状态，这是 Graph 的核心，本质上就是一个dict，不过通常用 `TypeDict` 类或者 Pydantic的`BaseModel`类表示。
 - `Nodes`: Graph 的计算节点，本质上就是一个Python函数（更广泛一点就是一个Callable对象），可以封装各种逻辑，比如langchain里LLM/ChatModel/Chain的调用
 - `Edges`: Graph 的边，用来连接节点，本质上也是一个Python函数，用于根据当前的`State`判断并返回下一个要执行的`Node`的名称
@@ -1064,7 +1158,9 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 ---------------------------------------------------
 ## `graph`模块
 
-### `graph.py`
+### ~~`graph.py`~~
+
+> 这个文件只有 v0.4.10 版本之前有，v0.5.0版本开始就删除了此文件，也没有了`Graph`和`CompiledGraph`类。
 
 无状态图的表示，定义了如下3个类：
 
@@ -1081,10 +1177,12 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 **使用说明**
 
 `Graph`类用于表示无状态图，它使用如下属性来存储图的信息：
+
 - `nodes: dict[str, NodeSpec] = {}`
 - `edges = set[tuple[str, str]]()`
 
 `Graph`类提供了如下方法：
+
 - `add_node`
 - `add_sequence`
 - `add_edge`
@@ -1101,7 +1199,8 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 - `get_state`/`aget_state`
 - `update_state`/`aupdate_state`
 - `get_state_history`/`aget_state_history`
-- 
+
+
 
 
 ### `state.py`
@@ -1115,13 +1214,17 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
   - `input: Type[Any]`: 记录了输入，也就是状态
   - `retry_policy`:
 
-- `StateGraph`: 继承自 `Graph`
+- `StateGraph`: 
 
 - `CompiledStateGraph`: 继承自 `CompiledGraph`
+
+> 在v0.4.10版本以前，`StateGraph`继承自 `Graph`，`CompiledStateGraph`继承自`CompiledGraph`，但是从v0.5.10版本开始，这两个类就不再继承父类了。
 
 **使用说明**
 
 **`StateGraph`的初始化方法里需要传入一个表示状态的对象**，其他大部分方法都和`Graph`一样。
+
+
 
 
 ### `message.py`
@@ -1197,15 +1300,15 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 **`ToolNode`**
 
-封装tool的节点。
+封装tool的节点类。
 
 **`tools_condition`**
 
-封装 tool 的条件边，源码里内部逻辑比较简单，就是判断 state 里有没有 messages，并且messages 最后一条是不是 AIMessage，是就调用 Tool,
-否则转向 END。
+封装 tool 的条件边，源码里内部逻辑比较简单，就是判断 state 里有没有 messages，并且messages 最后一条是不是 AIMessage，是就调用 Tool，否则转向 END。
 
+~~**`create_react_agent`**~~
 
-**`create_react_agent`**
+> v1.0版本开始，此函数被标记为废弃的了。
 
 用于快速创建一个React Agent。
 
