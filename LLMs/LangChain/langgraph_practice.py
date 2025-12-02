@@ -1,16 +1,20 @@
 """
-简单研究 LangGraph 的使用 —— 基于 v0.3.x 版本。
+简单研究 LangGraph 的使用 —— 基于 v0.6.x 版本。
+
 主要参考了如下官方文档：
 - [LangGraph Glossary](https://langchain-ai.github.io/langgraph/concepts/low_level/)
 - [LangGraph Quickstart](https://langchain-ai.github.io/langgraph/tutorials/introduction/)
+
 首先需要明确的是，LangGraph 不依赖 Langchain-Core 或者 Langchain，因此下面的研究都使用一个简单的Python Callable 对象
 来代替实际中的 Langchain-Core/Langchain 里的 Runnable/LLM/ChatModel/Chain 对象。
+
+即使升级到 LangGraph v1.0.x 版本，LangGraph 的核心架构和组件都没有太大的变化。
 """
 from typing import Annotated, List, TypedDict, Dict, Union
 # from typing_extensions import TypedDict
 from langgraph.constants import START, END
-from langgraph.graph import Graph, StateGraph
-from langgraph.graph.graph import CompiledGraph
+# from langgraph.graph.graph import Graph, CompiledGraph  # 这两个类只有 v0.4.10 版本之前有，v0.5.0开始被删除了
+from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.graph.message import MessageGraph, MessagesState, add_messages
 from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent, InjectedState, InjectedStore
@@ -62,27 +66,32 @@ def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
 
 # ======================= 无状态图 构建 =======================
 def stateless_graph_usage():
+    """
+    Graph / CompiledGraph 只有 v0.4.10 版本之前有，v0.5.0 版本开始删除了这两个类所在的 langgraph.graph.graph.py 文件.
+    因此这两个类不需要关注了。
+    """
+    ...
     # 创建一个 Graph，这个Graph类不接受任何初始化参数，所以说它是无状态的。
-    graph = Graph()
+    # graph = Graph()
     # 定义节点
-    graph.add_node(node="hello", action=lambda _: "Hello, world !")
-    graph.add_node(node="welcome", action=lambda _: "Welcome LangGraph !")
-    graph.add_node(node="bye", action=lambda _: "Goodbye !")
+    # graph.add_node(node="hello", action=lambda _: "Hello, world !")
+    # graph.add_node(node="welcome", action=lambda _: "Welcome LangGraph !")
+    # graph.add_node(node="bye", action=lambda _: "Goodbye !")
 
     # 定义边
-    graph.add_edge("hello", "welcome")
-    graph.add_edge("welcome", "bye")
+    # graph.add_edge("hello", "welcome")
+    # graph.add_edge("welcome", "bye")
 
     # 定义起始点和结束点
-    graph.set_entry_point('hello')
-    graph.set_finish_point('bye')
+    # graph.set_entry_point('hello')
+    # graph.set_finish_point('bye')
 
     # 编译并执行
-    compile_graph: CompiledGraph = graph.compile(name='StatelessGraph')
-    print(compile_graph.config_specs)
-    print(compile_graph.config_type)
-    result = compile_graph.invoke(input={'key1': 'value1', 'key2': 'value2'})
-    print(result)
+    # compile_graph: CompiledGraph = graph.compile(name='StatelessGraph')
+    # print(compile_graph.config_specs)
+    # print(compile_graph.config_type)
+    # result = compile_graph.invoke(input={'key1': 'value1', 'key2': 'value2'})
+    # print(result)
 
 
 # ======================= 简单有状态图 构建 =======================
