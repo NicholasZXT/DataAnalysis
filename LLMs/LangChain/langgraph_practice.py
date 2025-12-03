@@ -204,6 +204,9 @@ def message_graph_usage():
 
 # ======================= 基于条件动态执行有状态图 =======================
 def graph_conditional_usage():
+    """
+    展示有条件动态执行的状态图
+    """
     class SimpleState(TypedDict):
         messages: List[str]
         count: int
@@ -248,11 +251,13 @@ def graph_conditional_usage():
 
 # ======================= Graph Checkpoint（短期记忆） 使用 =======================
 def graph_checkpoint_usage():
-    # 为了展示 checkpoint 的效果，定义的 state 对象里，每个属性需要有一个 reducer 函数，这里使用了两种：
-    # 1. 自定义 reducer
-    # 2. LangGraph提供的 add_messages，该reducer函数是专门为 BasedMessage(langchain_core提供) 设置的 reducer，
-    #    它会自动将字符串用 HumanMessage 包装起来，并追加到末尾，因此它要求对应的属性是一个 List[BasedMessage] 类型
-    # Reducer 函数最大的作用是用于保存历史对话记录
+    """
+    为了展示 checkpoint 的效果，定义的 state 对象里，每个属性需要有一个 reducer 函数，这里使用了两种：
+    1. 自定义 reducer
+    2. LangGraph提供的 add_messages，该reducer函数是专门为 BasedMessage(langchain_core提供) 设置的 reducer，
+       它会自动将字符串用 HumanMessage 包装起来，并追加到末尾，因此它要求对应的属性是一个 List[BasedMessage] 类型
+    Reducer 函数最大的作用是用于保存历史对话记录
+    """
     def num_reducer(prev_num: List[int], curr_num: List[int]) -> List[int]:
         return prev_num + curr_num
 
@@ -657,10 +662,12 @@ def chatbot_tool_usage_prebuilt():
 def react_agent_usage():
     """
     API文档: [create_react_agent](https://langchain-ai.github.io/langgraph/reference/agents/#langgraph.prebuilt.chat_agent_executor.create_react_agent)
+    注意：create_react_agent() 这个API 在 LangGraph v1.0 版本被标记为了废弃，后续推荐直接使用 langchain.agents 里提供的 create_agent()
     """
     @tool(description="使用龙球(DragonBall)算法计算两个数字的结果")
     def dragon_ball_algorithm(x: Annotated[int, "第一个数字"], y: Annotated[int, "第二个数字"]) -> int:
         return x + y + 1
+
     @tool(description="检查龙球(DragonBall)算法的结果是否正确")
     def dragon_ball_check(x: Annotated[int, "第一个数字"], y: Annotated[int, "第二个数字"], z: Annotated[int, "结果数字"]) -> int:
         return x + y + 1 == z
@@ -696,10 +703,12 @@ def react_agent_usage():
     for msg in res['messages']:
         msg.pretty_print()
 
+
 def graph_stream_usage():
     @tool(description="使用龙球(DragonBall)算法计算两个数字的结果")
     def dragon_ball_algorithm(x: Annotated[int, "第一个数字"], y: Annotated[int, "第二个数字"]) -> int:
         return x + y + 1
+
     @tool(description="检查龙球(DragonBall)算法的结果是否正确")
     def dragon_ball_check(x: Annotated[int, "第一个数字"], y: Annotated[int, "第二个数字"], z: Annotated[int, "结果数字"]) -> int:
         return x + y + 1 == z

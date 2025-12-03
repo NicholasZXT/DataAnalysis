@@ -42,6 +42,8 @@ LangChain v0.3版本，官方文档介绍时的第一句话是：
 
 因此LangChain v1.0和LangGraph v1.0 需要相互搭配使用，两者均不适用于 0.x 版本。
 
+> v1.0的LangChain文档删除了对底层 `Runnable`系列抽象接口的介绍，这部分的内容如果想要了解，还得去找GitHub上 LangChain v0.3.x 文档。
+
 **（2）Agent构建引入了Middleware**
 
 新的Agent架构支持Middleware机制，可以更加方便的控制Agent流程中每步的操作
@@ -96,10 +98,18 @@ Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 简单看了下v1.0版本的`langchain-core`模块源码，感觉大体上相比v0.3.x变化不大，核心还是基于`Runnable`接口抽象实现。
 
 
+## `messages`模块
+
+`base.py` 里的 `BaseMessage` 基类，新增了一个`content_block`属性，用于统一消息内容：
+- 此属性是一个property，会根据不同的模型提供商，尝试对`BaseMessage.content`属性进行解析，返回类型更加安全的对象，也支持多模态模型返回的音视频。
+- 返回类型是一个`list[ContentBlock]`。
+
 
 ------
 
 # LangChain:v1.0
+
+v1.0版本的`langchain`包只有如下模块了。
 
 - `langchain.messages`
 - `langchain.chat_models`
@@ -108,6 +118,59 @@ Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 - `langchain.agents`
 
 > 删除了v0.3版本里的`langchain.chains`、`langchain.memory`等模块。
+
+
+
+## middleware
+
+v1.0版新增的middleware功能是专门配合`create_agent()`使用，此函数内部是基于LangGraph的状态图构建的。
+
+Agent里的middleware调用时机如官方文档图片所示：
+
+<img src="https://mintcdn.com/langchain-5e9cc07a/RAP6mjwE5G00xYsA/oss/images/middleware_final.png?w=840&fit=max&auto=format&n=RAP6mjwE5G00xYsA&q=85&s=e9b14e264f68345de08ae76f032c52d4" alt="AgentMiddleware.hook" style="zoom:80%;" align="left"/>
+
+上述调用的hook方法是由`AgentMiddleware`类定义的，所有Middleware都要继承此类，并实现其中的某个方法，可实现的hook方法分为如下两类：
+
+（1）Node-style hooks：在固定时机进行调用的hook，一般用于logging、validation、state update等操作
+
+- agent启动停止：每次调用`invoke()`等方法时执行一次
+
+  - `before_agent`/`abefore_agent`
+
+  - `after_agent`/`aafter_agent`
+
+- model调用：每次发生模型调用的前后，一次`invoke()`方法内部可能有多次模型调用
+
+  - `before_model`/`abefore_model`
+
+  - `after_model`/`aafter_model`
+
+（2）Wrap-style hooks：用于干涉agent执行流程，一般用于retries、caching等操作。
+
+- `wrap_model`/`awrap_model`：每次模型调用前后执行
+- `wrap_tool_call`/`awrap_tool_call`，每次工具调用前后执行
+
+除了继承`AgentMiddleware`类的方式外，还提供了如下hook装饰器来简化使用：
+
+- `@before_agent`/`@after_agent`
+- `@before_model`/`@after_model`
+- `@wrap_model_call`
+- `@wrap_tool_call`
+
+这些装饰器内部也是将被装饰函数使用动态类定义的技巧封装成`AgentMiddleware`的子类以供使用的。
+
+研究`create_agent()`函数源码发现，middleware的使用有如下几个要注意的地方：
+
+1. 所有middleware的`wrap_tool_call`方法会被合并成一条链，封装到`ToolNode`里，在每次调用tool前后执行。
+2. 所有middleware的`wrap_model_call`方法也会被合并成一条链，封装到一个`model_node`里，在每次模型调用前后执行。
+3. 所有middleware的`before_agent`/`after_agent`/`before_model`/`after_model`方法，**各自会被封装成LangGraph里的一个Node**，并依次添加之间的边，在指定时机/条件下执行
+4. 同一个middleware不能多次使用，否则会抛异常提醒有重复的middlware
+
+最重要的原则如下：
+
+> 每个middleware继承`AgentMiddleware`时，**最好只实现其中一个hook方法**——尽量遵守**单一职责**的实践；
+>
+> 即使要实现多个hook方法，这些方法之间**不要有关联或者访问共享变量的操作**，因为根据源码里的逻辑，这些方法都是被拆分开使用的，`AgentMiddleware`抽象类技巧子类只不过是一个方法封装的容器而已，这也要求`AgentMiddleware`子类里最好不要定义实例属性存放共享状态。
 
 
 
@@ -1098,6 +1161,13 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 ### `agents`模块
 
 旧版本构建Agent的方式，已经**被标记为废弃**，后续不再支持，建议使用 LangGraph 构建 Agent 应用。
+
+
+
+---------------------------------------------------
+# LangChain-Community
+
+LangChain-Community是一个第三方社区扩展包，提供了一些常用的功能。
 
 
 
