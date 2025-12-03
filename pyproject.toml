@@ -112,14 +112,15 @@ uv_nlp = [
 #]
 # --- langchain v1.0.x 版本，发布于 2025-10-18 ---
 uv_llm = [
-	"openai >=1.0.0",
+	"openai >= 1.0.0",
 #	"langchain-core",  # 无需显式指定版本
-	"langchain-classic >=1.0.0",  # 为了兼容 v0.3 代码，v1.0.0 提供了一个兼容模块
+	"langchain-classic >= 1.0.0",  # 为了兼容 v0.3 代码，v1.0.0 提供了一个兼容模块
 	"langchain >=1.0.0",
-	"langchain-community >=0.4.1",
-	"langgraph >=1.0.0",
-	"langchain-openai >=1.0.0",
-	"langchain-ollama >=1.0.0",
+	"langchain-community >= 0.4.1",
+	"langgraph >= 1.0.0",
+	"langchain-openai >= 1.0.0",
+	"langchain-ollama >= 1.0.0",
+	"langchain-mcp-adapters >= 0.1.10",
 	"mcp[cli] >= 1.12.0",
     "fastmcp >= 2.10.0"
 ]

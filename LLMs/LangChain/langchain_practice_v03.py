@@ -5,30 +5,30 @@ import os
 from typing import Optional, Dict, List, Union
 from typing_extensions import Annotated, TypedDict
 from pydantic import BaseModel, Field
-# --- 模型包装器的基类 ---
+# ------ 模型包装器抽象基类 ------
 from langchain_core.language_models.base import BaseLanguageModel
 from langchain_core.language_models.llms import BaseLLM, LLM
 from langchain_core.language_models.chat_models import BaseChatModel, SimpleChatModel
-# --- LLM 模型包装器 ---
+# ------ LLM 模型包装器实现类 ------
 # from langchain.llms import OpenAI, ChatGLM, Tongyi, Ollama, VLLM  # 这个用法过时了，它只是从下面的 langchain_community.llms 中导入对应对象
-# from langchain_community.llms import OpenAI, ChatGLM, Tongyi, Ollama, VLLM
-# 上面的导入其实是从下面位置导入的包装器对象
+from langchain_community.llms import OpenAI, ChatGLM, Tongyi, Ollama, VLLM
+# langchain_community.llms 其实是从下面位置导入的包装器对象
 # from langchain_community.llms.openai import OpenAI
-# 不过对于 OpenAI 客户端，官方文档又建议后续直接从下面单独的 langchain-openai 包里导入
-from langchain_openai.llms import OpenAI
+# from langchain_community.llms.chatglm import ChatGLM
+# from langchain_community.llms.tongyi import Tongyi
 # from langchain_community.llms.ollama import Ollama
+# from langchain_community.llms.vllm import VLLM
+# 但是对于 **一线模型厂商**，有专门的langchain包，建议直接从对应的第三方包里导入
+from langchain_openai.llms import OpenAI
 from langchain_ollama.llms import OllamaLLM
-from langchain_community.llms.vllm import VLLM
-from langchain_community.llms.tongyi import Tongyi
-from langchain_community.llms.chatglm import ChatGLM
-# --- ChatLLM 模型包装器 ---
+# ------ ChatLLM 模型包装器实现类 ------
 from langchain.chat_models import init_chat_model    # 模型初始化函数，根据名称自动选择模型
 # from langchain_community.chat_models import ChatOpenAI, ChatOllama
-# 对于 ChatOpenAI、ChatOllama，官方文档建议后续从 langchain_openai、langchain_ollama 包中导入
+# from langchain_community.chat_models import ChatLlamaCpp, ChatTongyi, ChatHuggingFace
+# 对于 **一线模型厂商**，有专门的langchain包，建议直接从对应的第三方包里导入
 from langchain_openai.chat_models import ChatOpenAI
 from langchain_ollama.chat_models import ChatOllama
-from langchain_community.chat_models import ChatLlamaCpp, ChatTongyi, ChatHuggingFace
-# ----------
+# ------ Message + Prompt 核心抽象 ------
 from langchain_core.messages import ChatMessage, SystemMessage, HumanMessage, AIMessage, ToolMessage, FunctionMessage
 from langchain_core.prompts import StringPromptTemplate, PromptTemplate
 from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplate, HumanMessagePromptTemplate, \
@@ -36,7 +36,7 @@ from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplat
 from langchain_core.prompts import FewShotPromptTemplate, FewShotChatMessagePromptTemplate, PipelinePromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser, PydanticOutputParser, MarkdownListOutputParser
 from langchain_core.output_parsers import JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser
-# ----------
+# ------ 文档解析 + Embedding  ------
 # document_loaders, embeddings, vectorstores, retrievers 都是 langchain_community 包里的内容，官方建议直接从langchain_community包中导入
 from langchain_core.documents import Document
 from langchain_community.document_loaders import TextLoader, CSVLoader, JSONLoader, WebBaseLoader
@@ -44,12 +44,12 @@ from langchain_community.embeddings import OpenAIEmbeddings, OllamaEmbeddings, H
 # from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvus, OpenSearchVectorSearch, \
 #     SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
 # from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
-# ----------
+# ------ 底层Runnable抽象接口 ------
 from langchain_core.tracers.schemas import Run
 from langchain_core.runnables import RunnableConfig, RunnableLambda, RunnableSequence, RunnableBinding, RunnableParallel
 from langchain_core.callbacks import BaseCallbackHandler, CallbackManager, StdOutCallbackHandler
 from langchain_core.runnables.passthrough import RunnablePassthrough, RunnableAssign, RunnablePick
-# ----------
+# ------ 对话历史相关组件 ------
 from langchain.chains.llm import LLMChain
 from langchain_core.memory import BaseMemory
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -57,11 +57,11 @@ from langchain.memory import ConversationBufferMemory
 # from langchain.memory import ChatMessageHistory, FileChatMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory, FileChatMessageHistory
 from langchain_core.runnables import RunnableWithMessageHistory
-# ----------
+# ------ 工具调用相关组件 ------
 from langchain_core.tools import BaseTool, BaseToolkit, Tool, StructuredTool, tool
 # from langchain.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
-# ----------
+# ------ 其他 ------
 from langchain.globals import set_verbose
 from langchain.callbacks.tracers import ConsoleCallbackHandler
 
