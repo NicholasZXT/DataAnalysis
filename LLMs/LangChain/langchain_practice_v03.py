@@ -50,20 +50,20 @@ from langchain_core.runnables import RunnableConfig, RunnableLambda, RunnableSeq
 from langchain_core.callbacks import BaseCallbackHandler, CallbackManager, StdOutCallbackHandler
 from langchain_core.runnables.passthrough import RunnablePassthrough, RunnableAssign, RunnablePick
 # ------ 对话历史相关组件 ------
-from langchain.chains.llm import LLMChain
 from langchain_core.memory import BaseMemory
 from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.runnables import RunnableWithMessageHistory
+from langchain.chains.llm import LLMChain
 from langchain.memory import ConversationBufferMemory
 # from langchain.memory import ChatMessageHistory, FileChatMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory, FileChatMessageHistory
-from langchain_core.runnables import RunnableWithMessageHistory
 # ------ 工具调用相关组件 ------
 from langchain_core.tools import BaseTool, BaseToolkit, Tool, StructuredTool, tool
 # from langchain.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 # ------ 其他 ------
-from langchain.globals import set_verbose
-from langchain.callbacks.tracers import ConsoleCallbackHandler
+# from langchain.globals import set_verbose
+# from langchain.callbacks.tracers import ConsoleCallbackHandler
 
 # --- vLLM 部署 ---
 # API_KEY = 'Empty'

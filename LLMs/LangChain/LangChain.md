@@ -6,14 +6,14 @@ LangChain & LangGraph 框架于 2025-10-18 **同时正式发布了 v1.0 版本**
 
 LangChain & LangGraph 框架 v1.0 的官方（Python）文档地址也变更为 [LangChain Docs](https://docs.langchain.com/).
 
-| 版本             | LangChain-Core | LangChain | LangGraph |
-| ---------------- | -------------- | --------- | --------- |
+| 版本         | LangChain-Core | LangChain | LangGraph |
+|------------|----------------|-----------|-----------|
 | v0.x最后一个版本 | 0.3.80         | 0.3.27    | 0.6.11    |
 
 `langchain-community`包目前还没有升级到v1.x版本，好像变化不大。
 
+------
 ## LangChain
-
 
 官方文档：
 
@@ -70,8 +70,11 @@ LangChain v0.3版本，官方文档介绍时的第一句话是：
 
 `langchain-core`包依然存在，并且依旧定义了`langchain`所有抽象组件，包括v0.3版本的`Runnable`接口抽象。
 
-`langchain-community`包也依旧存在，不过一个重要变化是：之前在langchain-v0.3版本，会直接导入`langchain-community`里的内容，v1.0版本不再直接导出了，需要用户手动显式直接从`langchain-community`里导入。
+`langchain-community`包也依旧存在，不过一个重要变化是：之前在`langchain`v0.3版本，会直接导入`langchain-community`里的内容，
+v1.0版本不再直接导出了，需要用户手动显式直接从`langchain-community`里导入。
 
+
+------
 ## LangGraph
 
 官方文档：
@@ -85,10 +88,10 @@ LangChain v0.3版本，官方文档介绍时的第一句话是：
 
 不过**由于v1.0的LangChain已经以LangGraph为基石进行了核心组件的重写，官方建议一般直接使用LangChain-v1.0即可，不太需要直接基于LangGraph来构建Agent**。
 
+------
 ## Deep-Agents
 
 Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
-
 
 
 ------
@@ -96,7 +99,6 @@ Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 # LangChain-Core:v1.0
 
 简单看了下v1.0版本的`langchain-core`模块源码，感觉大体上相比v0.3.x变化不大，核心还是基于`Runnable`接口抽象实现。
-
 
 ## `messages`模块
 
@@ -117,8 +119,7 @@ v1.0版本的`langchain`包只有如下模块了。
 - `langchian.embeddings`
 - `langchain.agents`
 
-> 删除了v0.3版本里的`langchain.chains`、`langchain.memory`等模块。
-
+> 删除了 v0.3 版本里的`langchain.chains`、`langchain.memory`等模块。
 
 
 ## middleware
@@ -161,18 +162,17 @@ Agent里的middleware调用时机如官方文档图片所示：
 
 研究`create_agent()`函数源码发现，middleware的使用有如下几个要注意的地方：
 
-1. 所有middleware的`wrap_tool_call`方法会被合并成一条链，封装到`ToolNode`里，在每次调用tool前后执行。
-2. 所有middleware的`wrap_model_call`方法也会被合并成一条链，封装到一个`model_node`里，在每次模型调用前后执行。
-3. 所有middleware的`before_agent`/`after_agent`/`before_model`/`after_model`方法，**各自会被封装成LangGraph里的一个Node**，并依次添加之间的边，在指定时机/条件下执行
-4. 同一个middleware不能多次使用，否则会抛异常提醒有重复的middlware
+- 所有middleware的`wrap_tool_call`方法会被合并成一条链，封装到`ToolNode`里，在每次调用tool前后执行。
+- 所有middleware的`wrap_model_call`方法也会被合并成一条链，封装到一个`model_node`里，在每次模型调用前后执行。
+- 所有middleware的`before_agent`/`after_agent`/`before_model`/`after_model`方法，**各自会被封装成LangGraph里的一个Node**，并依次添加之间的边，在指定时机/条件下执行
+- 同一个middleware不能多次使用，否则会抛异常提醒有重复的middlware
 
 最重要的原则如下：
 
 > 每个middleware继承`AgentMiddleware`时，**最好只实现其中一个hook方法**——尽量遵守**单一职责**的实践；
 >
-> 即使要实现多个hook方法，这些方法之间**不要有关联或者访问共享变量的操作**，因为根据源码里的逻辑，这些方法都是被拆分开使用的，`AgentMiddleware`抽象类技巧子类只不过是一个方法封装的容器而已，这也要求`AgentMiddleware`子类里最好不要定义实例属性存放共享状态。
-
-
+> 即使要实现多个hook方法，这些方法之间**不要有关联或者访问共享变量的操作**，因为根据源码里的逻辑，这些方法都是被拆分开使用的，
+> `AgentMiddleware`抽象类及其子类只不过是一个封装方法的容器而已，这也要求`AgentMiddleware`子类里最好不要定义实例属性存放共享状态。
 
 
 ---------------------------------------------------
@@ -181,7 +181,7 @@ Agent里的middleware调用时机如官方文档图片所示：
 
 以下是对 LangChain v0.3版本 的各个package进行简单总结。
 
-> LangChain v0.3 版本的文档现在只能在Github历史提交记录里看到了https://github.com/langchain-ai/langchain/tree/v0.3/docs/docs。
+> LangChain v0.3 版本的文档现在只能在Github历史提交记录里看到了：https://github.com/langchain-ai/langchain/tree/v0.3/docs/docs。
 
 package名称为`langchain_core`，需要关注的有如下内容。  
 
@@ -250,10 +250,9 @@ package名称为`langchain_core`，需要关注的有如下内容。
 - `RunnableEach`:
 
 
-
 #### `config.py`和`configurable.py`
 
-`config.py`模块定义了`RunnableConfig`类 —— 实际上就是一个Dict对象，用于封装运行时参数，可封装的参数如下：
+`config.py`模块定义了`RunnableConfig`类 —— 它实际上就是一个Dict对象，用于封装运行时参数，可封装的参数如下：
 - run_id: UUID类型
 - run_name: str类型，Runnable对象名称
 - metadata: dict
@@ -431,6 +430,7 @@ module主要内容有：
 
 ---------------------------------------------------
 ## Model IO相关
+
 ### `language_model`模块
 
 主要有两类：
@@ -445,7 +445,7 @@ module主要内容有：
   - `LLM`, 继承自`BaseLLM`，自定义LLM时，应当继承此类。
 - `chat_models.py`
   - `BaseChatModel`，所有聊天模型的基类，定义了使用时的方法。
-  - `SimpleChatModel`，继承自`BaseChatModel`，自定义ChatModel时，应当继承此类。
+  - `SimpleChatModel`，继承自`BaseChatModel`，**自定义ChatModel时，应当继承此类**。
 
 
 **使用说明**
@@ -495,7 +495,7 @@ module主要内容有：
 
 用于封装 prompts 和 chat conversations 中的信息。
 
-主要是和 prompts 模块中的 ChatMessagePromptTemplate 和 ChatPromptTemplate 搭配使用。
+主要是和 prompts 模块中的 `ChatMessagePromptTemplate` 和 `ChatPromptTemplate` 搭配使用。
 
 > 此模块只在`langchain_core`模块中有，可以直接使用，不需要在`langchain`等模块中继承。
 
@@ -505,7 +505,7 @@ module主要内容有：
   - `BaseMessage`，所有消息的基类——注意，**它并不是抽象类**。
   - `BaseMessageChunk`，所有消息块的基类，大致类似于 `List[BaseMessage]`，这个**也不是抽象类**。
 
-> 实际上 `BaseMessage` 是 pydantic的`BaseModel`子类。
+> 实际上 `BaseMessage` 也是 pydantic的`BaseModel`子类。
 
 - `chat.py`, 通用 Message 类
   - `ChatMessage`
@@ -616,12 +616,14 @@ module主要内容有：
 
 ### `prompt_values.py`
 
-定义了 Prompt Template 的输出值。
+封装了 Prompt Template 的输出值。
 
 内容如下：
 - `PromptValue`: 封装了 prompt 的输出值，这个类是一个**抽象类**
-  - 它继承自`Serializable`——也是pydantic的`BaseModel`子类，它也是下面所有类的基类。
-  - 主要定义了两个方法：`def to_messages(self) -> list[BaseMessage]` 和 `def to_string(self) -> str`
+  - 它继承自`Serializable` —— 也是pydantic的`BaseModel`子类，它也是下面所有类的基类。
+  - 主要定义了两个方法：
+    - `def to_messages(self) -> list[BaseMessage]`
+    - `def to_string(self) -> str`
 
 - `StringPromptValue`: 继承自`PromptValue`，用于封装字符串类型的 prompt 输出值。     
   - 有如下属性：
@@ -639,8 +641,8 @@ module主要内容有：
 **使用说明**
 
 `PromptValue` 类及其子类的作用是封装提示词模板的输出，以便适用于不同的任务，使用时主要关注两个方法：
-- `to_string() -> str`: 将提示模板转换为一个纯字符串，这是大多数基础 LLM 期望的输入格式。
-- `to_messages() -> List[BaseMessage]`: 将提示模板转换为一个消息对象列表。这是聊天模型期望的输入格式。
+- `to_string() -> str`: 将提示模板转换为一个纯字符串，这是大多数**基础对话LLM**期望的输入格式。
+- `to_messages() -> List[BaseMessage]`: 将提示模板转换为一个消息对象列表，这是**聊天模型**期望的输入格式。
 
 
 ### `output` 和 `output_parsers` 模块
@@ -1226,7 +1228,7 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 ## `config.py`
 
 ---------------------------------------------------
-## `graph`模块
+## `graph`模块 - KEY
 
 ### ~~`graph.py`~~
 
@@ -1316,7 +1318,7 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 
 ---------------------------------------------------
-## `checkpoint`模块
+## `checkpoint`模块 - KEY
 
 此模块对应的是LangGraph里的短期记忆机制，只维护每次会话内的历史消息记录。
 
@@ -1344,7 +1346,7 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 
 ---------------------------------------------------
-## `store`模块
+## `store`模块 - KEY
 
 此模块对应于 LangGraph 的长期记忆机制，用于保存和加载长期记忆。
 
