@@ -6,12 +6,13 @@ from typing import Optional, Dict, List, Union
 from typing_extensions import Annotated, TypedDict
 from pydantic import BaseModel, Field
 # ------ 模型包装器抽象基类（langchain-core提供） ------
-from langchain_core.language_models.base import BaseLanguageModel
-from langchain_core.language_models.llms import BaseLLM, LLM
-from langchain_core.language_models.chat_models import BaseChatModel, SimpleChatModel
+from langchain_core.language_models.base import BaseLanguageModel  # 下面所有模型的抽象基类
+from langchain_core.language_models.llms import BaseLLM, LLM  # LLM 继承自 BaseLLM
+from langchain_core.language_models.chat_models import BaseChatModel, SimpleChatModel  # SimpleChatModel 继承自 BaseChatModel
 # ------ LLM 模型包装器实现类 ------
 # from langchain.llms import OpenAI, ChatGLM, Tongyi, Ollama, VLLM  # 这个用法过时了，它只是从下面的 langchain_community.llms 中导入对应对象
-from langchain_community.llms import OpenAI, ChatGLM, Tongyi, Ollama, VLLM
+# from langchain_community.llms import OpenAI, Ollama
+from langchain_community.llms import ChatGLM, Tongyi, VLLM
 # langchain_community.llms 其实是从下面位置导入的包装器对象
 # from langchain_community.llms.openai import OpenAI
 # from langchain_community.llms.chatglm import ChatGLM
@@ -22,7 +23,6 @@ from langchain_community.llms import OpenAI, ChatGLM, Tongyi, Ollama, VLLM
 from langchain_openai.llms import OpenAI
 from langchain_ollama.llms import OllamaLLM
 # ------ ChatLLM 模型包装器实现类 ------
-from langchain.chat_models import init_chat_model    # 模型初始化函数，根据名称自动选择模型
 # from langchain_community.chat_models import ChatOpenAI, ChatOllama
 # from langchain_community.chat_models import ChatLlamaCpp, ChatTongyi, ChatHuggingFace
 # 对于 **一线模型厂商**，有专门的langchain包，建议直接从对应的第三方包里导入
@@ -35,7 +35,8 @@ from langchain_core.messages import ChatMessage, SystemMessage, HumanMessage, AI
 from langchain_core.prompts import StringPromptTemplate, PromptTemplate
 from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplate, HumanMessagePromptTemplate, \
     AIMessagePromptTemplate, SystemMessagePromptTemplate, ChatPromptTemplate
-from langchain_core.prompts import FewShotPromptTemplate, FewShotChatMessagePromptTemplate, PipelinePromptTemplate
+from langchain_core.prompts import FewShotPromptTemplate, FewShotChatMessagePromptTemplate
+# from langchain_core.prompts import PipelinePromptTemplate
 # ------ OutputParser  ------
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser, PydanticOutputParser, MarkdownListOutputParser
 from langchain_core.output_parsers import JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser
@@ -51,7 +52,7 @@ from langchain_core.chat_history import BaseChatMessageHistory
 # from langchain_core.memory import BaseMemory
 from langchain_classic.memory import BaseMemory
 # from langchain.memory import ConversationBufferMemory
-from langchain_classic.memory import ConversationMemory
+from langchain_classic.memory import ConversationBufferMemory
 # from langchain.chains.llm import LLMChain
 from langchain_classic.chains.llm import LLMChain
 # from langchain.memory import ChatMessageHistory, FileChatMessageHistory
@@ -98,8 +99,8 @@ from langchain.agents.middleware import SummarizationMiddleware, HumanInTheLoopM
 API_KEY = 'Empty'
 LLM_URL = 'http://localhost:11434'
 # MODEL = 'qwen2.5:7b'
-MODEL = 'qwen3:8b'
-# MODEL = 'qwen2.5:14b'
+# MODEL = 'qwen3:8b'
+MODEL = 'qwen2.5:14b'
 # MODEL = 'qwen3:14b'
 
 # ======================= LLM + ChatLLM 模型包装器 使用 =======================
@@ -125,12 +126,15 @@ def llm_usage():
     )
 
     input_str = "请解释下机器学习算法SVM的原理"
+    # 同步调用，会等到全部回答生成后才会返回结果
     res = client_llm.invoke(input=input_str)
     print(res)
 
+    # 流式输出
     for res in client_llm.stream(input=input_str):
         print(res, end='')
 
+    # 批量调用
     inputs = ["请解释下机器学习算法SVM的原理", "请解释下机器学习算法GBDT的原理"]
     res = client_llm.batch(inputs=inputs)
     print(res[0])
@@ -158,16 +162,37 @@ def chat_llm_usage():
         top_p=1,
         keep_alive='30m'
     )
+
     messages = [
-        {'role': 'system', 'content': '你是一个机器学习方面的专家'},
+        {'role': 'system', 'content': '你是一位机器学习方面的专家'},
         {'role': 'user', 'content': '请问什么是SVM算法'},
     ]
+
+    # 同步调用
     res = client_chat.invoke(input=messages)
+    print(type(res))   # <class 'langchain_core.messages.ai.AIMessage'>
     # print(res)
     print(res.content)
+    # 还可以获取响应的元数据，包含模型信息
+    print(res.response_metadata)
+    print(res.response_metadata.get('model', None))
+    print(res.response_metadata.get('model_name', None))
+    print(res.response_metadata.get('model_provider', None))
+    # 获取使用量
+    print(res.usage_metadata)
 
+    # content_blocks 是 v1.0 新增的字段
+    print(type(res.content_blocks))    # <class 'list'>
+    for content_block in res.content_blocks:
+        print(type(content_block))    # <class 'dict'>
+        print(content_block.keys())   # dict_keys(['type', 'text'])
+        print(content_block)
+
+    # 流式响应
     for res in client_chat.stream(input=messages):
         print(res.content, end='')
+    # 流式响应每次返回的对象类型是 AIMessageChunk
+    print(type(res))   # <class 'langchain_core.messages.ai.AIMessageChunk'>
 
     # Callable调用，不过只支持 List[BaseMessage] 参数，并且被标记为deprecated
     msg = [SystemMessage(content='你是一个机器学习方面的专家'), HumanMessage(content='请问什么是SVM算法')]
@@ -213,12 +238,30 @@ def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
     print(f"\n===> Using model '{MODEL}' with {client_chat.get_name()}\n")
     return client_chat
 
+def simple_chat():
+    client_chat = get_client_chat()
+    msg = [
+        # HumanMessage(content='RTX 4060 Ti 16GB跑本地大模型怎么样？'),
+        # 只有手动在消息前面加上 /no_think，对于 qwen3 的think模式才会有效，但是此时仍然会输出一个空的 <think></think> 块
+        HumanMessage(content='/no_think RTX 4060 Ti 16GB跑本地大模型怎么样？'),
+    ]
+    # res = client_chat.invoke(input=msg)
+    # print(res)
+    for chunk in client_chat.stream(input=msg):
+        print(chunk.content, end='')
+
+
 # ======================= Message + PromptTemplate 使用 =======================
 def message_usage():
     """
-
+    对于 ChatModel 来说，每次对话的最小单元就是 Message。
     官方文档[Messages](https://python.langchain.com/docs/concepts/messages/)
-    展示各类 Message 封装类的使用
+    展示各类 Message 封装类的使用:
+    - SystemMessage: 设置模型身份的消息
+    - HumanMessage: 用户输入的消息
+    - AIMessage: 模型返回的消息
+    - ToolMessage: 工具调用返回的消息
+    - ChatMessage: 通用消息
     """
     # ----- ChatMessage 使用 -----
     chat_msg = ChatMessage(role='user', content='Hello ChatGPT')
@@ -252,6 +295,9 @@ def message_usage():
 
 
 def prompt_template_usage():
+    """
+    Completion模型使用的 PromptTemplate。
+    """
     # StringPromptTemplate含有抽象方法，不能实例化
     # pt = StringPromptTemplate(input_variables=["p1", "p2"], template="content-1: {p1}, content-2: {p2}")
 
@@ -359,16 +405,23 @@ def chat_prompt_template_usage():
         print(msg)
 
 
-def placeholder_usage():
+def message_placeholder_usage():
+    """
+    MessagesPlaceholder，顾名思义，一个用于在提示模板（PromptTemplate）中动态插入对话历史消息的占位符组件
+    注意，MessagesPlaceholder 只能用于 ChatPromptTemplate 中，不能搭配 PromptTemplate 使用。
+    主要作用就是在 ChatPromptTemplate 中预留一个位置，用于在运行时动态传入一系列 BaseMessage（如 HumanMessage, AIMessage, SystemMessage 等）。
+    """
     # ------ MessagesPlaceholder 使用 ------
-    # 注意，MessagesPlaceholder 只能用于 ChatPromptTemplate 中，不能搭配 PromptTemplate 使用
     # 使用 optional=True，表示这个变量是可选的，如果不传，则不会报错，但会返回空列表
     prompt = MessagesPlaceholder(variable_name="history", optional=True)
     # 如果没有 optional=True，下面会抛异常
     print(prompt.format_messages())
-    # 传入一系列消息
+    # 传入的对象必须是 List[BaseMessage]
     history = [("system", "You are an AI assistant."), HumanMessage(content="Hello!")]
     res = prompt.format_messages(history=history)
+    print(type(res))     # <class 'list'>
+    print(type(res[0]))  # <class 'langchain_core.messages.system.SystemMessage'>
+    print(type(res[1]))  # <class 'langchain_core.messages.human.HumanMessage'>
     print(res)
     for msg in res:
         print(msg.content)
@@ -377,6 +430,7 @@ def placeholder_usage():
     chat_prompt = ChatPromptTemplate.from_messages(
         messages=[
             ("system", "你是一个智能助手，负责回答用户的问题。"),
+            # 这里表示后续会通过 history 插入一系列的对话历史，history 必须是一个 List[BaseMessage]
             MessagesPlaceholder("history"),
             ("human", "{user_input}")
         ]
@@ -477,20 +531,6 @@ def pipeline_prompt_usage():
     """
     ...
 
-
-def simple_chat():
-    client_chat = get_client_chat()
-    msg = [
-        # HumanMessage(content='RTX 4060 Ti 16GB跑本地大模型怎么样？'),
-        # 只有手动在消息前面加上 /no_think，对于 qwen3 的think模式才会有效，但是此时仍然会输出一个空的 <think></think> 块
-        HumanMessage(content='/no_think RTX 4060 Ti 16GB跑本地大模型怎么样？'),
-    ]
-    # res = client_chat.invoke(input=msg)
-    # print(res)
-    for chunk in client_chat.stream(input=msg):
-        print(chunk.content, end='')
-
-
 # ======================= Output Parser 使用 =======================
 def output_parser_usage():
     """
@@ -500,16 +540,27 @@ def output_parser_usage():
     - JsonOutputParser: 以JSON格式返回
     - PydanticOutputParser: 以Pydantic对象返回，它继承自JsonOutputParser
     - MarkdownListOutputParser: 以MarkDown列表形式返回
+
+    每个Parser类需要实现两个方法：
+    - get_format_instructions() 方法，用于返回一段提示词，告诉模型需要返回的格式
+    - parse(text: str) 方法，用于将模型的输出（字符串）解析成指定格式
+
+    参考 v1.x 版本的OutputParser接口说明：https://reference.langchain.com/python/langchain_core/output_parsers/
+    OutputParser 是早期用于解决获取模型输出格式的方案，随着大模型的发展，大部分模型都原生支持了 Structured Output 功能，
+    OutputParser 的使用似乎没有那么必要了，但是Langchain选择保留下来，是为了兼容那些暂时不支持 Structured Output 的模型，
+    以及提供更加深入自定义解析的功能。
     """
     class MyModel(BaseModel):
         name: str
         age: int
         position: str
         achievements: List[str]
+
     # 先实例化一个 parser 对象，可以通过 get_format_instructions 查看该Parser的格式化提示词指令
     # parser = StrOutputParser() # 注意，StrOutputParser没有提示词，因为它原样输出
     # parser = JsonOutputParser(pydantic_object=MyModel)
     parser = PydanticOutputParser(pydantic_object=MyModel)
+    # 获取格式化提示词指令
     format_instructions = parser.get_format_instructions()
     print(format_instructions)
     # 注意模版最后的 {format_instructions}，它并不在 input_variables 中填充
@@ -560,17 +611,26 @@ def structured_output_usage():
     """
     展示如何输出结构化的内容，参考官方文档：
     [How-to-Guides -> How to return structured data from a model](https://python.langchain.com/docs/how_to/structured_output/)
-    这里主要是使用 BaseLanguageModel 定义的抽象方法 with_structured_output，该方法接受一个 schema，用于描述模型输出的字段，返回一个 Runnable 对象。
+
+    注意：Structured Output 和上面的 Output Parser 原理并不一样，它不是通过在提示词中告诉模型输出什么格式，
+    而是借助于大模型原生的能力，在接口调用中通过 response_format (OpenAI API)、format (Ollama) 之类的
+    专用参数指定大模型需要返回JSON结构的回答，因此需要对应的模型原生支持此功能。
+
+    LangChain主要是通过 BaseLanguageModel 定义的抽象方法 with_structured_output（无默认实现）实现此功能。
+    该方法接受一个 schema，用于描述模型输出的字段，返回一个 Runnable 对象。
     一般有 3 种指定 schema 的方式：
     1. TypedDict
     2. JSON Schema
     3. Pydantic Model
     使用 1和2 返回的是一个 dict，使用 3 返回的是对应 Pydantic Model 的对象
-    with_structured_output 方法的实现交给了具体的模型类，但不是所有的模型类都实现了此方法。
-    **一般只有 ChatModel 有此方法，因为 BaseChatModel 提供了一个默认实现**。
-    具体有哪些模型实现了， 可以参考 https://python.langchain.com/docs/integrations/chat/#featured-providers 表格。
-    """
 
+    with_structured_output() 方法的实现交给了具体的模型类，但不是所有的模型类都实现了此方法。
+    特别是 LLM 类的模型，大都没有实现此方法
+    **一般只有 ChatModel 有此方法，因为 BaseChatModel 提供了一个默认实现**。
+    此外，查看源码可以发现，with_structured_output() 需要该模型实现 bind_tools() 方法。
+
+    具体有哪些模型实现了，可以参考 https://python.langchain.com/docs/integrations/chat/#featured-providers 表格。
+    """
     class JokeDict(TypedDict):
         """Joke to tell user."""
         setup: Annotated[str, ..., "The setup of the joke"]
@@ -589,8 +649,10 @@ def structured_output_usage():
 
     client_chat = get_client_chat()
     print(type(client_chat))
-    print(getattr(client_chat, 'with_structured_output'))
+    # 检查Chat模型类是否实现了 bind_tools 方法
     print(getattr(client_chat, 'bind_tools'))
+    # 检查Chat模型类是否实现了 with_structured_output 方法
+    print(getattr(client_chat, 'with_structured_output'))
     # 如果使用 ChatOllama，不要使用从 langchain_community.chat_models 导入的 ChatOllama，
     # 而是使用 langchain_ollama.chat_models 里的 ChatOllama，因为前者没有实现自己的 bind_tools 方法，会报错
 
@@ -601,11 +663,20 @@ def structured_output_usage():
     print(res_dict)
 
     structured_chat_model = client_chat.with_structured_output(schema=JokeModel)
-    # 如果使用了 include_raw=True，那么返回的 res_model 是一个 dict，而不是一个 Pydantic Model
-    # structured_chat_model = client_chat.with_structured_output(schema=JokeModel, include_raw=True)
+    print(type(structured_chat_model))  # <class 'langchain_core.runnables.base.RunnableSequence'>
     res_model = structured_chat_model.invoke("Tell me a joke about cats")
-    print(type(res_model))
+    print(type(res_model))  # <class '__main__.JokeModel'>
     print(res_model)
+
+    # 如果使用了 include_raw=True，那么返回的 res_model 是一个 dict，而不是一个 Pydantic Model
+    structured_chat_model = client_chat.with_structured_output(schema=JokeModel, include_raw=True)
+    res_model = structured_chat_model.invoke("Tell me a joke about cats")
+    print(type(res_model))   # <class 'dict'>
+    print(res_model.keys())  # dict_keys(['raw', 'parsed', 'parsing_error'])
+    print(type(res_model['raw']))      # <class 'langchain_core.messages.ai.AIMessage'>
+    print(type(res_model['parsed']))   # <class '__main__.JokeModel'>
+    print(res_model['parsing_error'])  # 解析有异常时才有值
+    print(res_model['parsed'])
 
 
 # ======================= Chain 相关模块使用 =======================
@@ -617,9 +688,11 @@ def runnable_usage():
     def add_one(x: int) -> int:
         """单参函数"""
         return x + 1
+
     def add(inputs: tuple[int, int]) -> int:
         """多参函数，必须通过 tuple 或者 dict 传入然后解包"""
         return inputs[0] + inputs[1]
+
     run1 = RunnableLambda(func=add_one, name='add_one_runnable')
     print(run1)
     print(run1.invoke(input=1))
@@ -712,6 +785,9 @@ def runnable_other_usage():
 
 
 def chain_usage():
+    """
+    v0.3.x 版本提供的 LLMChain 使用，v1.x 版本中已经不推荐使用了。
+    """
     client_llm = get_client_llm()
     client_chat = get_client_chat()
     template = "Tell me a {adjective} joke about {content}."
@@ -750,6 +826,7 @@ def chain_usage():
     print(res_chat)
 
 
+# ======================= Callback 使用 =======================
 class MyCustomHandler(BaseCallbackHandler):
     def on_llm_start(self, serialized, prompts, **kwargs):
         print("--->>> LLM 调用开始！")
@@ -760,20 +837,25 @@ class MyCustomHandler(BaseCallbackHandler):
         # print(f"<<<--- 返回结果: {response}")
 
 def callback_usage():
-    # LangChain的Callback一般是由`BaseLLM`/`BaseChatModel`/`Chain`对象封装，不直接和Runnable基础类配合使用
+    """
+    展示LangChain里 callback 的使用。
+    LangChain的Callback一般是由`BaseLLM`/`BaseChatModel`/`Chain`对象封装，不直接和Runnable基础类配合使用
+    """
     input_str = "请解释下机器学习算法SVM的原理"
-    # 第1种方式
+
+    # 第1种设置 callback 的方式：全局设置
     client_llm_v1 = OpenAI(
         openai_api_key=API_KEY,
         openai_api_base=LLM_URL,
         model_name=MODEL,
+        # 设置全局的 callback，每次模型调用都会触发
         callbacks=[MyCustomHandler()]
     )
     res = client_llm_v1.invoke(input=input_str)
     print("--------------------------------")
     print(res)
 
-    # 第2种方式
+    # 第2种方式：使用 CallbackManager 配置：全局设置
     callback_manager = CallbackManager(handlers=[MyCustomHandler()])
     client_llm_v2 = OpenAI(
         openai_api_key=API_KEY,
@@ -787,7 +869,7 @@ def callback_usage():
     print("--------------------------------")
     print(res)
 
-    # 第3种方式，在invoke方法里配置callback
+    # 第3种方式：在invoke方法里配置callback，单次调用配置
     client_llm_v3 = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
     # res = client_llm_v3.invoke(input=input_str, config={'callbacks': [MyCustomHandler()]})
     res = client_llm_v3.invoke(input=input_str, config={'callbacks': [MyCustomHandler()]})
@@ -795,6 +877,7 @@ def callback_usage():
     print(res)
 
 
+# ======================= 短期记忆Memory 使用 =======================
 def memory_usage():
     # ----- 早期版本基于 BaseMemory 实现的使用 -----
     cb_memory = ConversationBufferMemory()
@@ -842,6 +925,7 @@ def memory_usage():
     print(res2_history)
 
 
+# ======================= 对话历史 =======================
 def chat_history_usage():
     # ----- 基于 BaseChatMessageHistory 实现的使用 -----
     # --- 单独使用 ---
@@ -946,7 +1030,7 @@ def runnable_history_usage():
     print(store.keys())
 
 
-# ======================= Agent 相关模块使用 =======================
+# ======================= 工具调用 相关模块使用 =======================
 def tool_usage():
     """
     LangChain tool使用，参考官方文档:
@@ -1160,7 +1244,7 @@ def main():
     # chat_llm_usage()
     # prompt_template_usage()
     # chat_prompt_template_usage()
-    # placeholder_usage()
+    # message_placeholder_usage()
     # fewshot_prompt_template_usage()
     # pipeline_prompt_usage()
     simple_chat()
