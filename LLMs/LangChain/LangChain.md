@@ -100,6 +100,53 @@ Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 
 简单看了下v1.0版本的`langchain-core`模块源码，感觉大体上相比v0.3.x变化不大，核心还是基于`Runnable`接口抽象实现。
 
+包内容如下：
+```text
+## langchain_core v1.0.1 模块及文件
+### 子模块
+- api
+- callbacks
+- document_loaders
+- documents
+- embeddings
+- example_selectors
+- indexing
+- language_models
+- load
+- messages
+- output_parsers
+- outputs
+- prompts
+- runnables
+- tools
+- tracers
+- utils
+- vectorstores
+
+### 根目录文件
+- __init__.py
+- _import_utils.py
+- agents.py
+- caches.py
+- chat_history.py
+- chat_loaders.py
+- chat_sessions.py
+- env.py
+- exceptions.py
+- globals.py
+- prompt_values.py
+- pydantic.py
+- rate_limiters.py
+- retrievers.py
+- stores.py
+- structured_query.py
+- sys_info.py
+- version.py
+```
+
+对比 v0.3.x 版本的包结构，可以发现基本没有变化，说明`langchain_core`作为基础包，没有大的变动。
+
+
 ## `messages`模块
 
 `base.py` 里的 `BaseMessage` 基类，新增了一个`content_block`属性，用于统一消息内容：
@@ -113,13 +160,37 @@ Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 
 v1.0版本的`langchain`包只有如下模块了。
 
-- `langchain.messages`
-- `langchain.chat_models`
-- `langchain.tools`
-- `langchian.embeddings`
-- `langchain.agents`
+```text
+## langchain v1.0.1 模块及文件
+### 子模块
+- messages
+- chat_models
+- tools
+- embeddings
+- agents
+- rate_limiters
 
-> 删除了 v0.3 版本里的`langchain.chains`、`langchain.memory`等模块。
+### 根目录文件
+- __init__.py
+- pytyped
+```
+
+相比于 v0.3.80 版本里，删除了如下模块：
+- `langchain.chains`
+- `langchain.memory`
+- `langchain.callbacks`
+- `langchain.document_loaders`
+- `langchain.document_transformers`
+- `langchain.evaluation`
+- `langchain.output_parsers`
+- `langchain.prompts`
+- `langchain.retrievers`
+- `langchain.vectorstores`
+- ...
+
+应该说，`langchain` v1.x 的包里，只有 `agents` 和 `tools` 模块有实质性的内容，其他的模块都很简略，大部分是从 langchain-core 中导入。
+
+其实从 v0.3.x 版本开始，`langchain` 包里的一些模块就只是 `langchain_core` 模块里对应包的导入套壳了。
 
 
 ## middleware
@@ -186,6 +257,54 @@ Agent里的middleware调用时机如官方文档图片所示：
 package名称为`langchain_core`，需要关注的有如下内容。  
 
 大部分模块的说明可以在该模块的 `__init__.py` 文件中找到。
+
+`langchain_core` v0.3.80 版本的源码内容如下：
+
+```text
+## langchain_core 模块及文件
+### 子模块
+- api
+- beta
+- callbacks
+- document_loaders
+- documents
+- embeddings
+- example_selectors
+- indexing
+- language_models
+- load
+- messages
+- output_parsers
+- outputs
+- prompts
+- pydantic_v1
+- runnables
+- tools
+- tracers
+- utils
+- vectorstores
+
+### 根目录文件
+- __init__.py
+- _import_utils.py
+- agents.py
+- caches.py
+- chat_history.py
+- chat_loaders.py
+- chat_sessions.py
+- env.py
+- exceptions.py
+- globals.py
+- memory.py
+- prompt_values.py
+- pydantic.py
+- rate_limiters.py
+- retrievers.py
+- stores.py
+- structured_query.py
+- sys_info.py
+- version.py
+```
 
 ---------------------------------------------------
 ## Chain基础
@@ -891,8 +1010,59 @@ langchain-core里的agents内容并没有太多，主要在langchain包里。
 
 # LangChain:v0.3
 
-module名称为`langchain`，所有的模块可以分为如下6大类：
+module名称为`langchain`，源码内容如下：
 
+```text
+## langchain v0.3.27 模块及文件
+### 子模块
+- api
+- adapters
+- callbacks
+- chains
+- chat_models
+- docstore
+- document_loaders
+- document_transformers
+- embeddings
+- evaluation
+- graphs
+- indexes
+- llms
+- load
+- memory
+- output_parsers
+- prompts
+- pydantic_v1
+- retrievers
+- runnables
+- schema
+- smith
+- storage
+- tools
+- utilities
+- utils
+- vectorstores
+
+### 根目录文件
+- __init__.py
+- base_language.py
+- cache.py
+- env.py
+- example_generator.py
+- formatting.py
+- globals.py
+- hub.py
+- input.py
+- model_laboratory.py
+- pytyped
+- python.py
+- requests.py
+- sequapi.py
+- sql_database.py
+- text_splitter.py
+```
+
+所有的模块可以分为如下6大类：
 
 
 ## Chain核心模块
@@ -1170,6 +1340,10 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 # LangChain-Community
 
 LangChain-Community是一个第三方社区扩展包，提供了一些常用的功能。
+
+`langchain_community` 包并没有随着 LangChain-Core 和 LangChain 一起升级到 v1.x 版本，而是升级到 v0.4.x 版本。
+
+查看两个版本的源码内容也可以发现，两者变化并不大。
 
 
 
