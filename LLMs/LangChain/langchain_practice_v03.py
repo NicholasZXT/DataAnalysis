@@ -1,11 +1,11 @@
 """
-LangChain 入门使用练习 —— 基于 v0.3.x 版本
+LangChain 入门使用练习，适用于 v0.3.x 和 v1.x 版本.
 """
 import os
 from typing import Optional, Dict, List, Union
 from typing_extensions import Annotated, TypedDict
 from pydantic import BaseModel, Field
-# ------ 模型包装器抽象基类 ------
+# ------ 模型包装器抽象基类（langchain-core提供） ------
 from langchain_core.language_models.base import BaseLanguageModel
 from langchain_core.language_models.llms import BaseLLM, LLM
 from langchain_core.language_models.chat_models import BaseChatModel, SimpleChatModel
@@ -28,42 +28,67 @@ from langchain.chat_models import init_chat_model    # 模型初始化函数，�
 # 对于 **一线模型厂商**，有专门的langchain包，建议直接从对应的第三方包里导入
 from langchain_openai.chat_models import ChatOpenAI
 from langchain_ollama.chat_models import ChatOllama
+# ---- langchain v1.x 提供的模型统一初始化函数 ---
+from langchain.chat_models import init_chat_model
 # ------ Message + Prompt 核心抽象 ------
 from langchain_core.messages import ChatMessage, SystemMessage, HumanMessage, AIMessage, ToolMessage, FunctionMessage
 from langchain_core.prompts import StringPromptTemplate, PromptTemplate
 from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplate, HumanMessagePromptTemplate, \
     AIMessagePromptTemplate, SystemMessagePromptTemplate, ChatPromptTemplate
 from langchain_core.prompts import FewShotPromptTemplate, FewShotChatMessagePromptTemplate, PipelinePromptTemplate
+# ------ OutputParser  ------
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser, PydanticOutputParser, MarkdownListOutputParser
 from langchain_core.output_parsers import JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser
-# ------ 文档解析 + Embedding  ------
-# document_loaders, embeddings, vectorstores, retrievers 都是 langchain_community 包里的内容，官方建议直接从langchain_community包中导入
-from langchain_core.documents import Document
-from langchain_community.document_loaders import TextLoader, CSVLoader, JSONLoader, WebBaseLoader
-from langchain_community.embeddings import OpenAIEmbeddings, OllamaEmbeddings, HuggingFaceEmbeddings
-# from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvus, OpenSearchVectorSearch, \
-#     SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
-# from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
 # ------ 底层Runnable抽象接口 ------
 from langchain_core.tracers.schemas import Run
 from langchain_core.runnables import RunnableConfig, RunnableLambda, RunnableSequence, RunnableBinding, RunnableParallel
 from langchain_core.callbacks import BaseCallbackHandler, CallbackManager, StdOutCallbackHandler
 from langchain_core.runnables.passthrough import RunnablePassthrough, RunnableAssign, RunnablePick
 # ------ 对话历史相关组件 ------
-from langchain_core.memory import BaseMemory
-from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.runnables import RunnableWithMessageHistory
-from langchain.chains.llm import LLMChain
-from langchain.memory import ConversationBufferMemory
+from langchain_core.chat_history import BaseChatMessageHistory
+# 下面3个组件，从 v1.x 版本开始被移动到 langchain_classic 包中了
+# from langchain_core.memory import BaseMemory
+from langchain_classic.memory import BaseMemory
+# from langchain.memory import ConversationBufferMemory
+from langchain_classic.memory import ConversationMemory
+# from langchain.chains.llm import LLMChain
+from langchain_classic.chains.llm import LLMChain
 # from langchain.memory import ChatMessageHistory, FileChatMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory, FileChatMessageHistory
 # ------ 工具调用相关组件 ------
-from langchain_core.tools import BaseTool, BaseToolkit, Tool, StructuredTool, tool
+from langchain_core.tools import BaseTool, BaseToolkit, Tool, StructuredTool, tool, InjectedToolArg, InjectedState, ToolException
+# 上面的大部分内容， langchain.tools 包里也导入了
+# from langchain.tools import BaseTool, tool, InjectedToolArg, InjectedState, ToolException
 # from langchain.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
+# ------ Embedding  ------
+from langchain.embeddings import Embeddings, init_embeddings
+# ------ 文档解析及加载 ------
+# document_loaders, embeddings, vectorstores, retrievers 都是 langchain_community 包里的内容，官方建议直接从langchain_community包中导入
+from langchain_core.documents import Document
+from langchain_community.document_loaders import TextLoader, CSVLoader, JSONLoader, WebBaseLoader
+from langchain_community.embeddings import OpenAIEmbeddings, OllamaEmbeddings, HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvus, OpenSearchVectorSearch, \
+    SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
+from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
 # ------ 其他 ------
 # from langchain.globals import set_verbose
 # from langchain.callbacks.tracers import ConsoleCallbackHandler
+
+# ======================================================================================================================
+# ------ v1.0 里统一的 agent 创建API ------
+from langchain.agents import create_agent
+from langchain.agents.structured_output import ToolStrategy, ProviderStrategy
+# ------ middleware，v1.0版本一个更新亮点 ------
+from langchain.agents.middleware import (
+    AgentMiddleware, AgentState, ModelRequest, ModelResponse,
+    before_agent, after_agent, before_model, after_model, wrap_model_call, wrap_tool_call, hook_config
+)
+# 自带的 middleware 实现
+from langchain.agents.middleware import SummarizationMiddleware, HumanInTheLoopMiddleware, ModelCallLimitMiddleware, \
+    ToolCallLimitMiddleware
+
 
 # --- vLLM 部署 ---
 # API_KEY = 'Empty'
@@ -188,37 +213,10 @@ def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
     print(f"\n===> Using model '{MODEL}' with {client_chat.get_name()}\n")
     return client_chat
 
-# ======================= PromptTemplate + Message 使用 =======================
-def prompt_template_usage():
-    # StringPromptTemplate含有抽象方法，不能实例化
-    # pt = StringPromptTemplate(input_variables=["p1", "p2"], template="content-1: {p1}, content-2: {p2}")
-
-    # PromptTemplate 是 Completion 模型使用的基础模版
-    template = "Tell me a {adjective} joke about {content}."
-
-    # 第1种：直接实例化
-    pt1 = PromptTemplate(input_variables=["adjective", "content"], template=template)
-    # 一般使用如下两个方法：
-    # 1. format方法直接返回字符串
-    pt1.format(adjective="funny", content="chickens")
-    # 2. format_prompt方法返回 <class 'langchain_core.prompt_values.StringPromptValue'>
-    pv1 = pt1.format_prompt(adjective="funny", content="chickens")
-    print(type(pv1))
-    print(pv1)  # text='Tell me a funny joke about chickens.'
-    # StringPromptValue 只需要关注如下两个方法：
-    print(pv1.to_string())
-    print(pv1.to_messages())
-
-    # 第2种：使用类方法 from_template —— 推荐这种方式
-    pt2 = PromptTemplate.from_template(template=template)
-    pt2.format(adjective="nice", content="dog")
-    print(pt2.template)
-    print(pt2.template_format)
-    print(pt2.input_variables)
-
-
+# ======================= Message + PromptTemplate 使用 =======================
 def message_usage():
     """
+
     官方文档[Messages](https://python.langchain.com/docs/concepts/messages/)
     展示各类 Message 封装类的使用
     """
@@ -251,6 +249,34 @@ def message_usage():
     msg_add = ChatMessage(role='user', content='Hello ChatGPT', thinking=True, additional_kwargs={'some': 'something'})
     msg_add = SystemMessage(content='You are a helpful assistant.', thinking=True, additional_kwargs={'some': 'something'})
     print(msg_add)
+
+
+def prompt_template_usage():
+    # StringPromptTemplate含有抽象方法，不能实例化
+    # pt = StringPromptTemplate(input_variables=["p1", "p2"], template="content-1: {p1}, content-2: {p2}")
+
+    # PromptTemplate 是 Completion 模型使用的基础模版
+    template = "Tell me a {adjective} joke about {content}."
+
+    # 第1种：直接实例化
+    pt1 = PromptTemplate(input_variables=["adjective", "content"], template=template)
+    # 一般使用如下两个方法：
+    # 1. format方法直接返回字符串
+    pt1.format(adjective="funny", content="chickens")
+    # 2. format_prompt方法返回 <class 'langchain_core.prompt_values.StringPromptValue'>
+    pv1 = pt1.format_prompt(adjective="funny", content="chickens")
+    print(type(pv1))
+    print(pv1)  # text='Tell me a funny joke about chickens.'
+    # StringPromptValue 只需要关注如下两个方法：
+    print(pv1.to_string())
+    print(pv1.to_messages())
+
+    # 第2种：使用类方法 from_template —— 推荐这种方式
+    pt2 = PromptTemplate.from_template(template=template)
+    pt2.format(adjective="nice", content="dog")
+    print(pt2.template)
+    print(pt2.template_format)
+    print(pt2.input_variables)
 
 
 def chat_prompt_template_usage():
@@ -466,9 +492,9 @@ def simple_chat():
 
 
 # ======================= Output Parser 使用 =======================
-# LangChain的输出解析器是和提示词配合使用的，它会在提示词的末尾增加一段要求大模型输出指定格式的指令。
 def output_parser_usage():
     """
+    LangChain的输出解析器是和提示词配合使用的，它会在提示词的末尾增加一段要求大模型输出指定格式的指令。
     常用的有如下几种Parser:
     - StrOutputParser: 原样返回
     - JsonOutputParser: 以JSON格式返回
@@ -580,35 +606,6 @@ def structured_output_usage():
     res_model = structured_chat_model.invoke("Tell me a joke about cats")
     print(type(res_model))
     print(res_model)
-
-
-# ======================= 数据检索相关模块使用 =======================
-def document_loader_usage():
-    file_path = os.path.join(os.getcwd(), 'test.txt')
-    print(os.path.exists(file_path))
-    txt_loader = TextLoader(file_path=file_path, autodetect_encoding=True)
-    docs = txt_loader.load()
-    doc = docs[0]
-    print(doc.id)
-    print(doc.metadata)
-    print(doc.type)
-    print(doc.page_content)
-    print(doc)
-
-
-def text_embedding_usage():
-    # TODO
-    pass
-
-
-def vector_store_usage():
-    # TODO
-    pass
-
-
-def retriever_usage():
-    # TODO
-    pass
 
 
 # ======================= Chain 相关模块使用 =======================
@@ -1127,6 +1124,36 @@ def tool_parser_usage():
     final_res = client_chat_with_tool.invoke(input=messages)
     print(type(final_res))
     print(final_res.content)
+
+
+# ======================= 数据检索相关模块使用 =======================
+def document_loader_usage():
+    file_path = os.path.join(os.getcwd(), 'test.txt')
+    print(os.path.exists(file_path))
+    txt_loader = TextLoader(file_path=file_path, autodetect_encoding=True)
+    docs = txt_loader.load()
+    doc = docs[0]
+    print(doc.id)
+    print(doc.metadata)
+    print(doc.type)
+    print(doc.page_content)
+    print(doc)
+
+
+def text_embedding_usage():
+    # TODO
+    pass
+
+
+def vector_store_usage():
+    # TODO
+    pass
+
+
+def retriever_usage():
+    # TODO
+    pass
+
 
 def main():
     # llm_usage()
