@@ -321,20 +321,23 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 #### `base.py`
 
-**`Runnable`**
+##### `Runnable`
 
 它是LangChain里大部分对象执行的基本单元对象，是LangChain里的核心抽象基类，
 详细介绍可以参考官方文档[Conceptual Guide -> Runnable interface](https://python.langchain.com/docs/concepts/runnables/).
 
 它重载了运算符`|`（重写了`__or__`/`__oro__`方法），并提供了`pipe`方法，为LCEL的 `|` 语法提供了支持。
 
+`Runnable` 是抽象类（继承自`ABC`），同时也是泛型类，定义了泛型`Generic[Input, Output]`。
+
 `Runnable`只定义了一个`name`属性，用于标识Runnable对象的名称。
 
 `Runnable`定义了如下常用的接口方法:
-  - `invoke`/`ainvoke`: 输入单条，输出结果
-  - `batch`/`abatch`: 批量invoke，输出结果
-  - `stream`/`astream`: 流式调用invoke
-  - `batch_as_completed`/`abatch_as_completed`: 批量invoke直到完成
+- `invoke`/`ainvoke`: 输入单条，输出结果。这里的 `invoke` 方法被标记为抽象方法，所以继承 `Runnable` 时，必须实现 `invoke` 方法。
+- `batch`/`abatch`: 批量invoke，输出结果
+- `stream`/`astream`: 流式调用invoke
+- `batch_as_completed`/`abatch_as_completed`: 批量invoke直到完成
+- `transform`/`atransform`: 用于将输入转换成输出，底层默认是调用`stream`/`astream`方法
 
 > 上述所有方法中，只有 `invoke` 方法是抽象方法，其他方法都有默认实现，所以如果要继承 `Runnable` 时，必须要实现的方法只有 `invoke`。
 
@@ -350,7 +353,7 @@ package名称为`langchain_core`，需要关注的有如下内容。
 上面的`with_listeners`/`with_alisteners`方法接受的Callable对象签名是：`Union[Callable[[Run], None], Callable[[Run, RunnableConfig], None]]`
 
 
-**`RunnableSerializable`**
+##### `RunnableSerializable`
 
 继承自 `load`模块的`Serializable` + `Runnable`，是大部分LLM/ChatLLM的基类，**注意，它不是抽象类，不过一般不会直接使用**。
 
@@ -358,20 +361,50 @@ package名称为`langchain_core`，需要关注的有如下内容。
 - `configurable_fields`: 
 - `configurable_alternatives`: 
 
+##### `RunnableLambda` - KEY
 
-上面两个类是整个`runnable`模块的基础，除此之外，`base.py`文件里，还提供了一些Runnable的常用封装类，方便使用，列举如下：
-- `RunnableLambda`: 用于将任意Callable对象封装成Runnable对象，很常用
+继承自`Runnable`类，用于将任意`Callable`对象封装成`Runnable`对象，很常用。
+
+可以对异步或非异步函数进行封装，但**不适合以stream方式返回的函数** —— 这种情况应该使用 `RunnableGenerator`。
+
+##### `RunnableGenerator`
+
+继承自`Runnable`类，用于将任意`Generator`对象封装成`Runnable`对象，**适合以stream方式返回的函数**。
+
+##### `RunnableBinding` - KEY
+
+用于对`Runnable`对象进行封装并附加一些参数/属性，并返回一个`RunnableBinding`对象 —— 对原有的`Runnable`对象进行了包装。   
+它相当于一个 **Runnable 装饰器**，LangChain框架内部很多地方都用到了它。
+
+它继承自`RunnableBindingBase`类（此类继承自`RunnableSerializable`），该类定义了如下属性：
+- `bound: Runnable[Input, Output]`，内部包装的 `Runnable` 对象
+- `config: RunnableConfig`，附加到 `bound` 对象的运行配置
+
+`RunnableBindingBase`类还重写了`invoke`, `batch`, `stream` 等方法，将这些方法的调用附加`config`配置后转发给 `bound` 对象，并返回结果。
+
+`RunnableBinding`类定义了如下几个方法，和`Runnable`里的方法对应。
+- `bind()`
+- `with_config()`
+- `with_listeners()`
+- `with_types()`
+- `with_retry()`
+
+
+##### 总结
+
+`Runnable` 和 `RunnableSerializable` 两个类是整个`runnable`模块的基础。
+
+除此之外，`base.py`文件里，还提供了一些Runnable的常用封装类，方便使用，列举如下：
 - `RunnableSequence`: 组合多个Runnable对象，LCEL语法的 `|` 运算符返回的就是这个对象，也很常用
-- `RunnableBinding`: 对Runnable对象进行封装并附加一些参数/属性，**相当于 Runnable 装饰器**，LangChain框架内部很多地方都用到了它。
 - `RunnableParallel`: 用于并行执行多个 Runnable 对象。
   它将输入数据分发给多个独立的处理步骤，并将它们的结果合并为一个输出字典。
-- `RunnableGenerator`:
 - `RunnableEach`:
 
 
 #### `config.py`和`configurable.py`
 
-`config.py`模块定义了`RunnableConfig`类 —— 它实际上就是一个Dict对象，用于封装运行时参数，可封装的参数如下：
+`config.py`模块定义了`RunnableConfig`类 —— 它实际上就是一个Dict对象（`TypedDict`），用于封装`Runnable`对象运行时参数。    
+默认定义的`Runnable`参数如下：
 - run_id: UUID类型
 - run_name: str类型，Runnable对象名称
 - metadata: dict
@@ -476,25 +509,38 @@ callbacks模块一般是由`BaseLLM`/`BaseChatModel`/`Chain`对象封装，不�
 
 module主要内容有：
 
-- `base.py`: 定义了回调函数的 Mixin 类，回调函数通过 callback handler 定义
-  - 一系列Mixin类，大致可以分为如下几类：
-    - `RetrieverManagerMixin`, `LLMManagerMixin`, `ChainManagerMixin`, `ToolManagerMixin`
-    - `CallbackManagerMixin`
-    - `RunManagerMixin`   
-    这些Mixin类分别定义了各种类型事件的调用方法，比如`on_llm_start`/`on_chat_model_start`/`on_chain_start`等。
-  - `BaseCallbackHandler`: 同步回调函数handler的接口类，继承了上面大部分的 Mixin 类
-  - `AsyncCallbackHandler`: 异步回调函数handler的接口类
-  - `BaseCallbackManager`: 回调函数管理器的基础类
-    - 它提供了一系列注册、管理 `BaseCallbackHandler`/`AsyncCallbackHandler` 的方法，以列表的形式存放所有的 callbackhandler
-    - 它继承了`CallbackManagerMixin`，但是**并没有实现其中的事件方法**，所以应当看做抽象类
+#### `base.py`
 
-- `manager.py`: 实现了一系列回调管理器的类和方法，需要关注的有如下几个：
-  - `CallbackManager`: 同步callback handler管理器，继承自`BaseCallbackManager`，实现了其中的事件方法，在对应事件方法里依次调用注册的callbackhandler。
-  - `AsyncCallbackManager`: 异步callback handler管理器，继承自`BaseCallbackManager`
-  - `handle_event()`函数：具体执行调用回调函数的地方
+定义了回调函数的 Mixin 类，回调函数通过 callback handler 定义 一系列Mixin类，大致可以分为如下几类：
+
+- `RetrieverManagerMixin`, `LLMManagerMixin`, `ChainManagerMixin`, `ToolManagerMixin`
+- `CallbackManagerMixin`
+- `RunManagerMixin`   
+
+这些Mixin类分别定义了各种类型事件的调用方法，比如`on_llm_start`/`on_chat_model_start`/`on_chain_start`等。
+
+此外，还定义了一系列的 CallbackHandler：
+
+- `BaseCallbackHandler`: 同步回调函数handler的接口类，继承了上面大部分的 Mixin 类
+- `AsyncCallbackHandler`: 异步回调函数handler的接口类
+- `BaseCallbackManager`: 回调函数管理器的基础类
+  - 它提供了一系列注册、管理 `BaseCallbackHandler`/`AsyncCallbackHandler` 的方法，以列表的形式存放所有的 callbackhandler
+  - 它继承了`CallbackManagerMixin`，但是**并没有实现其中的事件方法**，所以应当看做抽象类
+
+
+#### `manager.py`
+
+实现了一系列回调管理器的类和方法，需要关注的有如下几个：
+- `CallbackManager`: 同步callback handler管理器，继承自`BaseCallbackManager`，实现了其中的事件方法，在对应事件方法里依次调用注册的callbackhandler。
+- `AsyncCallbackManager`: 异步callback handler管理器，继承自`BaseCallbackManager`
+- `handle_event()`函数：具体执行调用回调函数的地方
+
+#### 其他
 
 - `file.py`: 定义了一个`FileCallbackHandler`供使用，继承自`BaseCallbackHandler`，实现了部分事件方法
+
 - `stdout.py`: 定义了一个`StdOutCallbackHandler`供使用，继承自`BaseCallbackHandler`，实现了部分事件方法
+
 - `streaming_stdout.py`: 定义了一个`StreamingStdOutCallbackHandler`供使用，继承自`BaseCallbackHandler`
 
 
@@ -897,7 +943,7 @@ module内容如下：
 ---------------------------------------------------
 ## Memory相关
 
-从langchain v0.3.3 版本开始，memory模块被表示为废弃。  
+**从langchain v0.3.3 版本开始，memory模块被表示为废弃**。  
 
 官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议转向使用 LangGraph.
 
@@ -957,12 +1003,13 @@ LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 module内容如下：
 - `base.py`
-  - `BaseTool`: 所有工具类的抽象基类，它继承了 `RunnableSerializable`，所以也是一个Pydantic的`BaseModel`子类。
+  - `BaseTool`: 所有工具类的抽象基类，它继承了 `RunnableSerializable`，所以也是一个Pydantic的`BaseModel`子类。    
+     它定义了Langchain里Tool需要实现的接口，只有一个抽象方法`_run()`（异步版本的`_arun()`方法底层调用的也是这个）需要子类实现具体的工具调用逻辑
   - `BaseToolkit`: 所有工具集类的抽象基类，它没有继承 `BaseTool`，不过继承了Pydantic的`BaseModel`。
 - `simple.py`
-  - `Tool`: 工具类，继承自 `BaseTool`
+  - `Tool`: 工具类，继承自 `BaseTool`，实现了`_run()`方法。
 - `structured.py`
-  - `StructuredTool`: 结构化工具类，继承自 `BaseTool`
+  - `StructuredTool`: 结构化工具类，继承自 `BaseTool`，实现了`_run()`方法 —— 推荐使用这个。
 - `convert.py`: 提供了`@tool`装饰器，用于将函数转换为工具类（`StructuredTool`对象或者`Tool`对象）。
 - `render.py`
 - `reriever.py`
