@@ -837,51 +837,109 @@ module主要内容有：
   - `MarkdownListOutputParser`
 - `openai_function.py`
 
+
 ---------------------------------------------------
-## 数据检索相关
+## Memory相关
 
-构建LEDVR工作流相关的模块:
-- Loader: 加载器，用于加载Document数据
-- Embedding: 向量嵌入，生成Document的Text Embedding向量
-- Documentation Transform: 对Document进行转换，生成新的Document
-- VectorStore: 向量数据库，用于存储Document的Text Embedding向量
-- Retriever: 向量检索器，统一封装VectorStore的检索功能
+官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议转向使用 LangGraph.
+
+根据上面的官方文档，Langchain 里有关 Memory 的设计思路经历了3个阶段：
+1. 基于 `BaseMemory` (`langchain_core.memory.py`) 的早期设计
+2. 基于 `RunnableWithMessageHistory` (`langchian_core.runnables.history.py`) 或 
+   `BaseChatMessageHistory` (`lanchain_core.chat_history.py`) 的设计，这个设计思路还在沿用，适用于简单的场景
+3. 基于 LangGraph 的思路，这个是后续的发展方向
+
+`BaseChatMessageHistory` 是和 `langchain.memory` 模块的 `ChatBaseMemory` 配合使用的，大致流程是 `ChatBaseMemory` 会
+将历史聊天记录的存储委托给某个 `BaseChatMessageHistory` 实现类来进行。
+
+`RunnableWithMessageHistory` 的使用方式不一样，它是**为了和 LangGraph 配合使用，并且支持 LCEL 表达式**。
+
+LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 
-### `document_loaders`模块
+### `memory.py`
 
-> 还有一个 `load` 模块，该模块提供了序列化和反序列化相关的工具.
+**从langchain v0.3.3 版本开始，memory模块被表示为废弃，并在 v1.x 版本被移除了**。  
 
-module内容如下：
-- `base.py`
-  - `BaseLoader`: 所有 Loader 的抽象基类——定义了统一接口
-  - `BaseBlobParser`: 
-- `blob_loaders.py`
-  - `BlobLoader`
-- `langsmith.py`
-  - `LangSmithLoader`
+只提供了一个类：`BaseMemory`，所有memory的基类，提供了一些通用的接口。   
 
+`BaseMemory`继承了`Serializable`，所以也是一个Pydantic的`BaseModel`子类。
+
+`BaseMemory`定义了如下抽象方法：
+- `memory_variables`: 返回`list[str]`，表示此memory提供了哪些key给模型使用。
+- `load_memory_variables`/`aload_memory_variables`: 返回一个字典
+- `save_context`/`asave_context`: 保存上下文的输入和输出信息
+- `clear`/`aclear`: 清空上下文信息
+
+
+### `chat_history.py`
+
+内容如下：
+- `BaseChatMessageHistory`: 用于表示聊天历史记录的抽象基类
+- `InMemoryChatMessageHistory`: 存放在内存中的聊天历史记录简单实现类
+
+`BaseChatMessageHistory`定义了一个属性`messages: list[BaseMessage]`，还定义了如下抽象方法：
+- `add_message`: 用于添加消息
+- `add_messages`/`aadd_messages`: 用于批量添加消息
+- `add_user_message`/`add_ai_message`: 用于添加用户/AI消息
+- `aget_messages`: 异步获取历史消息
+- `clear`/`aclear`: 清空历史消息
+
+`InMemoryChatMessageHistory`就是一个简单的基于内存列表的`BaseChatMessageHistory`实现类。
 
 **使用说明**
 
-`BaseLoader`里定义了如下接口：
-- `load`/`aload`: 加载数据，返回 `List[Document]`
-- `lazy_load`/`alazy_load`: 迭代加载数据，返回 `Iterator[Document]`
-- `load_and_split`: 加载并分割数据，返回 `List[Document]`
+`BaseChatMessageHistory`有两种使用方式：
+1. 配合`langchain.memory.chat_memory.py`里的`BaseChatMemory`一起使用的，这种方式已经不太推荐了。
+2. 配合下面的 `RunnableWithMessageHistory`一起使用 —— 这种方式比较推荐。
 
-这几个方法也是所有Loader的通用方法。
+
+### `runnables.history.py`
+
+此文件里定义了 `RunnableWithMessageHistory` 类，它和上面的 memory 模块、chat_history 模块的使用方式差异很大。
+
+`RunnableWithMessageHistory` 主要作用是对一个 `Runnable`对象 和它的 对话历史 进行封装管理。
+为了管理对话历史，它要求在每次调用时，都提供一个 `session_id` ，用于确定内部的 `Runnable` 对象的对话历史。
+
+它初始化时，需要提供如下参数：
+- `runnable: Runnable`: 需要被包装的 `Runnable` 对象，此对象的输入是 `list[BaseMessage]`，返回值是 `str | BaseMessage | MessagesOrDictWithMessages`
+- `get_session_history`: 一个Callable对象，它的参数一般是一个`session_id`，然后返回该session的 `BaseChatMessageHistory` 对象
+- `input_messages_key`:
+- `output_messages_key`:
+- `history_messages_key`:
+- `history_factory_config`:
+
+
+---------------------------------------------------
+## 数据检索（RAG）相关
+
+LangChain 中将数据检索（RAG）分为以下几个步骤：
+
+1. Loader: 加载器，用于加载Document数据
+2. Documentation Transform: 对Document进行转换，也就是 Text-Splitter，生成 Chunks
+3. Embedding: 向量嵌入，生成Document/Chunks的Text Embedding向量 
+4. VectorStore: 向量数据库，用于存储Document/Chunks的Text Embedding向量 
+5. Retriever: 向量检索器，统一封装VectorStore的检索功能
+
+> 注意，langchain-core 里的以下模块，从 v0.3.x 到 v1.x 版本的变化不大。
+
 
 ### `documents`模块
 
+定义了LangChain里的文档对象的通用表示。
+
 module内容如下：
-- `base.py`
-  - `BaseMedia`: 所有 Media 的抽象基类，Media 包括text
-  - `Blob`
-  - `Document`: 文档的基类，包含text和metadata —— KEY
-- `compressor.py`
-  - `BaseDocumentCompressor`
-- `transformers.py`
-  - `BaseDocumentTransformer`
+
+`base.py`
+- `BaseMedia`: 所有 Media 的抽象基类，Media 包括text
+- `Blob`: 文档的二进制数据（raw data）
+- `Document`: 文档的基类，包含text和metadata —— KEY
+
+`compressor.py`
+- `BaseDocumentCompressor`
+
+`transformers.py`
+- `BaseDocumentTransformer`
 
 **使用说明**
 
@@ -892,6 +950,32 @@ module内容如下：
 `Document`继承自 `BaseMedia`，新增如下两个属性：
 - `type`: 固定是 Document
 - `page_content`: str，文档的文本内容
+
+
+### `document_loaders`模块
+
+> 还有一个 `load` 模块，该模块提供了序列化和反序列化相关的工具.
+
+module内容如下：
+
+`base.py`
+- `BaseLoader`: 所有 Loader 的抽象基类——定义了统一接口
+- `BaseBlobParser`: 
+
+`blob_loaders.py`
+- `BlobLoader`
+
+`langsmith.py`
+- `LangSmithLoader`
+
+**使用说明**
+
+`BaseLoader`里定义了如下接口：
+- `load`/`aload`: 加载数据，返回 `List[Document]`
+- `lazy_load`/`alazy_load`: 迭代加载数据，返回 `Iterator[Document]`
+- `load_and_split`: 加载并分割数据，返回 `List[Document]`
+
+这几个方法也是所有Loader的通用方法。
 
 
 ### `embeddings`模块
@@ -909,13 +993,15 @@ module内容如下：
 ### `vectorstores`模块
 
 module内容如下：
-- `base.py`
-  - `VectorStore`: 所有 VectorStore 的抽象基类
-  - `VectorStoreRetriever`: 所有 VectorStoreRetriever 的抽象基类，它继承自 `retrievers.py`里的`BaseRetriever`
-- `in_memory.py`
-  - `InMemoryVectorStore`
-- `utils.py`
 
+`base.py`
+- `VectorStore`: 所有 VectorStore 的抽象基类
+- `VectorStoreRetriever`: 所有 VectorStoreRetriever 的抽象基类，它继承自 `retrievers.py`里的`BaseRetriever`
+
+`in_memory.py`
+- `InMemoryVectorStore`
+
+`utils.py`
 
 **使用说明**   
 
@@ -937,64 +1023,8 @@ module内容如下：
 
 ### `retriever.py`
 
-module内容如下：
-- `BaseRetriever`类
+定义了 `BaseRetriever`类，继承自 `RunnableSerializable`，因此也是通过通用方法 `invoke()`/`ainvoke()` 进行调用。
 
----------------------------------------------------
-## Memory相关
-
-**从langchain v0.3.3 版本开始，memory模块被表示为废弃**。  
-
-官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议转向使用 LangGraph.
-
-根据上面的官方文档，Langchain 里有关 Memory 的设计思路经历了3个阶段：
-1. 基于`BaseMemory`的早期设计
-2. 基于 `RunnableWithMessageHistory` 或 `BaseChatMessageHistory` 的设计，这个设计思路还在沿用，适用于简单的场景
-3. 基于 LangGraph 的思路，这个是后续的发展方向
-
-`BaseChatMessageHistory` 是和 `langchain.memory` 模块的 `ChatBaseMemory` 配合使用的，大致流程是 `ChatBaseMemory` 会
-将历史聊天记录的存储委托给某个 `BaseChatMessageHistory` 实现类来进行。
-
-`RunnableWithMessageHistory` 的使用方式不一样，它是**为了和 LangGraph 配合使用，并且支持 LCEL 表达式**。
-
-LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
-
-
-### `memory.py`
-
-只提供了一个类：`BaseMemory`，所有memory的基类，提供了一些通用的接口。   
-
-`BaseMemory`继承了`Serializable`，所以也是一个Pydantic的`BaseModel`子类。
-
-`BaseMemory`定义了如下抽象方法：
-- `memory_variables`: 返回`list[str]`，表示此memory提供了哪些key给模型使用。
-- `load_memory_variables`/`aload_memory_variables`: 返回一个字典
-- `save_context`/`asave_context`: 保存上下文的输入和输出信息
-- `clear`/`aclear`: 清空上下文信息
-
-
-### `chat_history.py`
-
-内容如下：
-- `BaseChatMessageHistory`: 用于表示聊天历史记录的抽象基类
-- `InMemoryChatMessageHistory`: 存放在内存中的聊天历史记录简单实现类
-
-
-`BaseChatMessageHistory`定义了一个属性`messages: list[BaseMessage]`，还定义了如下抽象方法：
-- `add_message`: 用于添加消息
-- `add_messages`/`aadd_messages`: 用于批量添加消息
-- `add_user_message`/`add_ai_message`: 用于添加用户/AI消息
-- `aget_messages`: 异步获取历史消息
-- `clear`/`aclear`: 清空历史消息
-
-
-`InMemoryChatMessageHistory`就是一个简单的基于内存列表实现历史记录实现类。
-
-**使用说明**
-
-`BaseChatMessageHistory`是配合`langchain.memory.chat_memory.py`里的`BaseChatMemory`一起使用的。
-
-上面的`InMemoryChatMessageHistory`实现类其实就是`BaseChatMemory`里的`chat_memory`默认实现。
 
 ---------------------------------------------------
 ## Agent相关
@@ -1213,7 +1243,7 @@ module内容如下：
 
 
 ---------------------------------------------------
-## Memory 相关
+## Memory 相关模块
 
 ### `memeory`模块
 
@@ -1264,8 +1294,11 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `ElasticsearchChatMessageHistory`
 
 
+## 数据检索（RAG）相关模块
 
-## 数据增强
+> 以下模块，从 v0.3.x 升级到 v1.x 版本，除了 `embeddings` 模块依旧保留外，其他模块都移动到 `langchain_community`包了。
+> 实际上，即使是在 v0.3.x 模块，以下大部分模块也都是从 `langchain_community`包里导入的功能。
+> 由于 `langchain_community` 包并没有升级到 v1.x，所以可以认为 RAG 相关的模块变化不大。
 
 ### `document_loaders`模块
 
@@ -1291,6 +1324,9 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - BiliBiliLoader, 居然还有B站
 
 ### `document_transformers`模块
+
+主要从 `langchain_community.document_transformers` 里导入各种文档转换器。
+
 
 ### `embeddings`模块
 
@@ -1334,7 +1370,7 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 
 
 ---------------------------------------------------
-## Agent相关
+## Agent相关模块
 
 > LangChain的 Agent 相关模块在 0.3 版本之后有较大改动，`langchain.agents`模块里内容是之前构建Agent的方式，已被标记为废弃的，
 > 在 1.0.0 版本之前都会被保留，参加官方文档 [How to migrate from legacy LangChain agents to LangGraph](https://python.langchain.com/docs/how_to/migrate_agent/).
@@ -1374,7 +1410,6 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - RequestsPatchTool
 - RequestsPostTool
 - RequestsPutTool
-
 
 
 ### `agents`模块
