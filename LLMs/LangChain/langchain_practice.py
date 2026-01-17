@@ -72,31 +72,36 @@ from langchain_classic.memory import ConversationBufferMemory
 # --- 文档加载&转换 ---
 from langchain_core.documents import Document, BaseDocumentCompressor, BaseDocumentTransformer
 from langchain_core.document_loaders import BaseLoader, BaseBlobParser, BlobLoader, Blob
-from langchain_community.document_loaders import TextLoader, CSVLoader, JSONLoader, WebBaseLoader
+from langchain_community.document_loaders import (
+    TextLoader, CSVLoader, JSONLoader, WebBaseLoader, PyPDFLoader, PyMuPDFLoader
+)
 from langchain_community.document_transformers import (
     BeautifulSoupTransformer, Html2TextTransformer, MarkdownifyTransformer
 )
-# --- 文档转换（Text-Splitter），这个是由单独的 langchain-text-splitter 包提供的 ---
+# --- 文档转换（Text-Splitter），这个是由单独的 langchain-text-splitters 包提供的 ---
 from langchain_text_splitters.base import TextSplitter
 from langchain_text_splitters import (
     RecursiveCharacterTextSplitter, RecursiveJsonSplitter, MarkdownTextSplitter,
     NLTKTextSplitter, SpacyTextSplitter, SentenceTransformersTokenTextSplitter
 )
-# --- Embedding ---
+# --- Embedding生成 ---
 from langchain_core.embeddings import Embeddings, FakeEmbeddings
 from langchain.embeddings import init_embeddings  # langchain 包里只提供了一个通用Embedding初始化函数
-from langchain_community.embeddings import OpenAIEmbeddings, OllamaEmbeddings
-# --- 向量化存储 ---
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_ollama.embeddings import OllamaEmbeddings
+# --- 向量化存储&检索 ---
 from langchain_core.vectorstores import VectorStore, InMemoryVectorStore, VectorStoreRetriever
 from langchain_community.vectorstores import (
     Chroma, FAISS, Milvus, DuckDB, Redis, SKLearnVectorStore,
     ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
 )
-# --- 向量化检索 ---
+from langchain_elasticsearch import ElasticsearchStore
+# --- 文档检索 ---
 from langchain_core.retrievers import BaseRetriever
 from langchain_community.retrievers import (
     BM25Retriever, ElasticSearchBM25Retriever, KNNRetriever, MilvusRetriever, SVMRetriever
 )
+from langchain_elasticsearch import ElasticsearchRetriever
 # ---------- 其他 ----------
 # from langchain.globals import set_verbose
 # from langchain.callbacks.tracers import ConsoleCallbackHandler
@@ -1403,7 +1408,10 @@ def runnable_history_usage():
 # 所以可以认为 RAG 部分 v0.3.x 升级到 v1.x 并没有什么变化和影响。
 def document_loader_usage():
     """
-    Document loader 使用
+    Document loader 使用.
+    Langchain里提供的所有 DocumentLoader，都继承自 BaseLoader，只需要关注如下两个接口方法：
+    - `load`/`aload`: 加载数据，返回 `List[Document]`
+    - `lazy_load`/`alazy_load`: 迭代加载数据，返回 `Iterator[Document]`
     """
     file_path = os.path.join(os.getcwd(), 'test.txt')
     print(os.path.exists(file_path))
@@ -1429,32 +1437,123 @@ def document_transform_usage():
 # %%
 def text_splitter_usage():
     """
-    langchain-text-splitter 包专门用于对文档进行分割。
+    langchain-text-splitters 包专门用于对文档进行分割。
+    抽象基类 TextSplitter，继承自 BaseDocumentTransformer，
+    大多数情况下，推荐使用 RecursiveCharacterTextSplitter 这个实现类。
     """
-    # TODO
-    pass
+    # 加载文档
+    text_loader = TextLoader(file_path=os.path.join(os.getcwd(), 'test.txt'), autodetect_encoding=True)
+    documents: List[Document] = text_loader.load()
+    document = documents[0]
+
+    # 进行分割
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=0)
+    texts: List[str] = text_splitter.split_text(document.page_content)
+    print(len(texts))
+    for chunk in texts:
+        print(chunk)
+
 
 # %%
 def text_embedding_usage():
     """
     langchain 提供的 embedding 封装。
+    `Embeddings`抽象基类定义了如下两个接口：
+    - `embed_query`/`aembed_query`: 计算query的embedding向量，返回一个 `List[float]`
+    - `embed_documents`/`aembed_documents`: **批量计算**query的embedding向量，返回一个 `List[List[float]]`
     """
-    # TODO
-    pass
+    embeddings = OllamaEmbeddings(base_url=LLM_URL, model_name=MODEL, keep_alive='30m')
+
+    # query embedding
+    query = "如何使用Ollama获取Embeddings?"
+    query_embedding: List[float] = embeddings.embed_query(query)
+    print(len(query_embedding))
+
+    # documents embedding
+    docs = [
+        "在本地使用RTX-5060-Ti运行Ollama模型",
+        "如何使用Ollama获取Embeddings?"
+    ]
+    docs_embedding: List[List[float]] = embeddings.embed_documents(docs)
+    print(len(docs_embedding))
+    print(len(docs_embedding[0]))
+
 
 # %%
 def vector_store_usage():
     """
-    langchain 提供的向量数据库封装
+    langchain 提供的向量数据库封装.
+    `VectorStore`抽象基类是对向量数据库的抽象封装，
+    它在实例化时通常要提供一个 Embeddings 实现类对象，用于底层的 Embeddings 计算。
+    它定义了如下常用接口：
+    - `add_documents()`/`aadd_documents()`
+    - `delete`/`adelete`
+    - `get_by_ids`/`aget_by_ids`
+    - `search`/`asearch`
+    - `similarity_search`/`asimilarity_search`
     """
-    # TODO
-    pass
+    # 首先要提供一个 Embeddings 实现类对象
+    embeddings = OllamaEmbeddings(base_url=LLM_URL, model_name=MODEL, keep_alive='30m')
+
+    # 内存向量存储-测试用
+    vector_store = InMemoryVectorStore(embedding=embeddings)
+    # Chroma向量存储
+    # vector_store = Chroma(collection_name='my-chroma', embedding_function=embeddings, persist_directory='./chroma_db')
+    # ES向量存储
+    # vector_store = ElasticVectorSearch(elasticsearch_url='http://localhost:9200', index_name='my-index', embedding=embeddings)
+
+    doc1 = Document(page_content="在本地使用RTX-5060-Ti显卡运行Ollama模型")
+    doc2 = Document(page_content="如何使用Ollama获取Embeddings?")
+
+    docs_id: List[str] = vector_store.add_documents(documents=[doc1, doc2], ids=["id1", "id2"])
+    # 返回的是新添加的文档的id
+    print(docs_id)
+
+    # 删除文档
+    vector_store.delete(ids=["id1"])
+
+    # 相似度检索
+    similar_docs: List[Document] = vector_store.similarity_search(query="显卡型号", k=3)
+    print(similar_docs)
 
 
 # %%
 def retriever_usage():
     """
-    langchain 提供的向量检索封装
+    langchain 提供的文档检索封装。
+    Retriever 比 VectorStore 更加通用：给定一个 query，检索返回一系列相似的文档即可。
+    它不要求底层是向量存储，也可以是文档存储，最经典的就是ES（非向量检索）。
+
+    BaseRetriever 抽象基类继承自 `RunnableSerializable`，因此通过通用方法 `invoke()`/`ainvoke()` 进行调用即可,
+    返回类型是 List[Document]。
+    """
+    # ES-BM25向量检索包装器
+    from elasticsearch import Elasticsearch
+    es = Elasticsearch(hosts="localhost")
+    retriever = ElasticSearchBM25Retriever(es_client=es, index_name='my-index')
+
+    # ES官方向量检索
+    # retriever = ElasticsearchRetriever(es_url='http://localhost:9200', index_name='my-index')
+
+    docs: List[Document] = retriever.invoke(query="显卡型号", k=3)
+    print(len(docs))
+    doc = docs[0]
+    print(doc)
+
+
+# ======================= Langchain v1.x 的 Agent使用 =======================
+# %%
+def auto_agent_usage():
+    """
+    langchain-v1.x 的 agent 创建。
+    """
+    # TODO
+    pass
+
+# %%
+def agent_middleware_usage():
+    """
+    langchain-v1.x 的 agent middleware 使用。
     """
     # TODO
     pass

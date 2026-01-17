@@ -1,5 +1,5 @@
 """
-简单研究 LangGraph 的使用 —— 基于 v0.6.x 版本。
+简单研究 LangGraph 的使用 —— 适用于 v0.6.x / v1.x 版本。
 
 主要参考了如下官方文档：
 - [LangGraph Glossary](https://langchain-ai.github.io/langgraph/concepts/low_level/)

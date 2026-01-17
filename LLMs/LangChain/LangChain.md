@@ -985,7 +985,7 @@ module内容如下：
 
 **使用说明**   
 
-`Embeddings`是一个元类，定义了如下方法：
+`Embeddings`是一个抽象基类，定义了如下方法：
 - `embed_query`/`aembed_query`: 用于计算query的embedding向量，返回一个 `List[float]`
 - `embed_documents`/`aembed_documents`: 用于**批量计算**query的embedding向量，返回一个 `List[List[float]]`
 
@@ -1011,7 +1011,6 @@ module内容如下：
 - `delete`/`adelete`
 - `get_by_ids`/`aget_by_ids`
 - `search`/`asearch`
-- `similarity_search`/`asimilarity_search`
 - `similarity_search`/`asimilarity_search`
 - `as_retriever`: 返回一个 `VectorStoreRetriever` 对象，这个方法比较实用 —— KEY
 
