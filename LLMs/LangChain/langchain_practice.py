@@ -6,11 +6,11 @@ import os
 from typing import Optional, Dict, List, Union
 from typing_extensions import Annotated, TypedDict
 from pydantic import BaseModel, Field
-# ------ 模型包装器抽象基类（langchain-core提供） ------
+# ---------- 模型包装器抽象基类（langchain-core提供） ----------
 from langchain_core.language_models.base import BaseLanguageModel  # 下面所有模型的抽象基类
 from langchain_core.language_models.llms import BaseLLM, LLM  # LLM 继承自 BaseLLM
 from langchain_core.language_models.chat_models import BaseChatModel, SimpleChatModel  # SimpleChatModel 继承自 BaseChatModel
-# ------ LLM 模型包装器实现类 ------
+# ---------- LLM 模型包装器实现类 ----------
 # from langchain.llms import OpenAI, ChatGLM, Tongyi, Ollama, VLLM  # 这个用法过时了，它只是从下面的 langchain_community.llms 中导入对应对象
 # from langchain_community.llms import OpenAI, Ollama
 from langchain_community.llms import ChatGLM, Tongyi, VLLM
@@ -23,7 +23,7 @@ from langchain_community.llms import ChatGLM, Tongyi, VLLM
 # 但是对于 **一线模型厂商**，有专门的langchain包，建议直接从对应的第三方包里导入
 from langchain_openai.llms import OpenAI
 from langchain_ollama.llms import OllamaLLM
-# ------ ChatLLM 模型包装器实现类 ------
+# ---------- ChatLLM 模型包装器实现类 ----------
 # from langchain_community.chat_models import ChatOpenAI, ChatOllama
 # from langchain_community.chat_models import ChatLlamaCpp, ChatTongyi, ChatHuggingFace
 # 对于 **一线模型厂商**，有专门的langchain包，建议直接从对应的第三方包里导入
@@ -31,65 +31,88 @@ from langchain_openai.chat_models import ChatOpenAI
 from langchain_ollama.chat_models import ChatOllama
 # ---- langchain v1.x 提供的模型统一初始化函数 ---
 from langchain.chat_models import init_chat_model
-# ------ Message + Prompt 核心抽象 ------
+# ---------- Message + Prompt 核心抽象 ----------
 from langchain_core.messages import ChatMessage, SystemMessage, HumanMessage, AIMessage, ToolMessage, FunctionMessage
 from langchain_core.prompts import StringPromptTemplate, PromptTemplate
 from langchain_core.prompts import MessagesPlaceholder, ChatMessagePromptTemplate, HumanMessagePromptTemplate, \
     AIMessagePromptTemplate, SystemMessagePromptTemplate, ChatPromptTemplate
 from langchain_core.prompts import FewShotPromptTemplate, FewShotChatMessagePromptTemplate
 # from langchain_core.prompts import PipelinePromptTemplate
-# ------ OutputParser  ------
+# ---------- OutputParser  ----------
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser, PydanticOutputParser, MarkdownListOutputParser
 from langchain_core.output_parsers import JsonOutputKeyToolsParser, JsonOutputToolsParser, PydanticToolsParser
-# ------ 工具调用相关组件 ------
+# ---------- 工具调用相关组件 ----------
 from langchain_core.tools import BaseTool, BaseToolkit, Tool, StructuredTool, tool, InjectedToolArg, ToolException
 # langchain.tools 包里也导入了 langchian_core.tools 包里的一些内容
 # from langchain.tools import BaseTool, tool, InjectedToolArg, ToolException
 from langchain.tools import InjectedState, InjectedStore, ToolRuntime
 # community 包里提供了一些常用工具的实现
 from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
-# ------ 底层Runnable抽象接口 ------
-from langchain_core.tracers.schemas import Run
+# ---------- 底层Runnable抽象接口 ----------
 from langchain_core.runnables import RunnableConfig, RunnableLambda, RunnableSequence, RunnableBinding, RunnableParallel
 from langchain_core.runnables.passthrough import RunnablePassthrough, RunnableAssign, RunnablePick
 from langchain_core.callbacks import BaseCallbackHandler, CallbackManager, StdOutCallbackHandler
-# ------ Embedding  ------
-from langchain.embeddings import Embeddings, init_embeddings
-# ------ 文档解析及加载 ------
-# document_loaders, embeddings, vectorstores, retrievers 都是 langchain_community 包里的内容，官方建议直接从langchain_community包中导入
-from langchain_core.documents import Document
-from langchain_community.document_loaders import TextLoader, CSVLoader, JSONLoader, WebBaseLoader
-from langchain_community.embeddings import OpenAIEmbeddings, OllamaEmbeddings
-from langchain_community.vectorstores import FAISS, Cassandra, Clickhouse, Milvus, OpenSearchVectorSearch, \
-    SKLearnVectorStore, ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
-from langchain_community.retrievers import BM25Retriever, ElasticSearchBM25Retriever
-# ------ 对话历史相关组件（这些组件在 v1.x 版本已经不推荐使用了） ------
+# from langchain_core.tracers.schemas import Run
+# ---------- 对话历史相关组件 ----------
+# --- 以下两个组件在 v1.x 版本继续存在 ---
 from langchain_core.runnables import RunnableWithMessageHistory
+# chat_history 里的组件是配合早期的 memory 模块使用的，由于 memory 模块被废弃了，所以相关组件也不推荐使用了。
 from langchain_core.chat_history import BaseChatMessageHistory
-# 下面3个组件，从 v1.x 版本开始被移动到 langchain_classic 包中了
-# from langchain.chains.llm import LLMChain
-from langchain_classic.chains.llm import LLMChain
-# from langchain_core.memory import BaseMemory
-from langchain_classic.base_memory import BaseMemory
-# from langchain.memory import ConversationBufferMemory
-from langchain_classic.memory import ConversationBufferMemory
-# from langchain.memory import ChatMessageHistory, FileChatMessageHistory
+# 下面两个组件就是 BaseChatMessageHistory 的实现类
 from langchain_community.chat_message_histories import ChatMessageHistory, FileChatMessageHistory
-# ------ 其他 ------
+# --- 以下组件在 v1.x 版本已经不推荐使用了，并被移动到 langchain_classic 包中 ---
+# from langchain.chains.llm import LLMChain
+# from langchain_core.memory import BaseMemory
+# from langchain.memory import ConversationBufferMemory
+from langchain_classic.chains.llm import LLMChain
+from langchain_classic.base_memory import BaseMemory
+from langchain_classic.memory import ConversationBufferMemory
+# ---------- 文档解析及加载（RAG相关） ----------
+# langchain-core定义了相关的接口，具体实现大部分都交给了 langchain_community 包
+# --- 文档加载&转换 ---
+from langchain_core.documents import Document, BaseDocumentCompressor, BaseDocumentTransformer
+from langchain_core.document_loaders import BaseLoader, BaseBlobParser, BlobLoader, Blob
+from langchain_community.document_loaders import TextLoader, CSVLoader, JSONLoader, WebBaseLoader
+from langchain_community.document_transformers import (
+    BeautifulSoupTransformer, Html2TextTransformer, MarkdownifyTransformer
+)
+# --- 文档转换（Text-Splitter），这个是由单独的 langchain-text-splitter 包提供的 ---
+from langchain_text_splitters.base import TextSplitter
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter, RecursiveJsonSplitter, MarkdownTextSplitter,
+    NLTKTextSplitter, SpacyTextSplitter, SentenceTransformersTokenTextSplitter
+)
+# --- Embedding ---
+from langchain_core.embeddings import Embeddings, FakeEmbeddings
+from langchain.embeddings import init_embeddings  # langchain 包里只提供了一个通用Embedding初始化函数
+from langchain_community.embeddings import OpenAIEmbeddings, OllamaEmbeddings
+# --- 向量化存储 ---
+from langchain_core.vectorstores import VectorStore, InMemoryVectorStore, VectorStoreRetriever
+from langchain_community.vectorstores import (
+    Chroma, FAISS, Milvus, DuckDB, Redis, SKLearnVectorStore,
+    ElasticsearchStore, ElasticVectorSearch, ElasticKnnSearch
+)
+# --- 向量化检索 ---
+from langchain_core.retrievers import BaseRetriever
+from langchain_community.retrievers import (
+    BM25Retriever, ElasticSearchBM25Retriever, KNNRetriever, MilvusRetriever, SVMRetriever
+)
+# ---------- 其他 ----------
 # from langchain.globals import set_verbose
 # from langchain.callbacks.tracers import ConsoleCallbackHandler
-# ======================================================================================================================
-# ------ v1.0 里统一的 agent 创建API ------
+# ---------- v1.0 里统一的 agent 创建API ----------
 from langchain.agents import create_agent
 from langchain.agents.structured_output import ToolStrategy, ProviderStrategy
-# ------ middleware，v1.0版本一个更新亮点 ------
+# ---------- middleware，v1.0版本一个更新亮点 ----------
 from langchain.agents.middleware import (
     AgentMiddleware, AgentState, ModelRequest, ModelResponse,
     before_agent, after_agent, before_model, after_model, wrap_model_call, wrap_tool_call, hook_config
 )
 # 自带的 middleware 实现
-from langchain.agents.middleware import SummarizationMiddleware, HumanInTheLoopMiddleware, ModelCallLimitMiddleware, \
-    ToolCallLimitMiddleware
+from langchain.agents.middleware import (
+    SummarizationMiddleware, HumanInTheLoopMiddleware, ModelCallLimitMiddleware, ToolCallLimitMiddleware
+)
+# ======================================================================================================================
 
 # --- vLLM 部署 ---
 # API_KEY = 'Empty'
@@ -1003,7 +1026,7 @@ def community_tool_usage():
     print(res)
 
 
-# ======================= Chain 相关模块使用 =======================
+# ======================= Runnable 底层抽象 =======================
 # %%
 def runnable_usage():
     """
@@ -1055,7 +1078,7 @@ def runnable_usage():
     )
     run5.invoke(input=1)
 
-
+# %%
 def runnable_other_usage():
     """
     展示其他一些 Runnable 对象的使用
@@ -1109,49 +1132,8 @@ def runnable_other_usage():
     print(output_data)
 
 
-def chain_usage():
-    """
-    v0.3.x 版本提供的 LLMChain 使用，v1.x 版本中已经不推荐使用了。
-    """
-    client_llm = get_client_llm()
-    client_chat = get_client_chat()
-    template = "Tell me a {adjective} joke about {content}."
-    prompt = PromptTemplate(template=template, input_variables=['adjective', 'content'])
-    aipt = AIMessagePromptTemplate.from_template(template="you are an artist")  # 这个没有占位符
-    hmpt = HumanMessagePromptTemplate.from_template(template=template)
-    msg_pt = ChatPromptTemplate.from_messages(messages=[aipt, hmpt])
-
-    # ------ 使用旧版本的 LLMChain -----
-    chain_llm = LLMChain(llm=client_llm, prompt=prompt)
-    chain_chat = LLMChain(llm=client_chat, prompt=msg_pt)
-    print(type(chain_llm))
-    print(type(chain_chat))
-    # <class 'langchain.chains.llm.LLMChain'>
-
-    # Callable调用，run调用，invoke调用 —— 后续推荐使用invoke方法
-    res_llm = chain_llm(inputs={'adjective': 'happy', 'content': 'dog'})
-    res_llm = chain_llm.run(adjective='happy', content='dog')  # 多个输入以关键字参数传入，并且返回的是 str，不是dict
-    res_llm = chain_llm.invoke(input={'adjective': 'happy', 'content': 'dog'})
-    print(res_llm)
-
-    res_chat = chain_chat.invoke(input={'adjective': 'fantastic', 'content': 'cat'})
-    print(res_chat)
-
-    # ------ 使用新版本的 LCEL 语法 -----
-    chain_llm = prompt | client_llm
-    chain_chat = msg_pt | client_chat
-    print(type(chain_llm))
-    print(type(chain_chat))
-    # <class 'langchain_core.runnables.base.RunnableSequence'>
-
-    res_llm = chain_llm.invoke(input={'adjective': 'good', 'content': 'fish'})
-    print(res_llm)
-
-    res_chat = chain_chat.invoke(input={'adjective': 'nice', 'content': 'bird'})
-    print(res_chat)
-
-
 # ======================= Callback 使用 =======================
+# %%
 class MyCustomHandler(BaseCallbackHandler):
     """
     自定义 CallbackHander，需要继承 BaseCallbackHandler，并实现其中自己在某个阶段的回调方法。
@@ -1205,7 +1187,52 @@ def callback_usage():
     print(res)
 
 
+# ======================= Chain 使用（v0.3.x版本） =======================
+# %%
+def chain_usage():
+    """
+    v0.3.x 版本提供的 LLMChain 使用，v1.x 版本中已经不推荐使用了，可以使用 RunnableSequence 来代替。
+    """
+    client_llm = get_client_llm()
+    client_chat = get_client_chat()
+    template = "Tell me a {adjective} joke about {content}."
+    prompt = PromptTemplate(template=template, input_variables=['adjective', 'content'])
+    aipt = AIMessagePromptTemplate.from_template(template="you are an artist")  # 这个没有占位符
+    hmpt = HumanMessagePromptTemplate.from_template(template=template)
+    msg_pt = ChatPromptTemplate.from_messages(messages=[aipt, hmpt])
+
+    # ------ 使用旧版本的 LLMChain -----
+    chain_llm = LLMChain(llm=client_llm, prompt=prompt)
+    chain_chat = LLMChain(llm=client_chat, prompt=msg_pt)
+    print(type(chain_llm))
+    print(type(chain_chat))
+    # <class 'langchain.chains.llm.LLMChain'>
+
+    # Callable调用，run调用，invoke调用 —— 后续推荐使用invoke方法
+    res_llm = chain_llm(inputs={'adjective': 'happy', 'content': 'dog'})
+    res_llm = chain_llm.run(adjective='happy', content='dog')  # 多个输入以关键字参数传入，并且返回的是 str，不是dict
+    res_llm = chain_llm.invoke(input={'adjective': 'happy', 'content': 'dog'})
+    print(res_llm)
+
+    res_chat = chain_chat.invoke(input={'adjective': 'fantastic', 'content': 'cat'})
+    print(res_chat)
+
+    # ------ 使用新版本的 LCEL 语法 -----
+    chain_llm = prompt | client_llm
+    chain_chat = msg_pt | client_chat
+    print(type(chain_llm))
+    print(type(chain_chat))
+    # <class 'langchain_core.runnables.base.RunnableSequence'>
+
+    res_llm = chain_llm.invoke(input={'adjective': 'good', 'content': 'fish'})
+    print(res_llm)
+
+    res_chat = chain_chat.invoke(input={'adjective': 'nice', 'content': 'bird'})
+    print(res_chat)
+
+
 # ======================= 短期记忆Memory 使用 =======================
+# %%
 def memory_usage():
     """
     Memory 模块已经不推荐使用了。
@@ -1257,8 +1284,15 @@ def memory_usage():
 
 
 # ======================= 对话历史 =======================
+# %%
 def chat_history_usage():
-    # ----- 基于 BaseChatMessageHistory 实现的使用 -----
+    """
+    BaseChatMessageHistory 使用练习。
+    langchain_core.chat_history 里的 BaseChatMessageHistory 组件在 v1.x 版本并未被废弃。
+    BaseChatMessageHistory 有两种使用方式：
+    1. 搭配早期的 memory 模块使用的，随着 memory 模块的废弃，此种方式不推荐了；
+    2. 搭配下面的 RunnableWithMessageHistory 使用，这也是此组件没有被废弃的原因。
+    """
     # --- 单独使用 ---
     history = ChatMessageHistory()
     history.add_message(message=HumanMessage(content='hello from me'))
@@ -1266,7 +1300,7 @@ def chat_history_usage():
     print(history)
     print(history.messages)
 
-    # --- 配合 Memory 组件使用 ---
+    # --- 配合 Memory 组件使用（不再推荐了） ---
     client_llm = get_client_llm()
     template = "Tell me a {adjective} joke about {content}."
     prompt = PromptTemplate(template=template, input_variables=['adjective', 'content', 'nothing'])
@@ -1291,41 +1325,41 @@ def chat_history_usage():
     print(res2_history)
 
 
+# %%
 def runnable_history_usage():
-    # ----- 基于 RunnableWithMessageHistory 实现的使用 -----
+    """
+    RunnableWithMessageHistory 使用。
+    langchain_core.runnables.history.py 提供的 RunnableWithMessageHistory 在 v1.x 版本可以继续使用。
+    不过感觉在 v1.x 版本，这个组件的使用也不多了。
+    """
     # RunnableWithMessageHistory 使用分为3个部分：
 
-    # 1. 配置一个 Runnable 对象，Chain对象 或者 RunnableSequences对象 都可以
+    # 1. 配置一个 Runnable 对象，RunnableSequences对象 或者 Chain对象 都可以
     # RunnableWithMessageHistory 主要是和 ChatModel + ChatPromptTemplate 配合使用的，
     # 它和 LLM + PromptTemplate 的搭配有问题：通过 history 插入的历史消息显示的是 HumanMessage/AIMessage 的字符串表示，而不是里面的 content。
-    # client_llm = OpenAI(openai_api_key=API_KEY, openai_api_base=LLM_URL, model_name=MODEL)
-    # template = """你是一个智能助手，负责回答用户的问题。对话历史:\n{history}\n用户输入:\n{user_input}\n请根据上下文生成回复："""
-    # prompt = PromptTemplate(template=template, input_variables=["history", "user_input"])
-
-    # 改为使用 ChatModel + ChatPromptTemplate
     client_chat = get_client_chat()
     prompt_chat = ChatPromptTemplate.from_messages(
         messages=[
             ("system", "你是一个智能助手，负责回答用户的问题。"),
-            MessagesPlaceholder("history"),
+            MessagesPlaceholder("history"),  # 注意这里的 history
             ("human", "{user_input}")
         ]
     )
 
-    # set_verbose(False)  # 全局 verbose 设置，不好用
-    # client_llm.with_config({'callbacks': [ConsoleCallbackHandler()]})   # 设置控制台回调日志，也不好用
-    # 这里用 LLMChain 来演示，因为 RunnableSequence 不太好设置 verbose
-    # chain = prompt | client_llm
-    # print(type(chain))  # <class 'langchain_core.runnables.base.RunnableSequence'>
-    # chain = LLMChain(llm=client_llm, prompt=prompt, verbose=True)
-    chain = LLMChain(llm=client_chat, prompt=prompt_chat, verbose=True)
+    chain = prompt_chat | client_chat
+    print(type(chain))  # <class 'langchain_core.runnables.base.RunnableSequence'>
+    # 在 v0.3.x 版本可以搭配 LLMChain 使用
+    # chain = LLMChain(llm=client_chat, prompt=prompt_chat, verbose=True)
 
-    # 2. 配置一个根据用户身份生成 BaseChatMessageHistory实现类对象的工厂函数
+    # 2. 配置一个根据用户身份（session_id）生成 BaseChatMessageHistory实现类对象 的工厂函数
     # 这里使用了一个全局字典作为用户会话历史记录的存储，方便观察结果，实际中对应的是数据库或者redis等
     store = {}
 
-    def get_by_session_id(session_id: str) -> BaseChatMessageHistory:
-        # 这个工厂函数目前只有一个参数，如果有多个参数，需要更复杂的配置
+    def get_chat_history_by_session(session_id: str) -> BaseChatMessageHistory:
+        """
+        session_id 用于记录用户的身份，作为 key 从 store 这个全局字典中 查找返回对应用户的 BaseChatMessageHistory 对象。
+        这个工厂函数目前只有一个参数，如果有多个参数，需要更复杂的配置。
+        """
         if session_id not in store:
             store[session_id] = ChatMessageHistory()
         return store[session_id]
@@ -1333,10 +1367,10 @@ def runnable_history_usage():
     # 3. 配置 RunnableWithMessageHistory 对象
     chain_with_history = RunnableWithMessageHistory(
         runnable=chain,
-        get_session_history=get_by_session_id,
+        get_session_history=get_chat_history_by_session,
         history_messages_key="history",
         input_messages_key="user_input",
-        output_messages_key="text"  # 这个是 LLMChain 输出的默认 key
+        # output_messages_key="text"  # 这个是 LLMChain 输出的默认 key
     )
 
     # 4. 调用 RunnableWithMessageHistory 对象的 invoke 方法，用户身份通过 config 参数设置
@@ -1361,35 +1395,72 @@ def runnable_history_usage():
     print(store.keys())
 
 
-# ======================= 数据检索相关模块使用 =======================
+# ======================= 数据检索（RAG）相关模块使用 =======================
+# 整个流程参考 v1.0 版本官方文档 https://docs.langchain.com/oss/python/langchain/retrieval
+# 从 v0.3.x 升级到 v1.x:
+# - langchain-core 里RAG相关的模块变化不大
+# - langchain-community里的相关模块变化也不大，而v0.3.x 版本的langchain RAG相关模块大部分内容就是从 langchain-community 模块导入的
+# 所以可以认为 RAG 部分 v0.3.x 升级到 v1.x 并没有什么变化和影响。
 def document_loader_usage():
+    """
+    Document loader 使用
+    """
     file_path = os.path.join(os.getcwd(), 'test.txt')
     print(os.path.exists(file_path))
     txt_loader = TextLoader(file_path=file_path, autodetect_encoding=True)
-    docs = txt_loader.load()
+    docs: List[Document] = txt_loader.load()
     doc = docs[0]
     print(doc.id)
     print(doc.metadata)
     print(doc.type)
+    # 文档内容
     print(doc.page_content)
     print(doc)
 
 
+# %%
+def document_transform_usage():
+    """
+    Document transform 使用
+    """
+    # TODO
+    pass
+
+# %%
+def text_splitter_usage():
+    """
+    langchain-text-splitter 包专门用于对文档进行分割。
+    """
+    # TODO
+    pass
+
+# %%
 def text_embedding_usage():
+    """
+    langchain 提供的 embedding 封装。
+    """
     # TODO
     pass
 
-
+# %%
 def vector_store_usage():
+    """
+    langchain 提供的向量数据库封装
+    """
     # TODO
     pass
 
 
+# %%
 def retriever_usage():
+    """
+    langchain 提供的向量检索封装
+    """
     # TODO
     pass
 
 
+# %%
 def main():
     # llm_usage()
     # chat_llm_usage()
@@ -1408,5 +1479,6 @@ def main():
     # tool_parser_usage()
 
 
+# %%
 if __name__ == '__main__':
     main()
