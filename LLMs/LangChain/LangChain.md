@@ -1431,6 +1431,8 @@ LangChain-Community是一个第三方社区扩展包，提供了一些常用的�
 ---------------------------------------------------
 # LangGraph
 
+> LangGraph 从 v0.6.x 版本升级到 v1.x 版本，核心组件的变化不大。
+
 首先要明确的是，LangGraph并不依赖LangChain-Core或者LangChain，
 参考官方[FAQ -> Do I need to use LangChain to use LangGraph? What’s the difference?](https://langchain-ai.github.io/langgraph/concepts/faq/#do-i-need-to-use-langchain-to-use-langgraph-whats-the-difference)。
 
@@ -1458,6 +1460,22 @@ LangGraph更像是一个高度抽象的基于图的Agent调度框架，参考官
 - Checkpoint机制: 对应的就是Memory，每一步（Node）执行完都会保存当前Node的`State`，以方便可以作为恢复的快照，另一方面也是作为历史消息
 - Interrupt/Command机制：也就是打断/恢复功能，可以方便的添加人工介入的步骤，校验/纠正Agent的执行过程，或者获取人工反馈以进行下一步执行
 - TimeTravel机制：可以方便的回溯到之前的某个节点，重新执行，或者重新执行整个Graph，这个依赖的就是Checkpoint机制
+
+
+---------------------------------------------------
+## 两类API
+
+LangGraph提供了两种API:
+- [Graph API](https://docs.langchain.com/oss/python/langgraph/graph-api): 基于底层的图结构来定义Agent
+- [Functional API](https://docs.langchain.com/oss/python/langgraph/functional-api): 对已有的函数进行封装，定义Agent
+
+两类API的选择可以参考官方文档 [Choosing between Graph and Functional APIs](https://docs.langchain.com/oss/python/langgraph/choosing-apis).
+
+简单总结如下：
+- Graph API 适合复杂的场景，需要高度自定义
+- Functional API 适合简单的场景，特别是将LangGraph应用到已有的函数上，并做最小的改变。
+
+> 个人感觉，推荐使用 Graph API, Functional API 的局限性比较大。
 
 
 ---------------------------------------------------
@@ -1552,8 +1570,6 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 **`StateGraph`的初始化方法里需要传入一个表示状态的对象**，其他大部分方法都和`Graph`一样。
 
 
-
-
 ### `message.py`
 
 定义了如下2个类：
@@ -1575,7 +1591,7 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 ---------------------------------------------------
 ## `checkpoint`模块 - KEY
 
-此模块对应的是LangGraph里的短期记忆机制，只维护每次会话内的历史消息记录。
+此模块对应的是LangGraph里的**短期记忆机制**，只维护每次会话内的历史消息记录。
 
 ### `base`子模块
 
@@ -1603,7 +1619,7 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 ---------------------------------------------------
 ## `store`模块 - KEY
 
-此模块对应于 LangGraph 的长期记忆机制，用于保存和加载长期记忆。
+此模块对应于 LangGraph 的**长期记忆机制**，用于保存和加载长期记忆。
 
 ### `base`子模块
 
