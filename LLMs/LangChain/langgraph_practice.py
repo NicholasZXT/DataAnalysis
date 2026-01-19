@@ -12,6 +12,7 @@
 """
 # %%
 from typing import Annotated, List, TypedDict, Dict, Union, Iterator
+from dataclasses import dataclass
 # from typing_extensions import TypedDict
 # ---------- LangGraph Graph 组件 ----------
 from langgraph.constants import START, END
@@ -32,6 +33,8 @@ from langgraph.types import StateSnapshot
 from langgraph.types import interrupt, Command, StreamMode
 # ---------- LangGraph Tool 组件 ----------
 from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent, InjectedState, InjectedStore
+from langgraph.runtime import Runtime
+from langchain.tools import ToolRuntime  # LangChain 里也提供了一个类似的 ToolRuntime 类
 from langgraph.utils.runnable import RunnableCallable
 # from langgraph.prebuilt.chat_agent_executor import AgentState
 # ---------- langchain-core 组件 ----------
@@ -779,6 +782,23 @@ def chatbot_tool_usage_prebuilt():
     @tool(description="使用龙球(DragonBall)算法计算两个数字的结果")
     def dragon_ball_algorithm_tool(x: Annotated[int, "第一个数字"], y: Annotated[int, "第二个数字"]) -> int:
         return x + y + 1
+
+    # ------ 工具上下文使用 ------
+    # 使用 dataclass 自定义一个上下文，里面包含需要使用的字段信息
+    @dataclass
+    class Context:
+        user_id: str
+
+    @tool(description="获取工具上下文")
+    def get_tool_context(runtime: ToolRuntime[Context]) -> str:
+        # 从工具运行时获取工具上下文里的字段
+        user_id = runtime.context.user_id
+        preferences: str = "The user prefers you to write a brief and polite email."
+        if runtime.store:
+            if memory := runtime.store.get(("users",), user_id):
+                preferences = memory.value["preferences"]
+        return preferences
+    # ------ 工具上下文使用 ------
 
     # 初始化 ChatLLM，并绑定 tool
     client_chat = get_client_chat()

@@ -94,7 +94,7 @@ v1.0版本不再直接导出了，需要用户手动显式直接从`langchain-co
 Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 
 
-------
+------------------------------------------------------------
 
 # LangChain-Core:v1.0
 
@@ -154,7 +154,7 @@ Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 - 返回类型是一个`list[ContentBlock]`。
 
 
-------
+----------------------------------------------------------------
 
 # LangChain:v1.0
 
@@ -192,8 +192,41 @@ v1.0版本的`langchain`包只有如下模块了。
 
 其实从 v0.3.x 版本开始，`langchain` 包里的一些模块就只是 `langchain_core` 模块里对应包的导入套壳了。
 
+---------------
+## `agents`模块 - KEY
 
-## middleware
+这个模块是 LangChain v1.0 改动最大的模块，删除了 v0.6.x 版的许多内容，相当于重构了。
+
+v1.0 里此模块的内容如下：
+- `factory.py`: 里面实现了 `create_agent()` 函数用于快速创建 Agent 应用 —— KEY
+- `middleware`包: v1.x 版本配合 `create_agent()` 函数使用的中间件，详细介绍见下面
+- `structured_outputs.py`: 配合 `create_agent()` 函数，用于处理Agent的结构化输出结果。
+
+---------------
+### `create_agent()` 使用介绍 - KEY
+
+`create_agent()` 函数返回的是 LangGraph 的 `CompiledStateGraph` 对象。
+
+主要参数说明如下：
+- `name: str`: Agent名称
+- `model: str | BaseChatModel`: 配置使用的模型，可以直接传入配置好的模型对象，也可以传入模型名称（此时会调用`init_chat_model()`方法来初始化模型对象）
+- `system_prompt: str`: 系统角色提示词
+- `tools`: 工具列表
+- `middleware`: 中间件配置列表
+- `checkpointer: Checkpointer`: LangGraph Checkpointer 对象
+- `store: BaseStore`: LangGraph Store 对象
+- `response_format`: structured output 相关配置，详细介绍见下面的 `structured_outputs.py` 说明。
+- `state_schema`: `TypedDict` **类**，必须继承自`AgentState[ResponseT]`，用于 Middleware 的 hooks 方法中获取 Agent 的状态。
+- `context_schema`: `TypedDict`/`dataclass`/pydantic `BaseModel` **类**，用于定义LangGraph的 `Runtime[ContextT]` 里的 `ContextT` 泛型。
+- `interrupt_before: list[str]`: 通过name指定要在哪些node **执行前** 触发中断
+- `interrupt_after: list[str]`: 通过name指定要在哪些node **执行后** 触发中断
+- `debug: bool`:
+- `cache: BaseCache`:
+
+---------------
+### middleware
+
+middleware 的相关实现在 `langchain.agents.middleware` 中。
 
 v1.0版新增的middleware功能是专门配合`create_agent()`使用，此函数内部是基于LangGraph的状态图构建的。
 
@@ -201,26 +234,48 @@ Agent里的middleware调用时机如官方文档图片所示：
 
 <img src="https://mintcdn.com/langchain-5e9cc07a/RAP6mjwE5G00xYsA/oss/images/middleware_final.png?w=840&fit=max&auto=format&n=RAP6mjwE5G00xYsA&q=85&s=e9b14e264f68345de08ae76f032c52d4" alt="AgentMiddleware.hook" style="zoom:80%;" align="left"/>
 
-上述调用的hook方法是由`AgentMiddleware`类定义的，所有Middleware都要继承此类，并实现其中的某个方法，可实现的hook方法分为如下两类：
+上述调用的hook方法是由`AgentMiddleware`基类定义的（[官方文档：Custom middleware](https://docs.langchain.com/oss/python/langchain/middleware/custom)），
+所有Middleware都要继承此类。
 
-（1）Node-style hooks：在固定时机进行调用的hook，一般用于logging、validation、state update等操作
+`AgentMiddleware(Generic[StateT, ContextT])` 是一个泛型类，需要`StateT`和`ContextT`两个泛型参数：
+- `StateT`: 传递给Middleware的状态对象schema，需要继承自 `AgentState` 类
+- `ContextT`: 底层LangGraph的 `Runtime[ContextT]` 泛型参数
+
+`AgentMiddleware(Generic[StateT, ContextT])` 定义了如下两个属性：
+- `state_schema: type(StateT)`: 状态对象的类
+- `tools: List[BaseTool]`: 该 middleware 所附加的工具列表 —— 这个不知道有什么用。
+
+自定义Middleware时，需要继承`AgentMiddleware`并实现其中的某个方法，可实现的hook方法分为如下两类：
+
+（1）Node-style hooks：在固定时机进行调用的hook，一般用于logging、validation、state update等操作。
 
 - agent启动停止：每次调用`invoke()`等方法时执行一次
-
   - `before_agent`/`abefore_agent`
-
   - `after_agent`/`aafter_agent`
 
 - model调用：每次发生模型调用的前后，一次`invoke()`方法内部可能有多次模型调用
-
   - `before_model`/`abefore_model`
-
   - `after_model`/`aafter_model`
 
-（2）Wrap-style hooks：用于干涉agent执行流程，一般用于retries、caching等操作。
+Node-style hook方法的签名为：
+- 入参: `state: StateT, runtime: Runtime[ContextT]`
+  - `state` 就是该middleware的`state`对象
+  - `runtime` 就是LangGraph的`Runtime[ContextT]`对象
+- 返回值: `dict[str, Any] | None`
 
-- `wrap_model`/`awrap_model`：每次模型调用前后执行
+（2）Wrap-style hooks：用于**干预agent执行流程**，一般用于retries、caching等操作。
+
+- `wrap_model`/`awrap_model`：每次模型调用前后执行，方法签名为：
+  - 入参: 
+    - `request: ModelRequest`
+    - `handler: Callable[[ModelRequest], ModelResponse]`
+  - 返回值: `ModelCallResult`
+
 - `wrap_tool_call`/`awrap_tool_call`，每次工具调用前后执行
+  - 入参: 
+    - `request: ToolCallRequest`
+    - `handler: Callable[[ToolCallRequest], ToolMessage | Command]`
+  - 返回值: `ToolMessage | Command`
 
 除了继承`AgentMiddleware`类的方式外，还提供了如下hook装饰器来简化使用：
 
@@ -231,12 +286,15 @@ Agent里的middleware调用时机如官方文档图片所示：
 
 这些装饰器内部也是将被装饰函数使用动态类定义的技巧封装成`AgentMiddleware`的子类以供使用的。
 
-研究`create_agent()`函数源码发现，middleware的使用有如下几个要注意的地方：
+
+**使用要点**
+
+研究`create_agent()`函数源码可以发现，middleware的使用有如下几个要注意的地方：
 
 - 所有middleware的`wrap_tool_call`方法会被合并成一条链，封装到`ToolNode`里，在每次调用tool前后执行。
 - 所有middleware的`wrap_model_call`方法也会被合并成一条链，封装到一个`model_node`里，在每次模型调用前后执行。
 - 所有middleware的`before_agent`/`after_agent`/`before_model`/`after_model`方法，**各自会被封装成LangGraph里的一个Node**，并依次添加之间的边，在指定时机/条件下执行
-- 同一个middleware不能多次使用，否则会抛异常提醒有重复的middlware
+- 同一个middleware不能多次使用，否则会抛异常提醒有重复的middleware
 
 最重要的原则如下：
 
@@ -244,6 +302,30 @@ Agent里的middleware调用时机如官方文档图片所示：
 >
 > 即使要实现多个hook方法，这些方法之间**不要有关联或者访问共享变量的操作**，因为根据源码里的逻辑，这些方法都是被拆分开使用的，
 > `AgentMiddleware`抽象类及其子类只不过是一个封装方法的容器而已，这也要求`AgentMiddleware`子类里最好不要定义实例属性存放共享状态。
+
+
+---------------
+### 结构化输出
+
+官方文档 [Structured output](https://docs.langchain.com/oss/python/langchain/structured-output)
+
+`langchain.agents.structured_outputs.py` 用于处理Agent的输出结果。
+
+该文件里定义了如下4种结构化输出处理策略，其中`SchemaT`是泛型表示，需要用户自己定义一个数据类，用于封装结构化输出结果。
+- `None`: 默认值，不处理输出结果
+- `ProviderStrategy[SchemaT]`: 使用模型提供商（Model Provider）原生的结构化输出结构，这是**最可靠的方式**，使用起来也比较简单，推荐优先使用。
+- `ToolStrategy[SchemaT]`: 采用 Tool calling 方式处理结构化输出结果。当模型提供商不支持原生结构化输出时，可以采用此方式，但是不那么稳定。
+- `AutoStrategy[SchemaT]`: 自动选择处理策略，此时也可以简单的使用 `type[SchemaT]`
+
+对于 `ToolStrategy[SchemaT]`（它其实是一个`dataclass`类），它定义了如下属性：
+- `schema: type[SchemaT]`: 必填属性，存放结构化输出结果数据类，可以是 `TypedDict`/`dataclass`/pydantic `BaseModel`。
+- `tool_message_content: str`: 自定义文本，**在成功获取结构化结果时，会返回此文本来代替原本的JSON** —— 感觉用处不大
+- `handle_errors`: 在获取结构化结果时，如果发生错误，如何处理。有如下的选项：
+  - `True`: 默认值，会使用默认的异常信息模板返回错误信息
+  - `False`: 不处理错误，将异常向上抛出
+  - `str`: 自定义异常信息，一旦抛出结构化结果解析错误，都会返回此文本
+  - `type[Exception]` / `tuple[type[Exception],...]`: 只捕获此异常/多个异常，并使用默认异常模板返回异常信息，**并进行重试**；对于其他异常则会继续抛出
+  - `Callable[[Exception], str]`: 自定义的异常处理函数，返回处理后的异常信息
 
 
 ---------------------------------------------------
@@ -1498,7 +1580,9 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 - `END`
 
 
+---------------------------------------------------
 ## `config.py`
+
 
 ---------------------------------------------------
 ## `graph`模块 - KEY
@@ -1595,15 +1679,15 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 ### `base`子模块
 
-- 定义了`CheckpointTuple`，继承于`NamedTuple`，用来表示一个状态快照，有如下属性：
-  - `config: RunnableConfig`
-  - `checkpoint: Checkpoint`
-  - `metadata: CheckpointMetadata`
-  - `parent_config: Optional[RunnableConfig] = None`
-  - `pending_writes: Optional[List[PendingWrite]] = None`
+定义了`CheckpointTuple`，继承于`NamedTuple`，用来表示一个状态快照，有如下属性：
+- `config: RunnableConfig`
+- `checkpoint: Checkpoint`
+- `metadata: CheckpointMetadata`
+- `parent_config: Optional[RunnableConfig] = None`
+- `pending_writes: Optional[List[PendingWrite]] = None`
 
 
-- 定义了`BaseCheckpointSaver`基类，用来保存和加载状态快照。
+定义了`BaseCheckpointSaver`基类，用来保存和加载状态快照。
 
 
 ### `memory`子模块
@@ -1637,15 +1721,15 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 
 ---------------------------------------------------
-## `prebuilt`模块
+## `prebuilt`模块 - KEY
 
-这个模块提供了一些用于构建Agent的预制组件。
+这个模块提供了一些用于构建 Tool 的预制组件，在 v0.6.x 版本还提供了Agent 的预制组件，但是从 v1.0.0 开始，Agent 的预制组件不推荐使用了。
 
-**`ToolNode`**
+**`ToolNode`类**
 
 封装tool的节点类。
 
-**`tools_condition`**
+**`tools_condition`函数**
 
 封装 tool 的条件边，源码里内部逻辑比较简单，就是判断 state 里有没有 messages，并且messages 最后一条是不是 AIMessage，是就调用 Tool，否则转向 END。
 
@@ -1659,6 +1743,23 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 此外，还定义了一些注解类型，用于在 tool 函数中访问图的状态和存储。
 - `InjectedState`
 - `InjectedStore`
+
+---------------------------------------------------
+## `runtime.py`
+
+定义了 `Runtime` 泛型类，也是一个 `dataclass` 对象。
+
+> 这个 `Runtime` 类的介绍反倒在 LangChain v1.x 的文档里：[Runtime](https://docs.langchain.com/oss/python/langchain/runtime).
+
+`Runtime[ContextT]` 泛型类定义了如下属性：
+- `context`: 这个对象就是泛型类型对象 `ContextT`，它必须是一个 `TypedDict`/`dataclass`/pydantic `BaseModel` 对象。
+- `store`: LangGraph的 `BaseStore`
+- `stream_writer`: `StreamWriter` 对象，用于流式输出的`custom`模式使用。
+- `previous`
+
+这个 `Runtime` 类对象可以在 Tool 函数中获取，用于访问运行时上下文环境。
+
+不过似乎一般使用LangChain里提供的 `langchian.tools.tool_node.py` 里的 `ToolRuntime` 对象比较多。
 
 ---------------------------------------------------
 ## `utils`模块

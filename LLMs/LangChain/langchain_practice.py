@@ -3,9 +3,10 @@ LangChain 入门使用练习，适用于 v0.3.x 和 v1.x 版本.
 """
 # %%
 import os
-from typing import Optional, Dict, List, Union
+from typing import Optional, Dict, List, Union, Any, Callable
 from typing_extensions import Annotated, TypedDict
 from pydantic import BaseModel, Field
+from dataclasses import dataclass
 # ---------- 模型包装器抽象基类（langchain-core提供） ----------
 from langchain_core.language_models.base import BaseLanguageModel  # 下面所有模型的抽象基类
 from langchain_core.language_models.llms import BaseLLM, LLM  # LLM 继承自 BaseLLM
@@ -46,6 +47,7 @@ from langchain_core.tools import BaseTool, BaseToolkit, Tool, StructuredTool, to
 # langchain.tools 包里也导入了 langchian_core.tools 包里的一些内容
 # from langchain.tools import BaseTool, tool, InjectedToolArg, ToolException
 from langchain.tools import InjectedState, InjectedStore, ToolRuntime
+from langchain.tools.tool_node import ToolCallRequest
 # community 包里提供了一些常用工具的实现
 from langchain_community.tools import ListDirectoryTool, ReadFileTool, WriteFileTool, HumanInputRun, ShellTool
 # ---------- 底层Runnable抽象接口 ----------
@@ -117,6 +119,12 @@ from langchain.agents.middleware import (
 from langchain.agents.middleware import (
     SummarizationMiddleware, HumanInTheLoopMiddleware, ModelCallLimitMiddleware, ToolCallLimitMiddleware
 )
+# ---------- v1.0版本Agent底层是借助的LangGraph组件 ----------
+from langgraph.graph.state import CompiledStateGraph
+from langgraph.runtime import Runtime
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.memory import InMemoryStore
+from langgraph.types import Command
 # ======================================================================================================================
 
 # --- vLLM 部署 ---
@@ -1547,8 +1555,88 @@ def auto_agent_usage():
     """
     langchain-v1.x 的 agent 创建。
     """
-    # TODO
-    pass
+    model = get_client_chat()
+    memory_saver = MemorySaver()
+    memory_store = InMemoryStore()
+
+    class MiddlewareState(AgentState):
+        """
+        Middleware State 表示类，必须要继承自 AgentState 类，本质上是一个 TypedDict。
+        """
+        m_state: str
+
+    @dataclass
+    class UserContext:
+        user_id: str
+
+    class AgentHook(AgentMiddleware[MiddlewareState, UserContext]):
+        def before_agent(self, state: MiddlewareState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
+            print(f"--> before_agent called...")
+            return None
+
+        def after_agent(self, state: MiddlewareState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
+            print(f"--> after_agent called...")
+            return None
+
+    class ModelHook(AgentMiddleware[MiddlewareState, UserContext]):
+        def before_model(self, state: MiddlewareState, runtime: Runtime[UserContext])-> dict[str, Any] | None:
+            print(f"--> before_model called...")
+            return None
+
+        def after_model(self, state: MiddlewareState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
+            print(f"--> after_model called...")
+            return None
+
+    class WrapModelHook(AgentMiddleware[MiddlewareState, UserContext]):
+        def wrap_model_call(
+            self,
+            request: ModelRequest,
+            handler: Callable[[ModelRequest], ModelResponse],
+        ) -> ModelResponse | AIMessage:
+            return handler(request)
+
+    class WrapToolHook(AgentMiddleware[MiddlewareState, UserContext]):
+        def wrap_tool_call(
+            self,
+            request: ToolCallRequest,
+            handler: Callable[[ToolCallRequest], ToolMessage | Command],
+        ) -> ToolMessage | Command:
+            return handler(request)
+
+    @tool(description="Get weather of the city")
+    def get_weather(city: str) -> str:
+        """
+        Get weather of the city
+        """
+        return f"{city}的天气是晴天"
+
+    @tool(description="Get user location")
+    def get_user_location(user: str) -> str:
+        """
+        Get user location
+        """
+        return f"{user}的位置是北京"
+
+    agent: CompiledStateGraph = create_agent(
+        name="Some-Agent",
+        model=model,
+        system_prompt="你是一个智能助手",
+        tools=[get_user_location, get_weather],
+        middleware=[AgentHook(), ModelHook(), WrapModelHook(), WrapToolHook()],
+        checkpointer=memory_saver,
+        store=memory_store,
+        response_format=None,
+        state_schema=MiddlewareState,
+        context_schema=UserContext,
+        # interrupt_before=None,
+        # interrupt_after=None,
+        # debug=True
+    )
+
+    msg = HumanMessage(content="北京的天气如何？")
+    agent_res = agent.invoke(input=msg)
+    print(agent_res)
+
 
 # %%
 def agent_middleware_usage():
