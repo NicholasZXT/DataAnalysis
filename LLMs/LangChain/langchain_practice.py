@@ -309,11 +309,11 @@ def message_usage():
     对于 ChatModel 来说，每次对话的最小单元就是 Message。
     官方文档[Messages](https://python.langchain.com/docs/concepts/messages/)
     展示各类 Message 封装类的使用:
+    - ChatMessage: 通用消息 —— 似乎用的不多
     - SystemMessage: 设置模型身份的消息
     - HumanMessage: 用户输入的消息
-    - AIMessage: 模型返回的消息
-    - ToolMessage: 工具调用返回的消息
-    - ChatMessage: 通用消息
+    - AIMessage: 模型返回的消息，其中可能包含 ToolCall 信息
+    - ToolMessage: 工具调用返回的消息封装，会返回给模型 —— 相当一个 HumanMessage
     """
     print("===> message_usage()")
     # -------- ChatMessage 使用 --------
@@ -346,15 +346,18 @@ def message_usage():
     # -------- AIMessage 使用 --------
     # AIMessage 类有几个独有的属性：
     # - usage_metadata: 模型使用信息，是一个 TypedDict，包含：input_tokens, output_tokens, total_tokens, input_token_details 等
-    # - tool_calls: 如果触发了工具调用，在该属性有值
+    # - tool_calls: list[ToolCall] : 如果触发了工具调用，则该属性有值
+    #   - 每个 ToolCall 对象包含：id: str, name: str, args: dict
     # - invalid_tool_calls: 不合法的工具调用信息
 
     # -------- ToolMessage 使用 --------
-    # ToolMessage 类有几个独有的属性：
-    # - tool_call_id: 工具调用的 id
-    # - status: 工具调用结果， success 或者 error
-    # - artifact:
-    # - response_metadata:
+    # ToolMessage 类用于封装工具调用的返回结果，后续会被传递给模型 —— 相当于一个 HumanMessage
+    # ToolMessage 封装的工具调用结果存放在 content 属性中 —— 该属性继承自 BaseMessage
+    # 此外，ToolMessage 类有几个独有的属性：
+    # - tool_call_id: 工具调用的 id，需要和 AIMessage 中对应的工具调用的 id 一致
+    # - status: 工具调用结果，是一个字符串：success 或者 error
+    # - artifact: 工具调用的其他信息，此字段的内容不应当发送给模型
+    # - response_metadata: 从 BaseMessage 继承，但是目前没有用到。
 
     # -------- 在Message中加入额外信息 --------
     # 使用关键字参数传入额外的信息
@@ -939,7 +942,7 @@ def tool_usage():
     # 在调用模型之前，需要将本次请求返回的 AIMessage 追加到原始 messages 中
     tool_call_msgs = messages + [res]
 
-    # 然后遍历 tool_calls，使用返回的信息调研工具，并追加到 messages 中
+    # 然后遍历 tool_calls，使用返回的信息调用工具，并将工具调用的结果（最好封装成ToolMessage）追加到 messages 中
     # for tool_call in res.tool_calls:
     #     ...
     #     tool_msg = selected_tool.invoke(tool_call)
@@ -954,7 +957,7 @@ def tool_usage():
     print(type(tool_call_res))  # 这里返回的是 <class 'langchain_core.messages.tool.ToolMessage'>
     print(tool_call_res)
 
-    # 将工具调用结果追加到 messages 中
+    # 将工具调用结果（ToolMessage）追加到 messages 中
     tool_call_msgs.append(tool_call_res)
 
     # 然后将整个流程的 tool_call_msgs 传递给模型，并打印出结果
