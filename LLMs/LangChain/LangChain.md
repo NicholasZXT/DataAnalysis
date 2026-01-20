@@ -211,13 +211,18 @@ v1.0 里此模块的内容如下：
 - `name: str`: Agent名称
 - `model: str | BaseChatModel`: 配置使用的模型，可以直接传入配置好的模型对象，也可以传入模型名称（此时会调用`init_chat_model()`方法来初始化模型对象）
 - `system_prompt: str`: 系统角色提示词
+- `state_schema`: `TypedDict` 类，**用于定义底层 LangGraph 里的 Graph State**。
+  - 默认是 `AgentState[ResponseT]`，如果要自定义，则必须继承 `AgentState[ResponseT]`，因为其中定义了几个公共字段（有一个`messages`字段）
+  - 这里配置的 `state_schema` 会被用作 base schema，**所有middlewares中定义的`state_schema`字段都会被合并到此base schema中**。
+  - 预置的Middleware会用到 `AgentState[ResponseT]` 中定义的 `messages` 字段。
+  - Middleware 的各类 hook 方法也会使用这个 state_schema
+- `context_schema`: `TypedDict`/`dataclass`/pydantic `BaseModel` **类**，用于定义LangGraph的 `Runtime[ContextT]` 里的 `ContextT` 泛型。
+  - 这个schema的实例对象可以在调用`CompiledStateGraph.invoke()`方法时作为`context`参数传入，之后可以在LangGraph节点中的`Runtime[ContextT].context`属性获取了。
 - `tools`: 工具列表
 - `middleware`: 中间件配置列表
 - `checkpointer: Checkpointer`: LangGraph Checkpointer 对象
 - `store: BaseStore`: LangGraph Store 对象
 - `response_format`: structured output 相关配置，详细介绍见下面的 `structured_outputs.py` 说明。
-- `state_schema`: `TypedDict` **类**，必须继承自`AgentState[ResponseT]`，用于 Middleware 的 hooks 方法中获取 Agent 的状态。
-- `context_schema`: `TypedDict`/`dataclass`/pydantic `BaseModel` **类**，用于定义LangGraph的 `Runtime[ContextT]` 里的 `ContextT` 泛型。
 - `interrupt_before: list[str]`: 通过name指定要在哪些node **执行前** 触发中断
 - `interrupt_after: list[str]`: 通过name指定要在哪些node **执行后** 触发中断
 - `debug: bool`:
@@ -1602,7 +1607,6 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 - `CompiledGraph`: 继承自`pregel`模块的`Pregel`类，`Graph.compile`方法返回的就是此类的对象。
 
-
 **使用说明**
 
 `Graph`类用于表示无状态图，它使用如下属性来存储图的信息：
@@ -1621,7 +1625,6 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 注意，**`Graph`类的初始化方法不接受任何参数，所以说它是无状态的**。
 
-
 `CompiledGraph`是`Graph`编译后的对象，它继承了`pregel`模块的`Pregel`类，提供了如下方法（`Pregel`定义的）：
 - `invoke`/`ainvoke`
 - `stream`/`astream`
@@ -1629,31 +1632,32 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 - `update_state`/`aupdate_state`
 - `get_state_history`/`aget_state_history`
 
+------
+### `state.py` - KEY
 
+有状态图的表示，定义了如下2个类：
 
-
-### `state.py`
-
-有状态图的表示，定义了如下3个类：
-
-- `StateNodeSpec`: 有状态节点表示，继承自 `NamedTuple`，有如下属性：
-  - `runnable: Runnable`:
-  - `metadata`:
-  - `ends`:
-  - `input: Type[Any]`: 记录了输入，也就是状态
-  - `retry_policy`:
-
-- `StateGraph`: 
-
-- `CompiledStateGraph`: 继承自 `CompiledGraph`
+- `StateGraph`:
+- `CompiledStateGraph`
 
 > 在v0.4.10版本以前，`StateGraph`继承自 `Graph`，`CompiledStateGraph`继承自`CompiledGraph`，但是从v0.5.10版本开始，这两个类就不再继承父类了。
 
 **使用说明**
 
-**`StateGraph`的初始化方法里需要传入一个表示状态的对象**，其他大部分方法都和`Graph`一样。
+`StateGraph` 有如下 4 个需要重点关注的属性，也是初始化时需要传入的参数：
 
+- `state_schema: StateT`: **最重要的属性**，定义了整个Graph的状态，可以是 `TypeDict` / `dataclass` / `pydantic.BaseModel`
+- `context_schema: ContextT`: 定义了LangGraph的 `Runtime[ContextT]` 里的泛型参数 `ContextT`，这个类就是自定义的运行时上下文类。
+- `input_schema: InputT`: 定义了 LangGraph 的输入结构，可以是 `TypeDict` / `dataclass` / `pydantic.BaseModel`
+- `output_schema: OutputT`: 定义了 LangGraph 的输出结构，可以是 `TypeDict` / `dataclass` / `pydantic.BaseModel`
 
+**对于 `input_schema` 和 `output_schema` 参数，如果不设置，则默认使用 `state_schema`**。
+
+上面这个四个参数，其实对应的就是 `StateGraph[StateT, ContextT, InputT, OutputT]` 的 4 个泛型类。
+
+`CompiledStateGraph[StateT, ContextT, InputT, OutputT]` 的 4 个泛型参数和 `StateGraph` 的 4 个泛型参数一样。
+
+------
 ### `message.py`
 
 定义了如下2个类：

@@ -126,23 +126,29 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 # ======================================================================================================================
-
+# %%
+# --- 阿里百炼 ---
+API_KEY = ''
+LLM_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+MODEL = 'qwen-max'
 # --- vLLM 部署 ---
 # API_KEY = 'Empty'
 # LLM_URL = 'http://172.16.0.32:10086/v1'
-# MODEL = 'Qwen2.5-32B-Instruct'
+# MODEL = 'Qwen2.5-32B'
+# MODEL = 'Qwen3-32B'
 # --- Ollama 本地部署 ---
-API_KEY = 'Empty'
-LLM_URL = 'http://localhost:11434'
+# API_KEY = 'Empty'
+# LLM_URL = 'http://localhost:11434'
 # MODEL = 'qwen2.5:7b'
 # MODEL = 'qwen3:8b'
-MODEL = 'qwen2.5:14b'
+# MODEL = 'qwen2.5:14b'
 # MODEL = 'qwen3:14b'
 
 
 # %%
 # ======================= LLM + ChatLLM 模型包装器 使用 =======================
 def llm_usage():
+    print("===> llm_usage()")
     # client_llm = OpenAI(
     #     openai_api_key=API_KEY,
     #     openai_api_base=LLM_URL,
@@ -184,6 +190,7 @@ def llm_usage():
 
 # %%
 def chat_llm_usage():
+    print("===> chat_llm_usage()")
     # client_chat = ChatOpenAI(
     #     openai_api_key=API_KEY,
     #     openai_api_base=LLM_URL,
@@ -257,38 +264,43 @@ def get_client_llm() -> Union[BaseLLM, LLM]:
 
 # %%
 def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
-    # client_chat = ChatOpenAI(
-    #     openai_api_key=API_KEY,
-    #     openai_api_base=LLM_URL,
-    #     model_name=MODEL,
-    #     # temperature=0.7,
-    #     # top_p=1,
-    #     # streaming=False,
-    # )
-    client_chat = ChatOllama(
-        base_url=LLM_URL,
-        model=MODEL,
+    client_chat = ChatOpenAI(
+        openai_api_key=API_KEY,
+        openai_api_base=LLM_URL,
+        model_name=MODEL,
         # temperature=0.7,
         # top_p=1,
-        keep_alive='30m',
-        # 控制模型是否进行think，只对支持think的模型有效，但是似乎对 qwen3 的think模式无效
-        think=False
+        # streaming=False,
     )
+    # client_chat = ChatOllama(
+    #     base_url=LLM_URL,
+    #     model=MODEL,
+    #     # temperature=0.7,
+    #     # top_p=1,
+    #     keep_alive='30m',
+    #     # 控制模型是否进行think，只对支持think的模型有效，但是似乎对 qwen3 的think模式无效
+    #     think=False
+    # )
     print(f"\n===> Using model '{MODEL}' with {client_chat.get_name()}\n")
     return client_chat
 
 # %%
 def simple_chat():
+    print("===> simple_chat()")
     client_chat = get_client_chat()
+    # print(type(client_chat))
+    # issubclass(type(client_chat), BaseChatModel)
+    # print(hasattr(client_chat, 'profile'))
     msg = [
-        # HumanMessage(content='RTX 4060 Ti 16GB跑本地大模型怎么样？'),
+        HumanMessage(content='RTX 4060 Ti 16GB跑本地大模型怎么样？'),
         # 只有手动在消息前面加上 /no_think，对于 qwen3 的think模式才会有效，但是此时仍然会输出一个空的 <think></think> 块
-        HumanMessage(content='/no_think RTX 4060 Ti 16GB跑本地大模型怎么样？'),
+        # HumanMessage(content='/no_think RTX 4060 Ti 16GB跑本地大模型怎么样？'),
     ]
     # res = client_chat.invoke(input=msg)
     # print(res)
     for chunk in client_chat.stream(input=msg):
         print(chunk.content, end='')
+
 
 # %%
 # ======================= Message + PromptTemplate 使用 =======================
@@ -303,6 +315,7 @@ def message_usage():
     - ToolMessage: 工具调用返回的消息
     - ChatMessage: 通用消息
     """
+    print("===> message_usage()")
     # ----- ChatMessage 使用 -----
     chat_msg = ChatMessage(role='user', content='Hello ChatGPT')
     print(chat_msg)
@@ -338,6 +351,7 @@ def prompt_template_usage():
     """
     Completion模型使用的 PromptTemplate。
     """
+    print("===> prompt_template_usage()")
     # StringPromptTemplate含有抽象方法，不能实例化
     # pt = StringPromptTemplate(input_variables=["p1", "p2"], template="content-1: {p1}, content-2: {p2}")
 
@@ -375,6 +389,7 @@ def chat_prompt_template_usage():
       - SystemMessagePromptTemplate
     - 多条消息，使用 ChatPromptTemplate 对上面的单条消息进行 List 封装
     """
+    print("===> chat_prompt_template_usage()")
     # ----- ChatMessagePromptTemplate 使用 -----
     template1 = "Tell me a {adjective} joke about {content}."
     # ChatMessagePromptTemplate 必须要指定 template 和 role
@@ -451,6 +466,7 @@ def message_placeholder_usage():
     注意，MessagesPlaceholder 只能用于 ChatPromptTemplate 中，不能搭配 PromptTemplate 使用。
     主要作用就是在 ChatPromptTemplate 中预留一个位置，用于在运行时动态传入一系列 BaseMessage（如 HumanMessage, AIMessage, SystemMessage 等）。
     """
+    print("===> message_placeholder_usage()")
     # ------ MessagesPlaceholder 使用 ------
     # 使用 optional=True，表示这个变量是可选的，如果不传，则不会报错，但会返回空列表
     prompt = MessagesPlaceholder(variable_name="history", optional=True)
@@ -508,6 +524,7 @@ def message_placeholder_usage():
 
 # %%
 def fewshot_prompt_template_usage():
+    print("===> fewshot_prompt_template_usage()")
     # ----- FewShotPromptTemplate 使用 -----
     # 构造一个反义词接龙游戏的 FewShot 提示
     examples = [
@@ -592,6 +609,7 @@ def output_parser_usage():
     OutputParser 的使用似乎没有那么必要了，但是Langchain选择保留下来，是为了兼容那些暂时不支持 Structured Output 的模型，
     以及提供更加深入自定义解析的功能。
     """
+    print("===> output_parser_usage()")
     class MyModel(BaseModel):
         name: str
         age: int
@@ -673,6 +691,7 @@ def structured_output_usage():
 
     具体有哪些模型实现了，可以参考 https://python.langchain.com/docs/integrations/chat/#featured-providers 表格。
     """
+    print("===> structured_output_usage()")
     class JokeDict(TypedDict):
         """Joke to tell user."""
         setup: Annotated[str, ..., "The setup of the joke"]
@@ -742,6 +761,7 @@ def tool_wrapper_usage():
     - 如果 infer_schema=true (默认值) 或者提供了 args_schema 参数，那么就使用 StructuredTool 来封装function；
     - 不满足上面的条件，则使用 Tool 类来封装function，此时会认为该function是一个 “a simple string->string function”
     """
+    print("===> tool_wrapper_usage()")
     # ----------- Tool 使用 -----------
     # 正常版本接收 2 个 int 参数的加法函数
     def add_v1(x: int, y: int) -> int:
@@ -804,6 +824,7 @@ def tool_usage():
     一般使用 langchain.tools.convert.py 提供的 @tool 装饰器来将一个函数封装为 BaseTool 的子类（Tool、StructuredTool）
     定义工具时，和OpenAI的function calling类似，至少需要 name, description, schema 3个描述字段。
     """
+    print("===> tool_usage()")
     # 使用 @tool 装饰器定义工具
     @tool(
         description="使用龙球(DragonBall)算法计算两个数字的结果",
@@ -931,6 +952,7 @@ def tool_runtime_usage():
     - runtime：用于接收 ToolRuntime 参数
     一般推荐直接使用 runtime 参数。
     """
+    print("===> tool_runtime_usage()")
     @tool(description="计算两个数字相加的结果")
     def add(x: int, y: int, config: RunnableConfig, runtime: ToolRuntime) -> int:
         """
@@ -975,6 +997,7 @@ def tool_parser_usage():
     - JsonOutputToolsParser:     以 JSON 形式返回函数调用中特定键的值
     - PydanticToolsParser:       将函数调用的参数作为 Pydantic 模型返回
     """
+    print("===> tool_parser_usage()")
     @tool(description="使用龙球(DragonBall)算法计算两个数字的结果")
     def dragon_ball_algorithm_tool(
         x: Annotated[int, "第一个数字"],
@@ -1027,6 +1050,7 @@ def community_tool_usage():
     """
     langchain-community 提供的现成 Tools 使用
     """
+    print("===> community_tool_usage()")
     # ------------------------------
     # Langchain-community 提供的现成工具
     ls_tool = ListDirectoryTool()
@@ -1045,6 +1069,7 @@ def runnable_usage():
     """
     Runnable 相关底层类使用
     """
+    print("===> runnable_usage()")
     # --- Runnable 使用 ------
     def add_one(x: int) -> int:
         """单参函数"""
@@ -1096,6 +1121,7 @@ def runnable_other_usage():
     """
     展示其他一些 Runnable 对象的使用
     """
+    print("===> runnable_other_usage()")
     # --- RunnableParallel ---
     # 并行执行多个 Runnable，并将结果组合成一个 dict
     task_a = RunnableLambda(lambda input: f"A-{input}")
@@ -1149,7 +1175,7 @@ def runnable_other_usage():
 # %%
 class MyCustomHandler(BaseCallbackHandler):
     """
-    自定义 CallbackHander，需要继承 BaseCallbackHandler，并实现其中自己在某个阶段的回调方法。
+    自定义 CallbackHandler，需要继承 BaseCallbackHandler，并实现某个阶段的回调方法。
     """
     def on_llm_start(self, serialized, prompts, **kwargs):
         print("--->>> LLM 调用开始！")
@@ -1164,6 +1190,7 @@ def callback_usage():
     展示LangChain里 callback 的使用。
     LangChain的Callback一般是由`BaseLLM`/`BaseChatModel`/`Chain`对象封装，不直接和Runnable基础类配合使用
     """
+    print("===> callback_usage()")
     input_str = "请解释下机器学习算法SVM的原理"
 
     # 第1种设置 callback 的方式：全局设置
@@ -1206,6 +1233,7 @@ def chain_usage():
     """
     v0.3.x 版本提供的 LLMChain 使用，v1.x 版本中已经不推荐使用了，可以使用 RunnableSequence 来代替。
     """
+    print("===> chain_usage()")
     client_llm = get_client_llm()
     client_chat = get_client_chat()
     template = "Tell me a {adjective} joke about {content}."
@@ -1250,6 +1278,7 @@ def memory_usage():
     """
     Memory 模块已经不推荐使用了。
     """
+    print("===> memory_usage()")
     # ----- 早期版本基于 BaseMemory 实现的使用 -----
     cb_memory = ConversationBufferMemory()
     print(cb_memory.memory_key)  # 存储历史对话的 key
@@ -1306,6 +1335,7 @@ def chat_history_usage():
     1. 搭配早期的 memory 模块使用的，随着 memory 模块的废弃，此种方式不推荐了；
     2. 搭配下面的 RunnableWithMessageHistory 使用，这也是此组件没有被废弃的原因。
     """
+    print("===> chat_history_usage()")
     # --- 单独使用 ---
     history = ChatMessageHistory()
     history.add_message(message=HumanMessage(content='hello from me'))
@@ -1345,6 +1375,7 @@ def runnable_history_usage():
     langchain_core.runnables.history.py 提供的 RunnableWithMessageHistory 在 v1.x 版本可以继续使用。
     不过感觉在 v1.x 版本，这个组件的使用也不多了。
     """
+    print("===> runnable_history_usage()")
     # RunnableWithMessageHistory 使用分为3个部分：
 
     # 1. 配置一个 Runnable 对象，RunnableSequences对象 或者 Chain对象 都可以
@@ -1421,6 +1452,7 @@ def document_loader_usage():
     - `load`/`aload`: 加载数据，返回 `List[Document]`
     - `lazy_load`/`alazy_load`: 迭代加载数据，返回 `Iterator[Document]`
     """
+    print("===> document_loader_usage()")
     file_path = os.path.join(os.getcwd(), 'test.txt')
     print(os.path.exists(file_path))
     txt_loader = TextLoader(file_path=file_path, autodetect_encoding=True)
@@ -1439,6 +1471,7 @@ def document_transform_usage():
     """
     Document transform 使用
     """
+    print("===> document_transform_usage()")
     # TODO
     pass
 
@@ -1449,6 +1482,7 @@ def text_splitter_usage():
     抽象基类 TextSplitter，继承自 BaseDocumentTransformer，
     大多数情况下，推荐使用 RecursiveCharacterTextSplitter 这个实现类。
     """
+    print("===> text_splitter_usage()")
     # 加载文档
     text_loader = TextLoader(file_path=os.path.join(os.getcwd(), 'test.txt'), autodetect_encoding=True)
     documents: List[Document] = text_loader.load()
@@ -1470,6 +1504,7 @@ def text_embedding_usage():
     - `embed_query`/`aembed_query`: 计算query的embedding向量，返回一个 `List[float]`
     - `embed_documents`/`aembed_documents`: **批量计算**query的embedding向量，返回一个 `List[List[float]]`
     """
+    print("===> text_embedding_usage()")
     embeddings = OllamaEmbeddings(base_url=LLM_URL, model_name=MODEL, keep_alive='30m')
 
     # query embedding
@@ -1500,6 +1535,7 @@ def vector_store_usage():
     - `search`/`asearch`
     - `similarity_search`/`asimilarity_search`
     """
+    print("===> vector_store_usage()")
     # 首先要提供一个 Embeddings 实现类对象
     embeddings = OllamaEmbeddings(base_url=LLM_URL, model_name=MODEL, keep_alive='30m')
 
@@ -1535,6 +1571,7 @@ def retriever_usage():
     BaseRetriever 抽象基类继承自 `RunnableSerializable`，因此通过通用方法 `invoke()`/`ainvoke()` 进行调用即可,
     返回类型是 List[Document]。
     """
+    print("===> retriever_usage()")
     # ES-BM25向量检索包装器
     from elasticsearch import Elasticsearch
     es = Elasticsearch(hosts="localhost")
@@ -1553,117 +1590,206 @@ def retriever_usage():
 # %%
 def auto_agent_usage():
     """
-    langchain-v1.x 的 agent 创建。
+    展示 LangChain-v1.x 的 Agent 使用。
     """
+    print("===> auto_agent_usage()")
     model = get_client_chat()
+
     memory_saver = MemorySaver()
     memory_store = InMemoryStore()
-
-    class MiddlewareState(AgentState):
-        """
-        Middleware State 表示类，必须要继承自 AgentState 类，本质上是一个 TypedDict。
-        """
-        m_state: str
+    memory_store.put(namespace=("user", "db"), key="XiaoMing", value={"age": 20, "gender": "male"})
+    memory_store.put(namespace=("user", "db"), key="XiaoHong", value={"age": 18, "gender": "female"})
 
     @dataclass
     class UserContext:
-        user_id: str
+        user_name: str
 
-    class AgentHook(AgentMiddleware[MiddlewareState, UserContext]):
-        def before_agent(self, state: MiddlewareState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
-            print(f"--> before_agent called...")
-            return None
+    class MyAgentState(AgentState):
+        """
+        Graph State 表示类，必须要继承自 AgentState 类，本质上是一个 TypedDict。
+        它是一个 base schema，后续所有middleware里定义的schema都会被合并到这个base schema里
+        """
+        base_state: str
 
-        def after_agent(self, state: MiddlewareState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
-            print(f"--> after_agent called...")
-            return None
+    # class ModelHookState(AgentState):
+    class ModelHookState(MyAgentState):
+        """
+        ModelHook 中间件的 state_schema.
+        虽然可以直接继承 AgentState，但是建议继承自 MyAgentState，因为所有中间件的state_schema的属性会被合并到 MyAgentState 里。
+        """
+        model_hook_state: str
 
-    class ModelHook(AgentMiddleware[MiddlewareState, UserContext]):
-        def before_model(self, state: MiddlewareState, runtime: Runtime[UserContext])-> dict[str, Any] | None:
-            print(f"--> before_model called...")
-            return None
+    class AgentHook(AgentMiddleware[MyAgentState, UserContext]):
+        def before_agent(self, state: MyAgentState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
+            print(f"--> before_agent called with context: {runtime.context}...")
+            # print(f"--> before_agent state.__class__: {type(state)}")  # <class 'dict'>
+            print(f"--> before_agent state.keys: {state.keys()}")
+            # 如果想更新状态里的某个 key ，不要直接更新，应当返回一个 dict
+            # state["base_state"] += ";before_agent"
+            base_state_update = state["base_state"] + ";before_agent"
+            return {'base_state': base_state_update}
 
-        def after_model(self, state: MiddlewareState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
-            print(f"--> after_model called...")
-            return None
+        def after_agent(self, state: MyAgentState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
+            print(f"--> after_agent called with context: {runtime.context}...")
+            # print(f"--> after_agent state.__class__: {type(state)}")  # <class 'dict'>
+            print(f"--> after_agent state.keys: {state.keys()}")
+            # state["base_state"] += ";after_agent"
+            base_state_update = state["base_state"] + ";after_agent"
+            return {'base_state': base_state_update}
 
-    class WrapModelHook(AgentMiddleware[MiddlewareState, UserContext]):
+    class ModelHook(AgentMiddleware[ModelHookState, UserContext]):
+        # 这个 Middleware 也定义了自己的 state_schema
+        state_schema = ModelHookState
+
+        def before_model(self, state: ModelHookState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
+            print(f"--> before_model called with context: {runtime.context}...")
+            # print(f"--> before_model state.__class__: {type(state)}")
+            print(f"--> before_model state.keys: {state.keys()}")
+            print(f"--> before_model called with state.base_state: {state.get('base_state', None)}")
+            model_state_hook_update = state["model_hook_state"] + ";before_model"
+            return {'model_hook_state': model_state_hook_update}
+
+        def after_model(self, state: ModelHookState, runtime: Runtime[UserContext]) -> dict[str, Any] | None:
+            print(f"--> after_model called with context: {runtime.context}...")
+            # print(f"--> after_model state.__class__: {type(state)}")
+            print(f"--> after_model state.keys: {state.keys()}")
+            print(f"--> after_model called with state.base_state: {state.get('base_state', None)}")
+            model_state_hook_update = state["model_hook_state"] + ";after_model"
+            return {'model_hook_state': model_state_hook_update}
+
+    class WrapModelHook(AgentMiddleware[MyAgentState, UserContext]):
         def wrap_model_call(
             self,
             request: ModelRequest,
             handler: Callable[[ModelRequest], ModelResponse],
         ) -> ModelResponse | AIMessage:
+            print(f"--> wrap_model_call called with context: {request.runtime.context}...")
+            # print(f"--> wrap_model_call state.__class__: {type(request.state)}")
+            print(f"--> wrap_model_call state.keys: {request.state.keys()}")
+            print(f"--> wrap_model_call called with state.base_state: {request.state.get('base_state', None)}")
             return handler(request)
 
-    class WrapToolHook(AgentMiddleware[MiddlewareState, UserContext]):
+    class WrapToolHook(AgentMiddleware[MyAgentState, UserContext]):
         def wrap_tool_call(
             self,
             request: ToolCallRequest,
             handler: Callable[[ToolCallRequest], ToolMessage | Command],
         ) -> ToolMessage | Command:
+            print(f"--> wrap_tool_call called with context: {request.runtime.context}...")
+            # print(f"--> wrap_tool_call state.__class__: {type(request.state)}")
+            print(f"--> wrap_tool_call state.keys: {request.state.keys()}")
+            print(f"--> wrap_tool_call called with state.base_state: {request.state.get('base_state', None)}")
             return handler(request)
 
-    @tool(description="Get weather of the city")
-    def get_weather(city: str) -> str:
-        """
-        Get weather of the city
-        """
-        return f"{city}的天气是晴天"
+    @tool(description="获取当前Agent的执行上下文")
+    def get_agent_context(runtime: ToolRuntime[UserContext]) -> str:
+        # 从自定义的 UserContext 里获取用户名
+        user_name = runtime.context.user_name
+        # 然后从store里获取用户信息
+        user_info = runtime.store.get(namespace=("user", "db"), key=user_name)
+        return f"当前的Agent执行上下文是：{user_name} -> {user_info}"
 
-    @tool(description="Get user location")
-    def get_user_location(user: str) -> str:
-        """
-        Get user location
-        """
-        return f"{user}的位置是北京"
+    @tool(description="获取某个城市的天气信息")
+    def get_weather(city: str) -> str:
+        return f"{city}的天气是晴天"
 
     agent: CompiledStateGraph = create_agent(
         name="Some-Agent",
         model=model,
         system_prompt="你是一个智能助手",
-        tools=[get_user_location, get_weather],
+        tools=[get_agent_context, get_weather],
         middleware=[AgentHook(), ModelHook(), WrapModelHook(), WrapToolHook()],
         checkpointer=memory_saver,
         store=memory_store,
         response_format=None,
-        state_schema=MiddlewareState,
+        state_schema=MyAgentState,
         context_schema=UserContext,
         # interrupt_before=None,
         # interrupt_after=None,
         # debug=True
     )
+    # 查看图结构
+    # from .langgraph_practice import show_graph
+    # show_graph(agent)
 
-    msg = HumanMessage(content="北京的天气如何？")
-    agent_res = agent.invoke(input=msg)
-    print(agent_res)
+    agent_response = agent.invoke(
+        # input输入的dict必须对应初始化时传入的state_schema，这里是 MyAgentState；
+        # 此外，还可以传入各个Middleware的state_schema里的key
+        input={
+            "messages": HumanMessage(content="北京的天气如何？"),  # messages 这个key是 AgentState 定义的
+            "base_state": "base_state_init",                    # base_state 这个key是 MyAgentState 定义的
+            "model_hook_state": "model_hook_state_init",        # model_hook_state 这个key是 ModelHookState 定义的
+        },
+        config={"configurable": {"thread_id": "t1"}},
+        context=UserContext(user_name="XiaoMing")
+    )
+    # print(type(agent_response))   # <class 'dict'>
+    # print(agent_response.keys())  # dict_keys(['messages', 'model_hook_state', 'base_state'])
+    # print(agent_response)
+    print("agent response messages:")
+    for msg in agent_response['messages']:
+        msg.pretty_print()
+    print("-----------------------------------------")
+    print("agent response base_state: ", agent_response['base_state'])
+    print("agent response model_hook_state: ", agent_response['model_hook_state'])
 
-
-# %%
-def agent_middleware_usage():
-    """
-    langchain-v1.x 的 agent middleware 使用。
-    """
-    # TODO
-    pass
+    print("******************************************")
+    agent_response = agent.invoke(
+        input={
+            "messages": HumanMessage(content="当前Agent的运行上下文是什么？"),
+            "base_state": "base_state_init",
+            "model_hook_state": "model_hook_state_init",
+        },
+        config={"configurable": {"thread_id": "t2"}},
+        context=UserContext(user_name="XiaoHong")
+    )
+    print("agent response messages:")
+    for msg in agent_response['messages']:
+        msg.pretty_print()
+    print("-----------------------------------------")
+    print("agent response base_state: ", agent_response['base_state'])
+    print("agent response model_hook_state: ", agent_response['model_hook_state'])
 
 
 # %%
 def main():
     # llm_usage()
     # chat_llm_usage()
+    simple_chat()
+    # -----------------------------
     # prompt_template_usage()
     # chat_prompt_template_usage()
     # message_placeholder_usage()
     # fewshot_prompt_template_usage()
     # pipeline_prompt_usage()
-    simple_chat()
+    # -----------------------------
     # output_parser_usage()
     # structured_output_usage()
+    # -----------------------------
+    # tool_wrapper_usage()
+    # tool_usage()
+    # tool_runtime_usage()
+    # tool_parser_usage()
+    # community_tool_usage()
+    # -----------------------------
+    # runnable_usage()
+    # runnable_other_usage()
+    # -----------------------------
+    # callback_usage()
+    # chain_usage()
+    # -----------------------------
     # memory_usage()
     # chat_history_usage()
     # runnable_history_usage()
-    # tool_usage()
-    # tool_parser_usage()
+    # -----------------------------
+    # document_loader_usage()
+    # document_transform_usage()
+    # text_splitter_usage()
+    # text_embedding_usage()
+    # vector_store_usage()
+    # retriever_usage()
+    # -----------------------------
+    # auto_agent_usage()
 
 
 # %%

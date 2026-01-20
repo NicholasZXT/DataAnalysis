@@ -115,6 +115,9 @@ def stateful_graph_usage():
     """
     # 1. 首先定义整个 Graph 的状态表示，可以直接用dict，也可以用 TypedDict，或者是 Pydantic的 BaseModel —— 状态表示完全由用户自定义
     class SimpleState(TypedDict):
+        """
+        这个 state 对象的 key 就是后续 invoke() 方法里 input 参数接受的 dict 的key
+        """
         messages: List[str]
         count: int
 
@@ -149,6 +152,7 @@ def stateful_graph_usage():
         return {'count': 10}
 
     # 3. 使用StateGraph 构建 Graph，初始化参数必须传入自定义的 State 类
+    # state_schema 指定的 State 类，对应的就是 invoke() 方法里 input= 参数的 dict 结构 -------------------- KEY
     graph = StateGraph(state_schema=SimpleState)
 
     # 4. 使用 add_node 方法添加节点，add_node 方法有多个重载，注意选择
@@ -174,13 +178,14 @@ def stateful_graph_usage():
 
     # 7. 使用 Graph
     # 运行Graph: 调用 invoke/ainvoke; stream/astream 方法
+    # invoke()方法的 input= 参数接受一个 TypedDict/dataclass/pydantic BaseModel，对应于初始化时 state_schema 定义的结构 ------ KEY
     input = {"messages": [], "count": 0}
     print(f"Graph input: {input}")
     res = compile_graph.invoke(input=input)
-    # print(type(res))  # <class 'langgraph.pregel.io.AddableValuesDict'>
-    # Graph 返回的 AddableValuesDict 只是一个对 dict 进行简单封装，重写了 __add__ 方法的dict, key 和 state 里定义的完全一样
-    print(f"res.keys: {res.keys()}")
-    print(f"final state: {res}")
+    print(type(res))  # 早期版本是 <class 'langgraph.pregel.io.AddableValuesDict'>，新版本是 <class 'dict'>
+    # 早期 Graph 返回的 AddableValuesDict 只是一个对 dict 进行简单封装，重写了 __add__ 方法的dict, key 和 state 里定义的完全一样
+    print(f"res.keys: {res.keys()}")  # dict_keys(['messages', 'count'])，key 和 state 里定义的完全一样
+    print(f"output state: {res}")
 
     # 批量调用: batch/abatch 方法
     inputs = [{"messages": [], "count": 0}, {"messages": ["Hi"], "count": 1}]
@@ -999,10 +1004,22 @@ def graph_custom_node_with_class_usage():
     print(res)
 
 
+def show_graph(graph: CompiledStateGraph):
+    try:
+        from IPython.display import Image, display
+        # display(Image(graph.get_graph().draw_mermaid_png()))
+        img = Image(graph.get_graph().draw_mermaid_png())
+        with open(f"{graph.get_name()}.png", 'wb') as f:
+            f.write(img.data)
+    except Exception as e:
+        # This may require some extra dependencies and is optional
+        print(e)
+
+
 # ======================= Graph Node 自定义 =======================
 def main():
-    # stateful_graph_usage()
-    message_graph_usage()
+    stateful_graph_usage()
+    # message_graph_usage()
     # graph_conditional_usage()
     # graph_checkpoint_usage()
     # graph_store_usage()
