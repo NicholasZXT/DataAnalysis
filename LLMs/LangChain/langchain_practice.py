@@ -316,7 +316,8 @@ def message_usage():
     - ChatMessage: 通用消息
     """
     print("===> message_usage()")
-    # ----- ChatMessage 使用 -----
+    # -------- ChatMessage 使用 --------
+    # 不过 ChatMessage 的使用好像不多
     chat_msg = ChatMessage(role='user', content='Hello ChatGPT')
     print(chat_msg)
     # content='Hello ChatGPT' additional_kwargs={} response_metadata={} role='user'
@@ -328,7 +329,8 @@ def message_usage():
     print(chat_msg.pretty_repr())
     chat_msg.pretty_print()
 
-    # ----- SystemMessage/HumanMessage/AIMessage 等 使用 -----
+    # -------- SystemMessage/HumanMessage 使用 --------
+    # 这两个 Message 类除了 type 属性的值不一样，其他几乎都一样
     sys_msg = SystemMessage(content='You are a helpful assistant.')
     print(sys_msg)
     # content='You are a helpful assistant.' additional_kwargs={} response_metadata={}
@@ -341,10 +343,29 @@ def message_usage():
     print(sys_msg.pretty_repr())
     sys_msg.pretty_print()
 
+    # -------- AIMessage 使用 --------
+    # AIMessage 类有几个独有的属性：
+    # - usage_metadata: 模型使用信息，是一个 TypedDict，包含：input_tokens, output_tokens, total_tokens, input_token_details 等
+    # - tool_calls: 如果触发了工具调用，在该属性有值
+    # - invalid_tool_calls: 不合法的工具调用信息
+
+    # -------- ToolMessage 使用 --------
+    # ToolMessage 类有几个独有的属性：
+    # - tool_call_id: 工具调用的 id
+    # - status: 工具调用结果， success 或者 error
+    # - artifact:
+    # - response_metadata:
+
     # -------- 在Message中加入额外信息 --------
+    # 使用关键字参数传入额外的信息
     msg_add = ChatMessage(role='user', content='Hello ChatGPT', thinking=True, additional_kwargs={'some': 'something'})
     msg_add = SystemMessage(content='You are a helpful assistant.', thinking=True, additional_kwargs={'some': 'something'})
     print(msg_add)
+
+    # -------- Message ContentBlock 使用 --------
+    # Langchain v1.x 新增的功能，BaseMessage 基类提供了一个名为 content_blocks 的 property，
+    # 对 content 字段进行解析，返回一个标准的、类型安全的 内容表示。
+
 
 # %%
 def prompt_template_usage():
