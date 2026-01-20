@@ -218,7 +218,8 @@ v1.0 里此模块的内容如下：
   - Middleware 的各类 hook 方法也会使用这个 state_schema
 - `context_schema`: `TypedDict`/`dataclass`/pydantic `BaseModel` **类**，用于定义LangGraph的 `Runtime[ContextT]` 里的 `ContextT` 泛型。
   - 这个schema的实例对象可以在调用`CompiledStateGraph.invoke()`方法时作为`context`参数传入，之后可以在LangGraph节点中的`Runtime[ContextT].context`属性获取了。
-- `tools`: 工具列表
+- `tools`: 工具列表。
+  - 查看源码可以发现，传入的所有tools都被封装到了下面介绍的`tools`模块的 `_ToolNode` 类中。 
 - `middleware`: 中间件配置列表
 - `checkpointer: Checkpointer`: LangGraph Checkpointer 对象
 - `store: BaseStore`: LangGraph Store 对象
@@ -331,6 +332,26 @@ Node-style hook方法的签名为：
   - `str`: 自定义异常信息，一旦抛出结构化结果解析错误，都会返回此文本
   - `type[Exception]` / `tuple[type[Exception],...]`: 只捕获此异常/多个异常，并使用默认异常模板返回异常信息，**并进行重试**；对于其他异常则会继续抛出
   - `Callable[[Exception], str]`: 自定义的异常处理函数，返回处理后的异常信息
+
+---------------
+## `tools` 模块
+
+> v1.x 版本的 `tools` 模块改动很大，相当于重构了。
+
+此模块里面只有一个 `toos_node.py`，其中定义了如下有用的类：
+- `_ToolNode`: 配合`create_agent()` 函数使用，用于对传入的tools列表进行封装
+- `ToolCallRequest`:
+- `ToolRuntime`:
+- `InjectedState`:
+- `InjectedStore`:
+
+查看`_ToolNode`类的源码可以发现：
+- 它对传入的tools列表进行封装时，有一个`__tools_by_name: dict[str, BaseTool]`属性，**存储每个tool的name和tool对象的映射关系**
+- 调用`invoke()`方法时，会对传入的`input`进行解析检查，获取其中`AIMessage`对象的`.tool_calls`列表
+- 接着调用`_ToolNode._func()`方法，其中会采用 `executor.map(self._run_one, tool_calls, input_types, tool_runtimes))` 方式**并行调用每个Tool**
+- `_ToolNode._run_one()`方法中，会先根据tool_call.name从`__tools_by_name`属性中获取对应的tool对象，将调用上下文封装成`ToolCallRequest`对象
+- 调用`_ToolNode._execute_tool_sync()` 方法，其中会调用tool的`invoke()`方法，并传入该tool_call的args
+- 最后将tool的输出结果封装成`ToolMessage`对象并返回
 
 
 ---------------------------------------------------
@@ -1464,6 +1485,8 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 > 因此这里就**不再详细介绍 agents 模块相关内容了**。
 
 ### `tools`模块
+
+> v1.x 版本的 tools 模块改动很大，几乎相当于重构了。
 
 和上面类似，这个模块主要从两个地方导入内容：
 - `langchain_core.tool`里导入抽象基类
