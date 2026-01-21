@@ -310,6 +310,41 @@ Node-style hook方法的签名为：
 > `AgentMiddleware`抽象类及其子类只不过是一个封装方法的容器而已，这也要求`AgentMiddleware`子类里最好不要定义实例属性存放共享状态。
 
 
+### Built-in Middlewares
+
+官方文档 [Built-in Middlewares](https://docs.langchain.com/oss/python/langchain/middleware/built-in).
+
+LangChain 默认提供了如下built-in middleware：
+
+#### HumanInTheLoopMiddleware
+
+参考官方文档 [Human-in-the-loop](https://docs.langchain.com/oss/python/langchain/human-in-the-loop).
+
+`HumanInTheLoopMiddleware` 的作用是**在模型调用之后，如果有工具调用，判断哪些工具调用需要触发人工处理**。
+
+它配置了如下两个属性：
+- `description_prefix: str`，触发HIL时的描述前缀
+- `interrupt_on: dict[str, bool | InterruptOnConfig]`: 一个dict，配置需要中断的tool name
+  - key 是需要触发中断的tool name
+  - value，该工具的中断配置，可选值如下：
+    - `True`, 表示触发中断，后续允许 `approve, edit, and reject` 等HIL结果
+    - `False`, 表示自动批准该工具的调用
+    - `InterruptOnConfig`对象, 表示其他中断配置：
+      - `allowed_decisions`, 允许的HIL结果，可选值为 `Literal["approve", "edit", "reject"]`
+      - `description: str`, 触发HIL时的描述
+
+源码实现逻辑大致如下：
+- 实现 `AgentMiddleware` 的 `after_model` hook 方法
+- 在`after_model` 方法里，从 `state['messages']` 中获取 `AIMessage`
+- 从 `AIMessage.tool_calls` 里获取工具调用相关信息，并判断是否在 `self.interrupt_on` 里配置的需要中断的工具
+- 如果有需要中断的工具调用，则组织好信息，然后调用 `interrupt()` 方法触发中断。
+- `interrupt()` 方法的返回值里，会检查 `decisions` 这个属性， 
+  - 因此要求恢复执行时的 `Command` 对象的 `resume` 参数接受的dict里必须要包含 `decisions` 这个 key，
+  - `decisions` 是一个 `List[Dict[str, Any]]`，`Dict`的一个key是 `type`，value是 `Literal["approve", "edit", "reject"]`。
+
+#### ModelCallLimitMiddleware
+
+
 ---------------
 ### 结构化输出
 
