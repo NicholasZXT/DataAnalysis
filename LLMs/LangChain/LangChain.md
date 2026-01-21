@@ -1910,3 +1910,78 @@ checkpoint里快照的数据结构封装。
 ---------------------------------------------------
 ## `managed`模块
 
+
+---------------------------------------------------
+# LangChain-MCP-Adapters
+
+`langchain-mcp-adapters` 专门为 LangChain 提供 MCP 适配的package，使用时的包名为 `langchain_mcp_adapters`。
+
+此模块提供了将 MCP Tools 包装为 LangChain Tools 的功能，同时它**依赖于MCP官方的Python-SDK `mcp` **。
+
+> 以下是基于 **v0.1.14** 版本梳理的模块内容。
+
+`__init__.py` 里没有任何内容，所以无法从顶级模块中导入任何对象。
+
+------
+## `client.py` - KEY
+
+定义了一个 `MultiServerMCPClient`，这个类是 MCP-Adapter 大部分情况下的使用入口。
+
+`MultiServerMCPClient`类 有如下 3个 初始化参数：
+- `connections: dict[str, Connection]`, MCP服务器连接信息 —— 最重要的配置
+- `callbacks`:
+- `tool_interceptors`:
+
+`MultiServerMCPClient`类主要提供了如下 3 个方法：
+- `get_tools(server_name: str) -> list[Tool]`: 获取指定服务器的 MCP Tools，它会调用下面的 `load_mcp_tools()` 函数。
+- `get_resources(server_name: str, uris: str | list[str]) -> list[Blob]`: 获取指定服务器的 MCP Resources，它会调用下面的 `load_mcp_resources()` 函数。
+- `get_prompts(server_name: str, prompt_name: str,) -> list[HumanMessage | AIMessage]`: 获取指定服务器的 MCP Prompts，它会调用下面的 `load_mcp_prompts()` 函数。
+
+注意，上面3个方法都是**异步方法**！！！
+
+------
+## `sessions.py`
+
+定义了MCP的各类 Connection 的传输协议结构（TypedDict）：
+- `StdioConnection`
+- `SSEConnection`
+- `StreamableHttpConnection`
+- `WebsocketConnection`
+
+最重要的是实现了一个 `create_session()` 方法，用于创建一个 MCP Session。
+
+------
+## `tools.py`
+
+提供了将 MCP Tools 转换为 LangChain Tools、实现 MCP Tools 调用等功能。
+
+定义了一个 **`load_mcp_tools()`** 函数，用于从 **原生MCP Session** 里获取 MCP Tools 并转换为LangChain-Tools。
+
+------
+## `resources.py`
+
+定义了一个 `load_mcp_resources()` 函数，用于从 **原生MCP Session** 里获取 MCP Resources。
+
+------
+## `prompts.py`
+
+定义了一个 `load_mcp_prompts()` 函数，用于从 **原生MCP Session** 里获取 MCP Prompts。
+
+------
+## `callbacks.py`
+
+
+------
+## `interceptors.py`
+
+
+------
+## 使用说明
+
+有两种使用方式：
+
+（一） 直接使用 `client.py` 里的 `MultiServerMCPClient` 类连接多个MCP服务器，
+然后通过 `get_tools()` 、`get_resources()` 、`get_prompts()` 方法获取 MCP Tools、MCP Resources、MCP Prompts，
+然后将这些 MCP Tools、MCP Resources、MCP Prompts 提供给 LangChain/LangGraph 即可。
+
+（二）

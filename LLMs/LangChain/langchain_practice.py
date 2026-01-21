@@ -3,6 +3,7 @@ LangChain 入门使用练习，适用于 v0.3.x 和 v1.x 版本.
 """
 # %%
 import os
+import asyncio
 from typing import Optional, Dict, List, Union, Any, Callable
 from typing_extensions import Annotated, TypedDict
 from pydantic import BaseModel, Field
@@ -125,6 +126,10 @@ from langgraph.runtime import Runtime
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
+# ---------- v1.0版本 Auto-Agent 搭配 MCP ----------
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.callbacks import Callbacks, CallbackContext, ProgressCallback, LoggingMessageCallback
+from mcp.types import LoggingMessageNotificationParams
 # ======================================================================================================================
 # %%
 # --- 阿里百炼 ---
@@ -1775,6 +1780,101 @@ def auto_agent_usage():
     print("agent response model_hook_state: ", agent_response['model_hook_state'])
 
 
+# ======================= Langchain v1.x Auto-Agent 配合 MCP 使用 =======================
+# %%
+async def auto_agent_with_mcp_usage() -> None:
+    """
+    展示 LangChain v1.x auto agent 配合 MCP 使用。
+    """
+    print("===> Auto-agent with MCP usage")
+
+    # 定义 2个 MCP 回调函数
+    async def on_logging_message(
+        params: LoggingMessageNotificationParams,
+        context: CallbackContext,
+    ) -> None:
+        """
+        Handle log messages from MCP servers.
+        此回调函数必须满足 MCP 回调函数 Protocol: LoggingMessageCallback
+        """
+        print(f"[MCP.callback.on_logging_message] [{context.server_name}] {params.level}: {params.data}")
+
+    async def on_progress(
+        progress: float,
+        total: float | None,
+        message: str | None,
+        context: CallbackContext,
+    ) -> None:
+        """
+        Handle progress updates from MCP servers.
+        此回调函数必须满足 MCP 回调函数 Protocol: ProgressCallback
+        """
+        percent = (progress / total * 100) if total else progress
+        tool_info = f" ({context.tool_name})" if context.tool_name else ""
+        print(f"[MCP.callback.on_progress] [{context.server_name}{tool_info}] Progress: {percent:.1f}% - {message}")
+
+    # 初始化 MCP 客户端
+    mcp_client = MultiServerMCPClient(
+        connections={
+            # STDIO 模式
+            # "weather": {
+            #     "transport": "stdio",  # Local subprocess communication
+            #     "command": "python",
+            #     # Absolute path to your math_server.py file
+            #     "args": ["/path/to/math_server.py"],
+            # },
+            # HTTP 模式，配合 mcp_server.py 使用
+            "weather": {
+                "transport": "streamable_http",  # HTTP-based remote server
+                "url": "http://localhost:8000/mcp",
+            }
+        },
+        # 回调函数，目前只支持两种作用的回调函数 —— 但是这个回调函数的执行时机似乎有点奇怪 # TODO
+        callbacks=Callbacks(on_logging_message=on_logging_message, on_progress=on_progress),
+        tool_interceptors=None
+    )
+    # 获取 MCP 工具，这些工具会被转换成 LangChain 的 Tool 对象
+    mcp_tools: List[BaseTool] = await mcp_client.get_tools()
+    print("******************************************")
+    print("MCP tools:")
+    for tool in mcp_tools:
+        print(tool)
+
+    # 正常创建 Agent
+    print("******************************************")
+    print("creating agent with MCP tools...")
+    model = get_client_chat()
+    memory_saver = MemorySaver()
+    memory_store = InMemoryStore()
+    agent: CompiledStateGraph = create_agent(
+        name="Some-Agent-With-MCP",
+        model=model,
+        system_prompt="你是一个智能助手",
+        tools=mcp_tools,
+        middleware=(),
+        checkpointer=memory_saver,
+        store=memory_store,
+        response_format=None,
+        state_schema=None,
+        context_schema=None,
+        # interrupt_before=None,
+        # interrupt_after=None,
+        # debug=True
+    )
+
+    print("******************************************")
+    print("agent invoke with MCP tools...")
+    agent_response = await agent.ainvoke(
+        input={
+            "messages": HumanMessage(content="北京的天气如何？"),
+        },
+        config={"configurable": {"thread_id": "t1"}}
+    )
+    print("agent response messages:")
+    for msg in agent_response['messages']:
+        msg.pretty_print()
+
+
 # %%
 def main():
     # llm_usage()
@@ -1814,6 +1914,7 @@ def main():
     # retriever_usage()
     # -----------------------------
     # auto_agent_usage()
+    asyncio.run(auto_agent_with_mcp_usage())
 
 
 # %%
