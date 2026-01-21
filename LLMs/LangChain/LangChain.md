@@ -353,6 +353,17 @@ Node-style hook方法的签名为：
 - 调用`_ToolNode._execute_tool_sync()` 方法，其中会调用tool的`invoke()`方法，并传入该tool_call的args
 - 最后将tool的输出结果封装成`ToolMessage`对象并返回
 
+除了使用 `_ToolNode`类封装所有的tools，`factory.py` 里的 `create_agent()` 函数还需要构建 `_ToolNode` 的进入边和输出边：
+- 输出边是通过 `factory.py` 里的 `_make_tools_to_model_edge()` 方法构建的：
+  - source 是 `_ToolNode`，默认名称为 `tools`
+  - `_make_tools_to_model_edge()` 作为 `Graph.add_conditional_edge()` 方法的 `path` 参数
+  - 大致逻辑是：大多数情况下，`_ToolNode` 的输出边会指向 `model` 节点；如果**所有**的tool都设置了`return_direct=True`，就指向结束节点
+- 输入边是通过 `factory.py` 里 `_make_model_to_tools_edge()` 方法构建的：
+  - source 一般是 `model` 节点
+  - `_make_model_to_tools_edge()` 作为 `Graph.add_conditional_edge()` 方法的 `path` 参数
+  - 大致逻辑是：从 `state['messages']` 的末尾寻找 AIMessage 对象，如果对象的tool_calls属性有值，则遍历并封装tool_call对象，
+    并使用LangGraph的 `Send` 对象封装每个 tool_call 信息，返回一个 `List[Send]`。
+
 
 ---------------------------------------------------
 
@@ -1692,6 +1703,61 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 还定义了一个常用的reducer函数：`add_messages`。
 
+
+---------------------------------------------------
+## `types.py`
+
+此源文件里定义了LangGraph 里重要的数据类型。
+
+常用的有如下数据类型：
+
+### `StateSnapshot`
+
+checkpoint里快照的数据结构封装。
+
+### `Interrupt`
+
+触发中断时的数据结构封装，是一个`dataclass`类。
+- 封装了如下属性：
+  - `id`: 标识此次中断的标识符，一般不要手动生成
+  - `value`: 此次中断的附加信息，用户传入，可以是任何对象
+- 一般推荐通过类方法 `from_ns(value: Any, ns: str)` 来创建，它会自动生成一个唯一的id。 
+
+### `Send`
+
+配合 `add_conditional_edges()` 方法使用的数据结构封装，用于动态生成条件边。
+
+- 一般由 `add_conditional_edges()` 里的 `path` 参数传入的函数返回 一个或者多个 `Send` 对象
+- 这个类很简单，就是一个单纯的数据封装，只有两个属性：
+  - `node`: 指定要执行的节点名称
+  - `args`: 传递给目标节点的 state / message
+- `Send`类**没有定义任何方法**，所有的处理逻辑都交给在Graph实现。
+
+### `Command`
+
+用于状态更新和动态控制流（相当于conditional_edges）的数据结构封装。 
+
+> 官方文档 [Graph-API -> Command](https://docs.langchain.com/oss/python/langgraph/graph-api#command)
+> 
+> 使用示例可以参考官方文档 [Graph-API -> Use the Graph API -> Combine control flow and state updates with Command](https://docs.langchain.com/oss/python/langgraph/use-graph-api#combine-control-flow-and-state-updates-with-command)
+
+`Command` 是一个`dataclass`类，定义了如下属性：
+- `graph: str`，指定要发往的 graph：
+  - `None`，表示当前 graph
+  - `str`，一般是`Command.PARENT`，用于Multi-Agent场景，表示父级 graph
+- `update: Any`，表示要更新的状态
+- `resume: dict[str, Any] | Any`，中断后恢复执行的信息，这个参数的值会被作为 `interrupt()` 方法的返回值
+- `goto: Send | Sequence[Send | N]`，要跳转的节点
+  - `str` / `List[str]`，指定（多个）跳转Node的name
+  - `Send` / `List[Send]`，使用 `Send` 对象来封装要跳转的节点和参数。
+
+`Command`有如下几个使用场景：
+- 作为 Node 节点的返回值 —— 最常见
+- 作为中断恢复执行的传入参数 —— 也常见
+
+`Command` 和 conditional_edges 的使用区别在于：
+- 如果要同时更新state，并根据state执行动态控制流，使用 `Command`
+- 如果只是设置节点之间的控制流，使用 conditional_edges
 
 
 ---------------------------------------------------
