@@ -30,7 +30,7 @@ from langgraph.store.memory import InMemoryStore
 from langgraph.config import get_store
 from langgraph.types import StateSnapshot
 # ---------- LangGraph HIL 工具 ----------
-from langgraph.types import interrupt, Command, StreamMode
+from langgraph.types import interrupt, Command, Send
 # ---------- LangGraph Tool 组件 ----------
 from langgraph.prebuilt import ToolNode, tools_condition, create_react_agent, InjectedState, InjectedStore
 from langgraph.runtime import Runtime
@@ -235,6 +235,15 @@ def message_graph_usage():
 def graph_conditional_usage():
     """
     展示有条件动态执行的状态图.
+    主要是 Graph.add_conditional_edges() 方法的使用，该方法参数如下：
+    - source: str, 指定 source 节点
+    - path: 一个Python Callable 对象
+      - 接受的参数是当前图的状态state
+      - 在没有下面的 path_map 情况下，返回值会被作为 下一个/多个 执行Node的名称，多个Node会被并行执行
+      - 如果配置的 path_map，则返回值会被作为 path_map 的key，映射到具体的下一个Node名称
+    - path_map: dict[Hashable, str] | list[str]，对 path 的返回值进行映射处理
+      - 以 dict 形式给出时，会将 path 的返回值作为 key，获取实际待执行的下一个 Node 名称
+      - 以 list[str] 形式给出时，则表示后续执行的Node名称。实际上在 BranchSpec.from_path() 方法里会被转换成 {item: item} 的恒等映射dict
     """
     class SimpleState(TypedDict):
         messages: List[str]
@@ -1005,6 +1014,10 @@ def graph_custom_node_with_class_usage():
 
 
 def show_graph(graph: CompiledStateGraph):
+    """
+    绘制LangGraph 的 Graph 图结构.
+    参考官方文档[Graph API -> Use the graph API -> Visualize your graph](https://docs.langchain.com/oss/python/langgraph/use-graph-api#visualize-your-graph)
+    """
     try:
         from IPython.display import Image, display
         # display(Image(graph.get_graph().draw_mermaid_png()))
