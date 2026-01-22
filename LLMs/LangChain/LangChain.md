@@ -302,6 +302,9 @@ Node-style hook方法的签名为：
 - 所有middleware的`before_agent`/`after_agent`/`before_model`/`after_model`方法，**各自会被封装成LangGraph里的一个Node**，并依次添加之间的边，在指定时机/条件下执行
 - 同一个middleware不能多次使用，否则会抛异常提醒有重复的middleware
 
+> `create_agent()` 函数内部对所有middleware的 `wrap_tool_call` / `wrap_model_call` 进行合并的
+> `_chain_model_call_handlers()` / `_chain_tool_call_wrappers()` 方法值得看看（涉及到装饰器和绑定方法的使用）。
+
 最重要的原则如下：
 
 > 每个middleware继承`AgentMiddleware`时，**最好只实现其中一个hook方法**——尽量遵守**单一职责**的实践；
@@ -1633,17 +1636,6 @@ LangGraph提供了两种API:
 
 > 个人感觉，推荐使用 Graph API, Functional API 的局限性比较大。
 
-
----------------------------------------------------
-## `pregel`模块
-
-此模块是LangGraph 的 Runtime 实现，它基于Google的Pregel算法，该算法专门用于大规模的并行图计算。
-
-下面的 `CompiledGraph` 类就继承了此模块提供的 `Pregel` 类。
-
-这个模块应该是 LangGraph 的核心实现，研究起来难度比较高。
-
-
 ---------------------------------------------------
 ## `constants.py`
 
@@ -1740,7 +1732,7 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 
 ---------------------------------------------------
-## `types.py`
+## `types.py` - KEY
 
 此源文件里定义了LangGraph 里重要的数据类型。
 
@@ -1793,11 +1785,6 @@ checkpoint里快照的数据结构封装。
 `Command` 和 conditional_edges 的使用区别在于：
 - 如果要同时更新state，并根据state执行动态控制流，使用 `Command`
 - 如果只是设置节点之间的控制流，使用 conditional_edges
-
-
----------------------------------------------------
-## `channels`模块
-
 
 
 ---------------------------------------------------
@@ -1908,7 +1895,23 @@ checkpoint里快照的数据结构封装。
 
 
 ---------------------------------------------------
+## `pregel`模块
+
+此模块是LangGraph 的 Runtime 实现，它基于Google的Pregel算法，该算法专门用于大规模的并行图计算。
+
+上面的 `CompiledGraph` 类就继承了此模块提供的 `Pregel` 类。
+
+这个模块应该是 LangGraph 的核心实现，研究起来难度比较高。
+
+
+---------------------------------------------------
+## `channels`模块
+
+
+
+---------------------------------------------------
 ## `managed`模块
+
 
 
 ---------------------------------------------------
