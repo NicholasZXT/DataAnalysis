@@ -1789,6 +1789,9 @@ async def auto_agent_with_mcp_usage() -> None:
     print("===> Auto-agent with MCP usage")
 
     # 定义 2个 MCP 回调函数
+    # 查看源码可以发现，这两个回调函数不是在MCP客户端使用的，而是传递给 MCP Session 使用的 --------------------- KEY
+    # 而且在 0.1.14 版本，似乎只有 on_logging_message 回调函数会被传递给 MCP Session,
+    # on_progress 这个回调函数没有被使用
     async def on_logging_message(
         params: LoggingMessageNotificationParams,
         context: CallbackContext,
@@ -1829,7 +1832,7 @@ async def auto_agent_with_mcp_usage() -> None:
                 "url": "http://localhost:8000/mcp",
             }
         },
-        # 回调函数，目前只支持两种作用的回调函数 —— 但是这个回调函数的执行时机似乎有点奇怪 # TODO
+        # 回调函数，目前只支持两种作用的回调函数，在 v0.1.14 版本中，只有 on_logging_message 回调函数实际有用，并且是在 MCP Session 中使用的
         callbacks=Callbacks(on_logging_message=on_logging_message, on_progress=on_progress),
         tool_interceptors=None
     )
