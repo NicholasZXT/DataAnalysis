@@ -57,11 +57,12 @@ uv_db = [
 	"thrift >= 0.20.0",
     "thrift_sasl >= 0.4.3",
 #    "thriftpy2 >= 0.5.0",
-	"kafka-python >=2.0.0",
-	# "happybase >=1.2.0",
+	 "neo4j >=5.5.0,<6.0.0",
 	# "neo4j-python-driver >=5.5.0",
 	# "py2neo >=2021.2.3",
+#	"kafka-python >=2.0.0",
 	# "redis >=3.5.0",
+	# "happybase >=1.2.0",
 ]
 uv_ml = [
 	"openpyxl >=3.0.0",
@@ -134,12 +135,28 @@ uv_llm = [
     "fastmcp >= 2.10.0"
 ]
 uv_rag = [
-	"llama-index >= 0.14.0",
+    # llama-index 只是一个starter，包含了 llama-index-core + 插件package
+#	"llama-index >= 0.14.0",
+    # core 才是核心
+	"llama-index-core >= 0.14.0",
+#	"llama-index-cli",
+    # 以下都是扩展package，参见 https://llamahub.ai/
+	"llama-index-llms-openai",
+	"llama-index-embeddings-openai",
+	"llama-index-llms-ollama",
+	"llama-index-embeddings-ollama",
+	"llama-index-readers-file",
+	"llama-index-vector-stores-chroma",
+#	"llama-index-vector-stores-elasticsearch",
+#	"llama-index-vector-stores-milvus",
+#	"llama-index-vector-stores-neo4jvector",
+    # ------ 其他文件处理package ------
     "python-docx",
     "pymupdf",
     "pymupdf4llm",
 #    "markitdown[all]",
     "markitdown[pdf, docx, pptx, xlsx, xls]",
+    "chromadb",
 ]
 
 # ------------------------------------ UV 配置 ------------------------------------
@@ -152,7 +169,7 @@ index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 python-downloads = "manual"
 #python-preference = "system"
 python-preference = "managed"
-#link-mode = "copy"
+link-mode = "copy"
 
 default-groups = [
     "uv_db", "uv_ml", "uv_graph",
