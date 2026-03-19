@@ -1,7 +1,10 @@
 [build-system]
-# 使用Pixi
-build-backend = "hatchling.build"
-requires = ["hatchling"]
+# 使用传统的 setuptools 构建，建议使用较新版本的 setuptools 以支持 pyproject.toml 和 wheel
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+# 使用 Pixi 或 UV
+#requires = ["hatchling"]
+#build-backend = "hatchling.build"
 # 使用 Poetry
 #requires = ["poetry-core>=2.0.0,<3.0.0"]
 #build-backend = "poetry.core.masonry.api"
@@ -25,8 +28,10 @@ requires-python = "==3.10.*"
 # 项目依赖，在 pyproject.toml 的规范里，这里配置的依赖在打wheel包时会被一起上传到 PyPI 中
 # 此处的依赖配置，可以被 Poetry, Pixi, UV 识别并生效
 dependencies = [
-    "setuptools",
-    "wheel",
+    # build-system 的依赖不需要出现在这里
+#    "setuptools",
+#    "wheel",
+#    "hatchling",
     "pip"
 ]
 
@@ -82,20 +87,24 @@ uv_graph = [
 	"plotly >=5.10.0",
 	"dash",
 ]
-uv_dl = [
-	# 1.x 最后一个PyTorch版本，CUDA最高支持到 11.7
-	"torch == 1.13.1+cu117",
-	"torchvision == 0.14.1+cu117",
+#uv_torch_13 = [
+#	# 1.x 最后一个PyTorch版本，CUDA最高支持到 11.7，Python版本为3.10
 #    "torch == 1.13.1",
 #	"torchvision == 0.14.1",
-	"torchaudio == 0.13.1"
-	# 2.5 版本
+#	"torchaudio == 0.13.1",
+#]
+uv_torch_2x = [
+    # 2.x 版本PyTorch，这里选择 2.8 + CUDA 12.8
+    "torch == 2.8.0",
+	"torchvision == 0.23.0",
+	"torchaudio == 2.8.0",
 ]
 uv_nlp = [
 	# "nltk",
 	"spacy >=3.4.2 ",
-	"transformers >=4.23.1 ",
+	"transformers >=4.23.1",
 	"tokenizers",
+	"sentence-transformers <= 5.2.0",
 ]
 
 # --- langchain v0.3.x 版本 ---
@@ -124,7 +133,14 @@ uv_llm = [
 	"mcp[cli] >= 1.12.0",
     "fastmcp >= 2.10.0"
 ]
-
+uv_rag = [
+	"llama-index >= 0.14.0",
+    "python-docx",
+    "pymupdf",
+    "pymupdf4llm",
+#    "markitdown[all]",
+    "markitdown[pdf, docx, pptx, xlsx, xls]",
+]
 
 # ------------------------------------ UV 配置 ------------------------------------
 # 使用方式1： uv sync
@@ -134,32 +150,42 @@ managed = true
 package = false
 index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 python-downloads = "manual"
-python-preference = "system"
-#python-preference = "managed"
+#python-preference = "system"
+python-preference = "managed"
 #link-mode = "copy"
 
-default-groups = ["uv_db", "uv_ml", "uv_graph", "uv_dl", "uv_nlp", "uv_llm"]
-# PyTorch 的安装比较麻烦
-#default-groups = ["uv_dl"]
+default-groups = [
+    "uv_db", "uv_ml", "uv_graph",
+#    "uv_torch_13",
+    "uv_torch_2x",
+    "uv_nlp", "uv_llm", "uv_rag"
+]
+
+#[tool.uv.dependency-groups]
+## pytorch 1.13 版本只能使用 3.10 版本
+#uv_torch_13 = {requires-python = "==3.10.*"}
+## pytorch 2.8 版本只能使用 3.10 版本及其以上
+#uv_torch_2x = {requires-python = ">=3.10"}
 
 [tool.uv.sources]
+# 为pytorch包指定单独的仓库索引
 torch = [
-  { index = "pytorch-cuda117"},
+  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
 #  { index = "pytorch-cuda117", marker = "sys_platform == 'windows'" },
-#  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+  { index = "pytorch-cuda128", marker = "sys_platform == 'windows'" },
 ]
 torchvision = [
-  { index = "pytorch-cuda117" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
 #  { index = "pytorch-cuda117", marker = "sys_platform == 'windows'" },
-#  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+  { index = "pytorch-cuda128", marker = "sys_platform == 'windows'" },
 ]
 torchaudio = [
-  { index = "pytorch-cuda117"},
+  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
 #  { index = "pytorch-cuda117", marker = "sys_platform == 'windows'" },
-#  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+  { index = "pytorch-cuda128", marker = "sys_platform == 'windows'" },
 ]
 
-# PyTorch 使用的index配置
+# PyTorch 仓库index配置
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
@@ -180,26 +206,40 @@ explicit = true
 name = "pytorch-cuda124"
 url = "https://download.pytorch.org/whl/cu124"
 explicit = true
+[[tool.uv.index]]
+name = "pytorch-cuda126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+[[tool.uv.index]]
+name = "pytorch-cuda128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 # 适用于 uv pip 系列命令的配置
 [tool.uv.pip]
 index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 extra-index-url = [
 	"https://download.pytorch.org/whl/cpu",
-	"https://download.pytorch.org/whl/cu117"
+	"https://download.pytorch.org/whl/cu117",
+	"https://download.pytorch.org/whl/cu128"
 ]
 system = true
 break-system-packages = true
 all-extras = true
-# group 配置对于 uv pip sync 命令不生效
-group = ["uv_db", "uv_ml", "uv_graph", "uv_dl", "uv_nlp", "uv_llm"]
-#group = ["uv_dl"]
+# 此处的 group 配置对于 uv pip sync 命令不生效
+group = [
+    "uv_db", "uv_ml", "uv_graph",
+#    "uv_torch_13",
+    "uv_torch_2x",
+    "uv_nlp", "uv_llm", "uv_rag"
+]
 # PyTorch index 设置
-#torch-backend = "auto"
+torch-backend = "auto"
 #torch-backend = "cpu"
-torch-backend = "cu117"
+#torch-backend = "cu117"
 #torch-backend = "cu118"
 #torch-backend = "cu124"
+#torch-backend = "cu128"
 
 
 
