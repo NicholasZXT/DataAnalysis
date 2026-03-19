@@ -94,7 +94,7 @@ v1.0版本不再直接导出了，需要用户手动显式直接从`langchain-co
 Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 
 
-------
+------------------------------------------------------------
 
 # LangChain-Core:v1.0
 
@@ -154,7 +154,7 @@ Deep-Agents是 v1.0 新增的包，专门用于构建复杂任务的Agent。
 - 返回类型是一个`list[ContentBlock]`。
 
 
-------
+----------------------------------------------------------------
 
 # LangChain:v1.0
 
@@ -192,8 +192,47 @@ v1.0版本的`langchain`包只有如下模块了。
 
 其实从 v0.3.x 版本开始，`langchain` 包里的一些模块就只是 `langchain_core` 模块里对应包的导入套壳了。
 
+---------------
+## `agents`模块 - KEY
 
-## middleware
+这个模块是 LangChain v1.0 改动最大的模块，删除了 v0.6.x 版的许多内容，相当于重构了。
+
+v1.0 里此模块的内容如下：
+- `factory.py`: 里面实现了 `create_agent()` 函数用于快速创建 Agent 应用 —— KEY
+- `middleware`包: v1.x 版本配合 `create_agent()` 函数使用的中间件，详细介绍见下面
+- `structured_outputs.py`: 配合 `create_agent()` 函数，用于处理Agent的结构化输出结果。
+
+---------------
+### `create_agent()` 使用介绍 - KEY
+
+`create_agent()` 函数返回的是 LangGraph 的 `CompiledStateGraph` 对象。
+
+主要参数说明如下：
+- `name: str`: Agent名称
+- `model: str | BaseChatModel`: 配置使用的模型，可以直接传入配置好的模型对象，也可以传入模型名称（此时会调用`init_chat_model()`方法来初始化模型对象）
+- `system_prompt: str`: 系统角色提示词
+- `state_schema`: `TypedDict` 类，**用于定义底层 LangGraph 里的 Graph State**。
+  - 默认是 `AgentState[ResponseT]`，如果要自定义，则必须继承 `AgentState[ResponseT]`，因为其中定义了几个公共字段（有一个`messages`字段）
+  - 这里配置的 `state_schema` 会被用作 base schema，**所有middlewares中定义的`state_schema`字段都会被合并到此base schema中**。
+  - 预置的Middleware会用到 `AgentState[ResponseT]` 中定义的 `messages` 字段。
+  - Middleware 的各类 hook 方法也会使用这个 state_schema
+- `context_schema`: `TypedDict`/`dataclass`/pydantic `BaseModel` **类**，用于定义LangGraph的 `Runtime[ContextT]` 里的 `ContextT` 泛型。
+  - 这个schema的实例对象可以在调用`CompiledStateGraph.invoke()`方法时作为`context`参数传入，之后可以在LangGraph节点中的`Runtime[ContextT].context`属性获取了。
+- `tools`: 工具列表。
+  - 查看源码可以发现，传入的所有tools都被封装到了下面介绍的`tools`模块的 `_ToolNode` 类中。 
+- `middleware`: 中间件配置列表
+- `checkpointer: Checkpointer`: LangGraph Checkpointer 对象
+- `store: BaseStore`: LangGraph Store 对象
+- `response_format`: structured output 相关配置，详细介绍见下面的 `structured_outputs.py` 说明。
+- `interrupt_before: list[str]`: 通过name指定要在哪些node **执行前** 触发中断
+- `interrupt_after: list[str]`: 通过name指定要在哪些node **执行后** 触发中断
+- `debug: bool`:
+- `cache: BaseCache`:
+
+---------------
+### middleware
+
+middleware 的相关实现在 `langchain.agents.middleware` 中。
 
 v1.0版新增的middleware功能是专门配合`create_agent()`使用，此函数内部是基于LangGraph的状态图构建的。
 
@@ -201,26 +240,48 @@ Agent里的middleware调用时机如官方文档图片所示：
 
 <img src="https://mintcdn.com/langchain-5e9cc07a/RAP6mjwE5G00xYsA/oss/images/middleware_final.png?w=840&fit=max&auto=format&n=RAP6mjwE5G00xYsA&q=85&s=e9b14e264f68345de08ae76f032c52d4" alt="AgentMiddleware.hook" style="zoom:80%;" align="left"/>
 
-上述调用的hook方法是由`AgentMiddleware`类定义的，所有Middleware都要继承此类，并实现其中的某个方法，可实现的hook方法分为如下两类：
+上述调用的hook方法是由`AgentMiddleware`基类定义的（[官方文档：Custom middleware](https://docs.langchain.com/oss/python/langchain/middleware/custom)），
+所有Middleware都要继承此类。
 
-（1）Node-style hooks：在固定时机进行调用的hook，一般用于logging、validation、state update等操作
+`AgentMiddleware(Generic[StateT, ContextT])` 是一个泛型类，需要`StateT`和`ContextT`两个泛型参数：
+- `StateT`: 传递给Middleware的状态对象schema，需要继承自 `AgentState` 类
+- `ContextT`: 底层LangGraph的 `Runtime[ContextT]` 泛型参数
+
+`AgentMiddleware(Generic[StateT, ContextT])` 定义了如下两个属性：
+- `state_schema: type(StateT)`: 状态对象的类
+- `tools: List[BaseTool]`: 该 middleware 所附加的工具列表 —— 这个不知道有什么用。
+
+自定义Middleware时，需要继承`AgentMiddleware`并实现其中的某个方法，可实现的hook方法分为如下两类：
+
+（1）Node-style hooks：在固定时机进行调用的hook，一般用于logging、validation、state update等操作。
 
 - agent启动停止：每次调用`invoke()`等方法时执行一次
-
   - `before_agent`/`abefore_agent`
-
   - `after_agent`/`aafter_agent`
 
 - model调用：每次发生模型调用的前后，一次`invoke()`方法内部可能有多次模型调用
-
   - `before_model`/`abefore_model`
-
   - `after_model`/`aafter_model`
 
-（2）Wrap-style hooks：用于干涉agent执行流程，一般用于retries、caching等操作。
+Node-style hook方法的签名为：
+- 入参: `state: StateT, runtime: Runtime[ContextT]`
+  - `state` 就是该middleware的`state`对象
+  - `runtime` 就是LangGraph的`Runtime[ContextT]`对象
+- 返回值: `dict[str, Any] | None`
 
-- `wrap_model`/`awrap_model`：每次模型调用前后执行
+（2）Wrap-style hooks：用于**干预agent执行流程**，一般用于retries、caching等操作。
+
+- `wrap_model`/`awrap_model`：每次模型调用前后执行，方法签名为：
+  - 入参: 
+    - `request: ModelRequest`
+    - `handler: Callable[[ModelRequest], ModelResponse]`
+  - 返回值: `ModelCallResult`
+
 - `wrap_tool_call`/`awrap_tool_call`，每次工具调用前后执行
+  - 入参: 
+    - `request: ToolCallRequest`
+    - `handler: Callable[[ToolCallRequest], ToolMessage | Command]`
+  - 返回值: `ToolMessage | Command`
 
 除了继承`AgentMiddleware`类的方式外，还提供了如下hook装饰器来简化使用：
 
@@ -231,12 +292,18 @@ Agent里的middleware调用时机如官方文档图片所示：
 
 这些装饰器内部也是将被装饰函数使用动态类定义的技巧封装成`AgentMiddleware`的子类以供使用的。
 
-研究`create_agent()`函数源码发现，middleware的使用有如下几个要注意的地方：
+
+**使用要点**
+
+研究`create_agent()`函数源码可以发现，middleware的使用有如下几个要注意的地方：
 
 - 所有middleware的`wrap_tool_call`方法会被合并成一条链，封装到`ToolNode`里，在每次调用tool前后执行。
 - 所有middleware的`wrap_model_call`方法也会被合并成一条链，封装到一个`model_node`里，在每次模型调用前后执行。
 - 所有middleware的`before_agent`/`after_agent`/`before_model`/`after_model`方法，**各自会被封装成LangGraph里的一个Node**，并依次添加之间的边，在指定时机/条件下执行
-- 同一个middleware不能多次使用，否则会抛异常提醒有重复的middlware
+- 同一个middleware不能多次使用，否则会抛异常提醒有重复的middleware
+
+> `create_agent()` 函数内部对所有middleware的 `wrap_tool_call` / `wrap_model_call` 进行合并的
+> `_chain_model_call_handlers()` / `_chain_tool_call_wrappers()` 方法值得看看（涉及到装饰器和绑定方法的使用）。
 
 最重要的原则如下：
 
@@ -244,6 +311,96 @@ Agent里的middleware调用时机如官方文档图片所示：
 >
 > 即使要实现多个hook方法，这些方法之间**不要有关联或者访问共享变量的操作**，因为根据源码里的逻辑，这些方法都是被拆分开使用的，
 > `AgentMiddleware`抽象类及其子类只不过是一个封装方法的容器而已，这也要求`AgentMiddleware`子类里最好不要定义实例属性存放共享状态。
+
+
+### Built-in Middlewares
+
+官方文档 [Built-in Middlewares](https://docs.langchain.com/oss/python/langchain/middleware/built-in).
+
+LangChain 默认提供了如下built-in middleware：
+
+#### HumanInTheLoopMiddleware
+
+参考官方文档 [Human-in-the-loop](https://docs.langchain.com/oss/python/langchain/human-in-the-loop).
+
+`HumanInTheLoopMiddleware` 的作用是**在模型调用之后，如果有工具调用，判断哪些工具调用需要触发人工处理**。
+
+它配置了如下两个属性：
+- `description_prefix: str`，触发HIL时的描述前缀
+- `interrupt_on: dict[str, bool | InterruptOnConfig]`: 一个dict，配置需要中断的tool name
+  - key 是需要触发中断的tool name
+  - value，该工具的中断配置，可选值如下：
+    - `True`, 表示触发中断，后续允许 `approve, edit, and reject` 等HIL结果
+    - `False`, 表示自动批准该工具的调用
+    - `InterruptOnConfig`对象, 表示其他中断配置：
+      - `allowed_decisions`, 允许的HIL结果，可选值为 `Literal["approve", "edit", "reject"]`
+      - `description: str`, 触发HIL时的描述
+
+源码实现逻辑大致如下：
+- 实现 `AgentMiddleware` 的 `after_model` hook 方法
+- 在`after_model` 方法里，从 `state['messages']` 中获取 `AIMessage`
+- 从 `AIMessage.tool_calls` 里获取工具调用相关信息，并判断是否在 `self.interrupt_on` 里配置的需要中断的工具
+- 如果有需要中断的工具调用，则组织好信息，然后调用 `interrupt()` 方法触发中断。
+- `interrupt()` 方法的返回值里，会检查 `decisions` 这个属性， 
+  - 因此要求恢复执行时的 `Command` 对象的 `resume` 参数接受的dict里必须要包含 `decisions` 这个 key，
+  - `decisions` 是一个 `List[Dict[str, Any]]`，`Dict`的一个key是 `type`，value是 `Literal["approve", "edit", "reject"]`。
+
+#### ModelCallLimitMiddleware
+
+
+---------------
+### 结构化输出
+
+官方文档 [Structured output](https://docs.langchain.com/oss/python/langchain/structured-output)
+
+`langchain.agents.structured_outputs.py` 用于处理Agent的输出结果。
+
+该文件里定义了如下4种结构化输出处理策略，其中`SchemaT`是泛型表示，需要用户自己定义一个数据类，用于封装结构化输出结果。
+- `None`: 默认值，不处理输出结果
+- `ProviderStrategy[SchemaT]`: 使用模型提供商（Model Provider）原生的结构化输出结构，这是**最可靠的方式**，使用起来也比较简单，推荐优先使用。
+- `ToolStrategy[SchemaT]`: 采用 Tool calling 方式处理结构化输出结果。当模型提供商不支持原生结构化输出时，可以采用此方式，但是不那么稳定。
+- `AutoStrategy[SchemaT]`: 自动选择处理策略，此时也可以简单的使用 `type[SchemaT]`
+
+对于 `ToolStrategy[SchemaT]`（它其实是一个`dataclass`类），它定义了如下属性：
+- `schema: type[SchemaT]`: 必填属性，存放结构化输出结果数据类，可以是 `TypedDict`/`dataclass`/pydantic `BaseModel`。
+- `tool_message_content: str`: 自定义文本，**在成功获取结构化结果时，会返回此文本来代替原本的JSON** —— 感觉用处不大
+- `handle_errors`: 在获取结构化结果时，如果发生错误，如何处理。有如下的选项：
+  - `True`: 默认值，会使用默认的异常信息模板返回错误信息
+  - `False`: 不处理错误，将异常向上抛出
+  - `str`: 自定义异常信息，一旦抛出结构化结果解析错误，都会返回此文本
+  - `type[Exception]` / `tuple[type[Exception],...]`: 只捕获此异常/多个异常，并使用默认异常模板返回异常信息，**并进行重试**；对于其他异常则会继续抛出
+  - `Callable[[Exception], str]`: 自定义的异常处理函数，返回处理后的异常信息
+
+---------------
+## `tools` 模块
+
+> v1.x 版本的 `tools` 模块改动很大，相当于重构了。
+
+此模块里面只有一个 `toos_node.py`，其中定义了如下有用的类：
+- `_ToolNode`: 配合`create_agent()` 函数使用，用于对传入的tools列表进行封装
+- `ToolCallRequest`:
+- `ToolRuntime`:
+- `InjectedState`:
+- `InjectedStore`:
+
+查看`_ToolNode`类的源码可以发现：
+- 它对传入的tools列表进行封装时，有一个`__tools_by_name: dict[str, BaseTool]`属性，**存储每个tool的name和tool对象的映射关系**
+- 调用`invoke()`方法时，会对传入的`input`进行解析检查，获取其中`AIMessage`对象的`.tool_calls`列表
+- 接着调用`_ToolNode._func()`方法，其中会采用 `executor.map(self._run_one, tool_calls, input_types, tool_runtimes))` 方式**并行调用每个Tool**
+- `_ToolNode._run_one()`方法中，会先根据tool_call.name从`__tools_by_name`属性中获取对应的tool对象，将调用上下文封装成`ToolCallRequest`对象
+- 调用`_ToolNode._execute_tool_sync()` 方法，其中会调用tool的`invoke()`方法，并传入该tool_call的args
+- 最后将tool的输出结果封装成`ToolMessage`对象并返回
+
+除了使用 `_ToolNode`类封装所有的tools，`factory.py` 里的 `create_agent()` 函数还需要构建 `_ToolNode` 的进入边和输出边：
+- 输出边是通过 `factory.py` 里的 `_make_tools_to_model_edge()` 方法构建的：
+  - source 是 `_ToolNode`，默认名称为 `tools`
+  - `_make_tools_to_model_edge()` 作为 `Graph.add_conditional_edge()` 方法的 `path` 参数
+  - 大致逻辑是：大多数情况下，`_ToolNode` 的输出边会指向 `model` 节点；如果**所有**的tool都设置了`return_direct=True`，就指向结束节点
+- 输入边是通过 `factory.py` 里 `_make_model_to_tools_edge()` 方法构建的：
+  - source 一般是 `model` 节点
+  - `_make_model_to_tools_edge()` 作为 `Graph.add_conditional_edge()` 方法的 `path` 参数
+  - 大致逻辑是：从 `state['messages']` 的末尾寻找 AIMessage 对象，如果对象的tool_calls属性有值，则遍历并封装tool_call对象，
+    并使用LangGraph的 `Send` 对象封装每个 tool_call 信息，返回一个 `List[Send]`。
 
 
 ---------------------------------------------------
@@ -837,119 +994,16 @@ module主要内容有：
   - `MarkdownListOutputParser`
 - `openai_function.py`
 
----------------------------------------------------
-## 数据检索相关
-
-构建LEDVR工作流相关的模块:
-- Loader: 加载器，用于加载Document数据
-- Embedding: 向量嵌入，生成Document的Text Embedding向量
-- Documentation Transform: 对Document进行转换，生成新的Document
-- VectorStore: 向量数据库，用于存储Document的Text Embedding向量
-- Retriever: 向量检索器，统一封装VectorStore的检索功能
-
-
-### `document_loaders`模块
-
-> 还有一个 `load` 模块，该模块提供了序列化和反序列化相关的工具.
-
-module内容如下：
-- `base.py`
-  - `BaseLoader`: 所有 Loader 的抽象基类——定义了统一接口
-  - `BaseBlobParser`: 
-- `blob_loaders.py`
-  - `BlobLoader`
-- `langsmith.py`
-  - `LangSmithLoader`
-
-
-**使用说明**
-
-`BaseLoader`里定义了如下接口：
-- `load`/`aload`: 加载数据，返回 `List[Document]`
-- `lazy_load`/`alazy_load`: 迭代加载数据，返回 `Iterator[Document]`
-- `load_and_split`: 加载并分割数据，返回 `List[Document]`
-
-这几个方法也是所有Loader的通用方法。
-
-### `documents`模块
-
-module内容如下：
-- `base.py`
-  - `BaseMedia`: 所有 Media 的抽象基类，Media 包括text
-  - `Blob`
-  - `Document`: 文档的基类，包含text和metadata —— KEY
-- `compressor.py`
-  - `BaseDocumentCompressor`
-- `transformers.py`
-  - `BaseDocumentTransformer`
-
-**使用说明**
-
-`BaseMedia`继承自 `Serializable`，所以也是一个Pydantic的`BaseModel`子类，里面定义了如下两个属性：
-- `id`: 可选str，用于标识文档
-- `metadata`: dict，用于存储文档的元数据
-
-`Document`继承自 `BaseMedia`，新增如下两个属性：
-- `type`: 固定是 Document
-- `page_content`: str，文档的文本内容
-
-
-### `embeddings`模块
-
-module内容如下：
-- `embeddings.py`: 只有一个 `Embeddings` 抽象基类
-
-**使用说明**   
-
-`Embeddings`是一个元类，定义了如下方法：
-- `embed_query`/`aembed_query`: 用于计算query的embedding向量，返回一个 `List[float]`
-- `embed_documents`/`aembed_documents`: 用于**批量计算**query的embedding向量，返回一个 `List[List[float]]`
-
-
-### `vectorstores`模块
-
-module内容如下：
-- `base.py`
-  - `VectorStore`: 所有 VectorStore 的抽象基类
-  - `VectorStoreRetriever`: 所有 VectorStoreRetriever 的抽象基类，它继承自 `retrievers.py`里的`BaseRetriever`
-- `in_memory.py`
-  - `InMemoryVectorStore`
-- `utils.py`
-
-
-**使用说明**   
-
-`VectorStore`抽象基类里定义了如下方法：
-- `add_texts`/`aadd_texts`
-- `add_documents`/`aadd_documents`
-- `delete`/`adelete`
-- `get_by_ids`/`aget_by_ids`
-- `search`/`asearch`
-- `similarity_search`/`asimilarity_search`
-- `similarity_search`/`asimilarity_search`
-- `as_retriever`: 返回一个 `VectorStoreRetriever` 对象，这个方法比较实用 —— KEY
-
-
-`VectorStoreRetriever`抽象基类里定义了如下方法：
-- `add_documents`/`aadd_documents`
-- `add_documents`/`aadd_documents`
-
-
-### `retriever.py`
-
-module内容如下：
-- `BaseRetriever`类
 
 ---------------------------------------------------
 ## Memory相关
 
-**从langchain v0.3.3 版本开始，memory模块被表示为废弃**。  
-
 官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议转向使用 LangGraph.
 
 根据上面的官方文档，Langchain 里有关 Memory 的设计思路经历了3个阶段：
-1. 基于`BaseMemory`的早期设计
-2. 基于 `RunnableWithMessageHistory` 或 `BaseChatMessageHistory` 的设计，这个设计思路还在沿用，适用于简单的场景
+1. 基于 `BaseMemory` (`langchain_core.memory.py`) 的早期设计
+2. 基于 `RunnableWithMessageHistory` (`langchian_core.runnables.history.py`) 或 
+   `BaseChatMessageHistory` (`lanchain_core.chat_history.py`) 的设计，这个设计思路还在沿用，适用于简单的场景
 3. 基于 LangGraph 的思路，这个是后续的发展方向
 
 `BaseChatMessageHistory` 是和 `langchain.memory` 模块的 `ChatBaseMemory` 配合使用的，大致流程是 `ChatBaseMemory` 会
@@ -961,6 +1015,8 @@ LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 
 ### `memory.py`
+
+**从langchain v0.3.3 版本开始，memory模块被表示为废弃，并在 v1.x 版本被移除了**。  
 
 只提供了一个类：`BaseMemory`，所有memory的基类，提供了一些通用的接口。   
 
@@ -979,7 +1035,6 @@ LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 - `BaseChatMessageHistory`: 用于表示聊天历史记录的抽象基类
 - `InMemoryChatMessageHistory`: 存放在内存中的聊天历史记录简单实现类
 
-
 `BaseChatMessageHistory`定义了一个属性`messages: list[BaseMessage]`，还定义了如下抽象方法：
 - `add_message`: 用于添加消息
 - `add_messages`/`aadd_messages`: 用于批量添加消息
@@ -987,14 +1042,145 @@ LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 - `aget_messages`: 异步获取历史消息
 - `clear`/`aclear`: 清空历史消息
 
-
-`InMemoryChatMessageHistory`就是一个简单的基于内存列表实现历史记录实现类。
+`InMemoryChatMessageHistory`就是一个简单的基于内存列表的`BaseChatMessageHistory`实现类。
 
 **使用说明**
 
-`BaseChatMessageHistory`是配合`langchain.memory.chat_memory.py`里的`BaseChatMemory`一起使用的。
+`BaseChatMessageHistory`有两种使用方式：
+1. 配合`langchain.memory.chat_memory.py`里的`BaseChatMemory`一起使用的，这种方式已经不太推荐了。
+2. 配合下面的 `RunnableWithMessageHistory`一起使用 —— 这种方式比较推荐。
 
-上面的`InMemoryChatMessageHistory`实现类其实就是`BaseChatMemory`里的`chat_memory`默认实现。
+
+### `runnables.history.py`
+
+此文件里定义了 `RunnableWithMessageHistory` 类，它和上面的 memory 模块、chat_history 模块的使用方式差异很大。
+
+`RunnableWithMessageHistory` 主要作用是对一个 `Runnable`对象 和它的 对话历史 进行封装管理。
+为了管理对话历史，它要求在每次调用时，都提供一个 `session_id` ，用于确定内部的 `Runnable` 对象的对话历史。
+
+它初始化时，需要提供如下参数：
+- `runnable: Runnable`: 需要被包装的 `Runnable` 对象，此对象的输入是 `list[BaseMessage]`，返回值是 `str | BaseMessage | MessagesOrDictWithMessages`
+- `get_session_history`: 一个Callable对象，它的参数一般是一个`session_id`，然后返回该session的 `BaseChatMessageHistory` 对象
+- `input_messages_key`:
+- `output_messages_key`:
+- `history_messages_key`:
+- `history_factory_config`:
+
+
+---------------------------------------------------
+## 数据检索（RAG）相关
+
+LangChain 中将数据检索（RAG）分为以下几个步骤：
+
+1. Loader: 加载器，用于加载Document数据
+2. Documentation Transform: 对Document进行转换，也就是 Text-Splitter，生成 Chunks
+3. Embedding: 向量嵌入，生成Document/Chunks的Text Embedding向量 
+4. VectorStore: 向量数据库，用于存储Document/Chunks的Text Embedding向量 
+5. Retriever: 向量检索器，统一封装VectorStore的检索功能
+
+> 注意，langchain-core 里的以下模块，从 v0.3.x 到 v1.x 版本的变化不大。
+
+
+### `documents`模块
+
+定义了LangChain里的文档对象的通用表示。
+
+module内容如下：
+
+`base.py`
+- `BaseMedia`: 所有 Media 的抽象基类，Media 包括text
+- `Blob`: 文档的二进制数据（raw data）
+- `Document`: 文档的基类，包含text和metadata —— KEY
+
+`compressor.py`
+- `BaseDocumentCompressor`
+
+`transformers.py`
+- `BaseDocumentTransformer`
+
+**使用说明**
+
+`BaseMedia`继承自 `Serializable`，所以也是一个Pydantic的`BaseModel`子类，里面定义了如下两个属性：
+- `id`: 可选str，用于标识文档
+- `metadata`: dict，用于存储文档的元数据
+
+`Document`继承自 `BaseMedia`，新增如下两个属性：
+- `type`: 固定是 Document
+- `page_content`: str，文档的文本内容
+
+
+### `document_loaders`模块
+
+> 还有一个 `load` 模块，该模块提供了序列化和反序列化相关的工具.
+
+module内容如下：
+
+`base.py`
+- `BaseLoader`: 所有 Loader 的抽象基类——定义了统一接口
+- `BaseBlobParser`: 
+
+`blob_loaders.py`
+- `BlobLoader`
+
+`langsmith.py`
+- `LangSmithLoader`
+
+**使用说明**
+
+`BaseLoader`里定义了如下接口：
+- `load`/`aload`: 加载数据，返回 `List[Document]`
+- `lazy_load`/`alazy_load`: 迭代加载数据，返回 `Iterator[Document]`
+- `load_and_split`: 加载并分割数据，返回 `List[Document]`
+
+这几个方法也是所有Loader的通用方法。
+
+
+### `embeddings`模块
+
+module内容如下：
+- `embeddings.py`: 只有一个 `Embeddings` 抽象基类
+
+**使用说明**   
+
+`Embeddings`是一个抽象基类，定义了如下方法：
+- `embed_query`/`aembed_query`: 用于计算query的embedding向量，返回一个 `List[float]`
+- `embed_documents`/`aembed_documents`: 用于**批量计算**query的embedding向量，返回一个 `List[List[float]]`
+
+
+### `vectorstores`模块
+
+module内容如下：
+
+`base.py`
+- `VectorStore`: 所有 VectorStore 的抽象基类
+- `VectorStoreRetriever`: 所有 VectorStoreRetriever 的抽象基类，它继承自 `retrievers.py`里的`BaseRetriever`
+
+`in_memory.py`
+- `InMemoryVectorStore`
+
+`utils.py`
+
+**使用说明**   
+
+`VectorStore`抽象基类里定义了如下方法：
+- `add_texts`/`aadd_texts`
+- `add_documents`/`aadd_documents`
+- `delete`/`adelete`
+- `get_by_ids`/`aget_by_ids`
+- `search`/`asearch`
+- `similarity_search`/`asimilarity_search`
+- `as_retriever`: 返回一个 `VectorStoreRetriever` 对象，这个方法比较实用 —— KEY
+
+
+`VectorStoreRetriever`抽象基类里定义了如下方法：
+- `add_documents`/`aadd_documents`
+- `add_documents`/`aadd_documents`
+
+
+### `retriever.py`
+
+定义了 `BaseRetriever`类，继承自 `RunnableSerializable`，因此也是通过通用方法 `invoke()`/`ainvoke()` 进行调用。
+
 
 ---------------------------------------------------
 ## Agent相关
@@ -1213,7 +1399,7 @@ module内容如下：
 
 
 ---------------------------------------------------
-## Memory 相关
+## Memory 相关模块
 
 ### `memeory`模块
 
@@ -1264,8 +1450,11 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `ElasticsearchChatMessageHistory`
 
 
+## 数据检索（RAG）相关模块
 
-## 数据增强
+> 以下模块，从 v0.3.x 升级到 v1.x 版本，除了 `embeddings` 模块依旧保留外，其他模块都移动到 `langchain_community`包了。
+> 实际上，即使是在 v0.3.x 模块，以下大部分模块也都是从 `langchain_community`包里导入的功能。
+> 由于 `langchain_community` 包并没有升级到 v1.x，所以可以认为 RAG 相关的模块变化不大。
 
 ### `document_loaders`模块
 
@@ -1291,6 +1480,9 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - BiliBiliLoader, 居然还有B站
 
 ### `document_transformers`模块
+
+主要从 `langchain_community.document_transformers` 里导入各种文档转换器。
+
 
 ### `embeddings`模块
 
@@ -1334,7 +1526,7 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 
 
 ---------------------------------------------------
-## Agent相关
+## Agent相关模块
 
 > LangChain的 Agent 相关模块在 0.3 版本之后有较大改动，`langchain.agents`模块里内容是之前构建Agent的方式，已被标记为废弃的，
 > 在 1.0.0 版本之前都会被保留，参加官方文档 [How to migrate from legacy LangChain agents to LangGraph](https://python.langchain.com/docs/how_to/migrate_agent/).
@@ -1342,6 +1534,8 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 > 因此这里就**不再详细介绍 agents 模块相关内容了**。
 
 ### `tools`模块
+
+> v1.x 版本的 tools 模块改动很大，几乎相当于重构了。
 
 和上面类似，这个模块主要从两个地方导入内容：
 - `langchain_core.tool`里导入抽象基类
@@ -1376,7 +1570,6 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - RequestsPutTool
 
 
-
 ### `agents`模块
 
 旧版本构建Agent的方式，已经**被标记为废弃**，后续不再支持，建议使用 LangGraph 构建 Agent 应用。
@@ -1396,6 +1589,8 @@ LangChain-Community是一个第三方社区扩展包，提供了一些常用的�
 
 ---------------------------------------------------
 # LangGraph
+
+> LangGraph 从 v0.6.x 版本升级到 v1.x 版本，核心组件的变化不大。
 
 首先要明确的是，LangGraph并不依赖LangChain-Core或者LangChain，
 参考官方[FAQ -> Do I need to use LangChain to use LangGraph? What’s the difference?](https://langchain-ai.github.io/langgraph/concepts/faq/#do-i-need-to-use-langchain-to-use-langgraph-whats-the-difference)。
@@ -1427,14 +1622,19 @@ LangGraph更像是一个高度抽象的基于图的Agent调度框架，参考官
 
 
 ---------------------------------------------------
-## `pregel`模块
+## 两类API
 
-此模块是LangGraph 的 Runtime 实现，它基于Google的Pregel算法，该算法专门用于大规模的并行图计算。
+LangGraph提供了两种API:
+- [Graph API](https://docs.langchain.com/oss/python/langgraph/graph-api): 基于底层的图结构来定义Agent
+- [Functional API](https://docs.langchain.com/oss/python/langgraph/functional-api): 对已有的函数进行封装，定义Agent
 
-下面的 `CompiledGraph` 类就继承了此模块提供的 `Pregel` 类。
+两类API的选择可以参考官方文档 [Choosing between Graph and Functional APIs](https://docs.langchain.com/oss/python/langgraph/choosing-apis).
 
-这个模块应该是 LangGraph 的核心实现，研究起来难度比较高。
+简单总结如下：
+- Graph API 适合复杂的场景，需要高度自定义
+- Functional API 适合简单的场景，特别是将LangGraph应用到已有的函数上，并做最小的改变。
 
+> 个人感觉，推荐使用 Graph API, Functional API 的局限性比较大。
 
 ---------------------------------------------------
 ## `constants.py`
@@ -1446,7 +1646,9 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 - `END`
 
 
+---------------------------------------------------
 ## `config.py`
+
 
 ---------------------------------------------------
 ## `graph`模块 - KEY
@@ -1466,7 +1668,6 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 - `CompiledGraph`: 继承自`pregel`模块的`Pregel`类，`Graph.compile`方法返回的就是此类的对象。
 
-
 **使用说明**
 
 `Graph`类用于表示无状态图，它使用如下属性来存储图的信息：
@@ -1485,7 +1686,6 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 注意，**`Graph`类的初始化方法不接受任何参数，所以说它是无状态的**。
 
-
 `CompiledGraph`是`Graph`编译后的对象，它继承了`pregel`模块的`Pregel`类，提供了如下方法（`Pregel`定义的）：
 - `invoke`/`ainvoke`
 - `stream`/`astream`
@@ -1493,33 +1693,32 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 - `update_state`/`aupdate_state`
 - `get_state_history`/`aget_state_history`
 
+------
+### `state.py` - KEY
 
+有状态图的表示，定义了如下2个类：
 
-
-### `state.py`
-
-有状态图的表示，定义了如下3个类：
-
-- `StateNodeSpec`: 有状态节点表示，继承自 `NamedTuple`，有如下属性：
-  - `runnable: Runnable`:
-  - `metadata`:
-  - `ends`:
-  - `input: Type[Any]`: 记录了输入，也就是状态
-  - `retry_policy`:
-
-- `StateGraph`: 
-
-- `CompiledStateGraph`: 继承自 `CompiledGraph`
+- `StateGraph`:
+- `CompiledStateGraph`
 
 > 在v0.4.10版本以前，`StateGraph`继承自 `Graph`，`CompiledStateGraph`继承自`CompiledGraph`，但是从v0.5.10版本开始，这两个类就不再继承父类了。
 
 **使用说明**
 
-**`StateGraph`的初始化方法里需要传入一个表示状态的对象**，其他大部分方法都和`Graph`一样。
+`StateGraph` 有如下 4 个需要重点关注的属性，也是初始化时需要传入的参数：
 
+- `state_schema: StateT`: **最重要的属性**，定义了整个Graph的状态，可以是 `TypeDict` / `dataclass` / `pydantic.BaseModel`
+- `context_schema: ContextT`: 定义了LangGraph的 `Runtime[ContextT]` 里的泛型参数 `ContextT`，这个类就是自定义的运行时上下文类。
+- `input_schema: InputT`: 定义了 LangGraph 的输入结构，可以是 `TypeDict` / `dataclass` / `pydantic.BaseModel`
+- `output_schema: OutputT`: 定义了 LangGraph 的输出结构，可以是 `TypeDict` / `dataclass` / `pydantic.BaseModel`
 
+**对于 `input_schema` 和 `output_schema` 参数，如果不设置，则默认使用 `state_schema`**。
 
+上面这个四个参数，其实对应的就是 `StateGraph[StateT, ContextT, InputT, OutputT]` 的 4 个泛型类。
 
+`CompiledStateGraph[StateT, ContextT, InputT, OutputT]` 的 4 个泛型参数和 `StateGraph` 的 4 个泛型参数一样。
+
+------
 ### `message.py`
 
 定义了如下2个类：
@@ -1532,28 +1731,78 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 还定义了一个常用的reducer函数：`add_messages`。
 
 
-
 ---------------------------------------------------
-## `channels`模块
+## `types.py` - KEY
 
+此源文件里定义了LangGraph 里重要的数据类型。
+
+常用的有如下数据类型：
+
+### `StateSnapshot`
+
+checkpoint里快照的数据结构封装。
+
+### `Interrupt`
+
+触发中断时的数据结构封装，是一个`dataclass`类。
+- 封装了如下属性：
+  - `id`: 标识此次中断的标识符，一般不要手动生成
+  - `value`: 此次中断的附加信息，用户传入，可以是任何对象
+- 一般推荐通过类方法 `from_ns(value: Any, ns: str)` 来创建，它会自动生成一个唯一的id。 
+
+### `Send`
+
+配合 `add_conditional_edges()` 方法使用的数据结构封装，用于动态生成条件边。
+
+- 一般由 `add_conditional_edges()` 里的 `path` 参数传入的函数返回 一个或者多个 `Send` 对象
+- 这个类很简单，就是一个单纯的数据封装，只有两个属性：
+  - `node`: 指定要执行的节点名称
+  - `args`: 传递给目标节点的 state / message
+- `Send`类**没有定义任何方法**，所有的处理逻辑都交给在Graph实现。
+
+### `Command`
+
+用于状态更新和动态控制流（相当于conditional_edges）的数据结构封装。 
+
+> 官方文档 [Graph-API -> Command](https://docs.langchain.com/oss/python/langgraph/graph-api#command)
+> 
+> 使用示例可以参考官方文档 [Graph-API -> Use the Graph API -> Combine control flow and state updates with Command](https://docs.langchain.com/oss/python/langgraph/use-graph-api#combine-control-flow-and-state-updates-with-command)
+
+`Command` 是一个`dataclass`类，定义了如下属性：
+- `graph: str`，指定要发往的 graph：
+  - `None`，表示当前 graph
+  - `str`，一般是`Command.PARENT`，用于Multi-Agent场景，表示父级 graph
+- `update: Any`，表示要更新的状态
+- `resume: dict[str, Any] | Any`，中断后恢复执行的信息，这个参数的值会被作为 `interrupt()` 方法的返回值
+- `goto: Send | Sequence[Send | N]`，要跳转的节点
+  - `str` / `List[str]`，指定（多个）跳转Node的name
+  - `Send` / `List[Send]`，使用 `Send` 对象来封装要跳转的节点和参数。
+
+`Command`有如下几个使用场景：
+- 作为 Node 节点的返回值 —— 最常见
+- 作为中断恢复执行的传入参数 —— 也常见
+
+`Command` 和 conditional_edges 的使用区别在于：
+- 如果要同时更新state，并根据state执行动态控制流，使用 `Command`
+- 如果只是设置节点之间的控制流，使用 conditional_edges
 
 
 ---------------------------------------------------
 ## `checkpoint`模块 - KEY
 
-此模块对应的是LangGraph里的短期记忆机制，只维护每次会话内的历史消息记录。
+此模块对应的是LangGraph里的**短期记忆机制**，只维护每次会话内的历史消息记录。
 
 ### `base`子模块
 
-- 定义了`CheckpointTuple`，继承于`NamedTuple`，用来表示一个状态快照，有如下属性：
-  - `config: RunnableConfig`
-  - `checkpoint: Checkpoint`
-  - `metadata: CheckpointMetadata`
-  - `parent_config: Optional[RunnableConfig] = None`
-  - `pending_writes: Optional[List[PendingWrite]] = None`
+定义了`CheckpointTuple`，继承于`NamedTuple`，用来表示一个状态快照，有如下属性：
+- `config: RunnableConfig`
+- `checkpoint: Checkpoint`
+- `metadata: CheckpointMetadata`
+- `parent_config: Optional[RunnableConfig] = None`
+- `pending_writes: Optional[List[PendingWrite]] = None`
 
 
-- 定义了`BaseCheckpointSaver`基类，用来保存和加载状态快照。
+定义了`BaseCheckpointSaver`基类，用来保存和加载状态快照。
 
 
 ### `memory`子模块
@@ -1569,7 +1818,7 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 ---------------------------------------------------
 ## `store`模块 - KEY
 
-此模块对应于 LangGraph 的长期记忆机制，用于保存和加载长期记忆。
+此模块对应于 LangGraph 的**长期记忆机制**，用于保存和加载长期记忆。
 
 ### `base`子模块
 
@@ -1587,15 +1836,15 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 
 ---------------------------------------------------
-## `prebuilt`模块
+## `prebuilt`模块 - KEY
 
-这个模块提供了一些用于构建Agent的预制组件。
+这个模块提供了一些用于构建 Tool 的预制组件，在 v0.6.x 版本还提供了Agent 的预制组件，但是从 v1.0.0 开始，Agent 的预制组件不推荐使用了。
 
-**`ToolNode`**
+**`ToolNode`类**
 
 封装tool的节点类。
 
-**`tools_condition`**
+**`tools_condition`函数**
 
 封装 tool 的条件边，源码里内部逻辑比较简单，就是判断 state 里有没有 messages，并且messages 最后一条是不是 AIMessage，是就调用 Tool，否则转向 END。
 
@@ -1609,6 +1858,23 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 此外，还定义了一些注解类型，用于在 tool 函数中访问图的状态和存储。
 - `InjectedState`
 - `InjectedStore`
+
+---------------------------------------------------
+## `runtime.py`
+
+定义了 `Runtime` 泛型类，也是一个 `dataclass` 对象。
+
+> 这个 `Runtime` 类的介绍反倒在 LangChain v1.x 的文档里：[Runtime](https://docs.langchain.com/oss/python/langchain/runtime).
+
+`Runtime[ContextT]` 泛型类定义了如下属性：
+- `context`: 这个对象就是泛型类型对象 `ContextT`，它必须是一个 `TypedDict`/`dataclass`/pydantic `BaseModel` 对象。
+- `store`: LangGraph的 `BaseStore`
+- `stream_writer`: `StreamWriter` 对象，用于流式输出的`custom`模式使用。
+- `previous`
+
+这个 `Runtime` 类对象可以在 Tool 函数中获取，用于访问运行时上下文环境。
+
+不过似乎一般使用LangChain里提供的 `langchian.tools.tool_node.py` 里的 `ToolRuntime` 对象比较多。
 
 ---------------------------------------------------
 ## `utils`模块
@@ -1629,5 +1895,96 @@ LangGraph的常量字符串定义，这些字符串使用了`sys.intern()`函数
 
 
 ---------------------------------------------------
+## `pregel`模块
+
+此模块是LangGraph 的 Runtime 实现，它基于Google的Pregel算法，该算法专门用于大规模的并行图计算。
+
+上面的 `CompiledGraph` 类就继承了此模块提供的 `Pregel` 类。
+
+这个模块应该是 LangGraph 的核心实现，研究起来难度比较高。
+
+
+---------------------------------------------------
+## `channels`模块
+
+
+
+---------------------------------------------------
 ## `managed`模块
 
+
+
+---------------------------------------------------
+# LangChain-MCP-Adapters
+
+`langchain-mcp-adapters` 专门为 LangChain 提供 MCP 适配的package，使用时的包名为 `langchain_mcp_adapters`。
+
+此模块提供了将 MCP Tools 包装为 LangChain Tools 的功能，同时它**依赖于MCP官方的Python-SDK `mcp` **。
+
+> 以下是基于 **v0.1.14** 版本梳理的模块内容。
+
+`__init__.py` 里没有任何内容，所以无法从顶级模块中导入任何对象。
+
+------
+## `client.py` - KEY
+
+定义了一个 `MultiServerMCPClient`，这个类是 MCP-Adapter 大部分情况下的使用入口。
+
+`MultiServerMCPClient`类 有如下 3个 初始化参数：
+- `connections: dict[str, Connection]`, MCP服务器连接信息 —— 最重要的配置
+- `callbacks`:
+- `tool_interceptors`:
+
+`MultiServerMCPClient`类主要提供了如下 3 个方法：
+- `get_tools(server_name: str) -> list[Tool]`: 获取指定服务器的 MCP Tools，它会调用下面的 `load_mcp_tools()` 函数。
+- `get_resources(server_name: str, uris: str | list[str]) -> list[Blob]`: 获取指定服务器的 MCP Resources，它会调用下面的 `load_mcp_resources()` 函数。
+- `get_prompts(server_name: str, prompt_name: str,) -> list[HumanMessage | AIMessage]`: 获取指定服务器的 MCP Prompts，它会调用下面的 `load_mcp_prompts()` 函数。
+
+注意，上面3个方法都是**异步方法**！！！
+
+------
+## `sessions.py`
+
+定义了MCP的各类 Connection 的传输协议结构（TypedDict）：
+- `StdioConnection`
+- `SSEConnection`
+- `StreamableHttpConnection`
+- `WebsocketConnection`
+
+最重要的是实现了一个 `create_session()` 方法，用于创建一个 MCP Session。
+
+------
+## `tools.py`
+
+提供了将 MCP Tools 转换为 LangChain Tools、实现 MCP Tools 调用等功能。
+
+定义了一个 **`load_mcp_tools()`** 函数，用于从 **原生MCP Session** 里获取 MCP Tools 并转换为LangChain-Tools。
+
+------
+## `resources.py`
+
+定义了一个 `load_mcp_resources()` 函数，用于从 **原生MCP Session** 里获取 MCP Resources。
+
+------
+## `prompts.py`
+
+定义了一个 `load_mcp_prompts()` 函数，用于从 **原生MCP Session** 里获取 MCP Prompts。
+
+------
+## `callbacks.py`
+
+
+------
+## `interceptors.py`
+
+
+------
+## 使用说明
+
+有两种使用方式：
+
+（一） 直接使用 `client.py` 里的 `MultiServerMCPClient` 类连接多个MCP服务器，
+然后通过 `get_tools()` 、`get_resources()` 、`get_prompts()` 方法获取 MCP Tools、MCP Resources、MCP Prompts，
+然后将这些 MCP Tools、MCP Resources、MCP Prompts 提供给 LangChain/LangGraph 即可。
+
+（二）
