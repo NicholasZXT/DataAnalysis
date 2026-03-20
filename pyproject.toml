@@ -29,10 +29,15 @@ requires-python = "==3.10.*"
 # 此处的依赖配置，可以被 Poetry, Pixi, UV 识别并生效
 dependencies = [
     # build-system 的依赖不需要出现在这里
-#    "setuptools",
-#    "wheel",
-#    "hatchling",
-    "pip"
+    #    "setuptools",
+    #    "wheel",
+    #    "hatchling",
+    "pip",
+    "ipykernel>=6.29.5",
+    "ipython >= 8.30.0",
+    "notebook >= 7.0.0",
+    "jupyterlab >=4.0.0",
+    "pandas-stubs~=2.2.3",
 ]
 
 # 可选依赖，此处的依赖可以通过 pip install package[opt_name] 选择安装
@@ -72,15 +77,23 @@ uv_ml = [
 	"scipy",
 	"statsmodels",
 	"dataclasses",
-	"ipython",
-	"ipykernel",
-	"ipywidgets >=8.0.0",
-	"jupyterlab >=3.4.0",
 	"xgboost >=2.0.0",
 	"lightgbm >=4.0.0",
 	"optuna >=3.1.0",
 	"optuna-dashboard >=0.10.0",
 	"hyperopt ==0.2.7",
+]
+uv_jupyter = [
+#    "jupyter",
+    "ipykernel>=6.29.5",
+    "ipython >= 8.30.0",
+    "notebook >= 7.0.0",
+    "jupyterlab >=4.0.0",
+    # notebook 6.x 最后一个版本，对应 jupyterlab 3.6.8
+#    "notebook <= 6.5.7",
+#    "jupyterlab >=3.4.0,<=3.6.8",
+    "nbconvert",
+	"ipywidgets >=8.0.0",
 ]
 uv_graph = [
 	"matplotlib >=3.5.0",
@@ -102,8 +115,9 @@ uv_torch_2x = [
 ]
 uv_nlp = [
 	# "nltk",
-	"spacy >=3.4.2 ",
-	"transformers >=4.23.1",
+    "gensim",
+	"spacy >= 3.4.2 ",
+	"transformers >= 4.23.1",
 	"tokenizers",
 	"sentence-transformers <= 5.2.0",
 ]
@@ -146,6 +160,7 @@ uv_rag = [
 	"llama-index-embeddings-openai",
 	"llama-index-llms-ollama",
 	"llama-index-embeddings-ollama",
+    "llama-index-embeddings-huggingface",
 	"llama-index-readers-file",
 	"llama-index-vector-stores-chroma",
 #	"llama-index-vector-stores-elasticsearch",
@@ -173,7 +188,7 @@ python-preference = "managed"
 link-mode = "copy"
 
 default-groups = [
-    "uv_db", "uv_ml", "uv_graph",
+    "uv_db", "uv_ml", "uv_graph", "uv_jupyter",
 #    "uv_torch_13",
     "uv_torch_2x",
     "uv_nlp", "uv_llm", "uv_rag"
@@ -235,18 +250,17 @@ explicit = true
 
 # 适用于 uv pip 系列命令的配置
 [tool.uv.pip]
+system = false
 index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 extra-index-url = [
 	"https://download.pytorch.org/whl/cpu",
 	"https://download.pytorch.org/whl/cu117",
 	"https://download.pytorch.org/whl/cu128"
 ]
-system = true
-break-system-packages = true
 all-extras = true
 # 此处的 group 配置对于 uv pip sync 命令不生效
 group = [
-    "uv_db", "uv_ml", "uv_graph",
+    "uv_db", "uv_ml", "uv_graph", "uv_jupyter",
 #    "uv_torch_13",
     "uv_torch_2x",
     "uv_nlp", "uv_llm", "uv_rag"
