@@ -33,11 +33,6 @@ dependencies = [
     #    "wheel",
     #    "hatchling",
     "pip",
-    "ipykernel>=6.29.5",
-    "ipython >= 8.30.0",
-    "notebook >= 7.0.0",
-    "jupyterlab >=4.0.0",
-    "pandas-stubs~=2.2.3",
 ]
 
 # 可选依赖，此处的依赖可以通过 pip install package[opt_name] 选择安装
@@ -57,15 +52,15 @@ uv_db = [
 	"requests",
 	"httpx",
 	"elasticsearch >=7.13.0",
-	"pyhive >=0.6.5",
+#	"pyhive >=0.6.5",
 	# pyhive 依赖下面的 thrift
-	"thrift >= 0.20.0",
-    "thrift_sasl >= 0.4.3",
+#	"thrift >= 0.20.0",
+#    "thrift_sasl >= 0.4.3",
 #    "thriftpy2 >= 0.5.0",
 	 "neo4j >=5.5.0,<6.0.0",
 	# "neo4j-python-driver >=5.5.0",
 	# "py2neo >=2021.2.3",
-#	"kafka-python >=2.0.0",
+	"kafka-python >=2.0.0",
 	# "redis >=3.5.0",
 	# "happybase >=1.2.0",
 ]
@@ -87,11 +82,12 @@ uv_jupyter = [
 #    "jupyter",
     "ipykernel>=6.29.5",
     "ipython >= 8.30.0",
-    "notebook >= 7.0.0",
-    "jupyterlab >=4.0.0",
+	# 新版 notebook + jupyterlab
+#    "notebook >= 7.0.0",
+#    "jupyterlab >=4.0.0",
     # notebook 6.x 最后一个版本，对应 jupyterlab 3.6.8
-#    "notebook <= 6.5.7",
-#    "jupyterlab >=3.4.0,<=3.6.8",
+    "notebook <= 6.5.7",
+    "jupyterlab >=3.4.0,<=3.6.8",
     "nbconvert",
 	"ipywidgets >=8.0.0",
 ]
