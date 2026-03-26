@@ -113,6 +113,7 @@ uv_nlp = [
 	# "nltk",
     "gensim",
 	"spacy >= 3.4.2 ",
+	"spacy-pkuseg >= 1.0.0",
 	"transformers >= 4.23.1",
 	"tokenizers",
 	"sentence-transformers <= 5.2.0",
