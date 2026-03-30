@@ -705,7 +705,7 @@ wheels = [
 ]
 
 [[package]]
-name = "data-analysis-project"
+name = "data-analysis"
 version = "1.0.0"
 source = { virtual = "." }
 dependencies = [

@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 
 # ------------------------------------ Project 配置 ------------------------------------
 [project]
-name = "Data-Analysis-Project"
+name = "Data-Analysis"
 version = "1.0.0"
 description = ""
 authors = [
