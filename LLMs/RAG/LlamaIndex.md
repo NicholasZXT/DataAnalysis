@@ -1050,7 +1050,9 @@ Trace 是树状结构的：
 - 根节点 (Root)：代表整个请求的开始和结束。
 - 子节点 (Spans)：代表过程中的具体步骤（如一次检索、一次 LLM 调用、一次工具执行）。
 
-**Instrumentation是由 `llama-index-instrumentation` 包实现的**，`llama-index-core` 中虽然也有一个 `instrumentation` 模块，但是此模块大部分内容都是从`llama-index-instrumentation`导入的。因此这里**只介绍 `llama-index-core` 包内置的 CallbackHander 使用**。
+**Instrumentation是由 `llama-index-instrumentation` 包实现的**，`llama-index-core` 中虽然也有一个 `instrumentation` 模块，但是此模块大部分内容都是从`llama-index-instrumentation`导入的。
+
+因此这里**只介绍 `llama-index-core` 包内置的 CallbackHandler 使用**。
 
 Callback Handler 由 `llama_index.core.callbacks` 模块定义。
 
@@ -1120,12 +1122,13 @@ class BaseCallbackHandler(ABC):
 此外，`CallbackManager`提供了两个上下文接口（`@contextmanager`封装，配合`with`使用）：
 
 - `as_trace(trace_id: str)`: 内部自动调用 `start_trace()` / `end_trace()` 方法，返回None
-- `event(event_type: CBEventType, payload: Dict[str, Any], event_id: str)`: 内部自动封装事件类型为`EventContext`并返回，会自动调用 `on_event_start()` / `on_event_end()` 方法
+- `event(event_type: CBEventType, payload: Dict[str, Any], event_id: str)`: 内部自动封装事件类型为`EventContext`并返回， 
+   会自动调用 `on_event_start()` / `on_event_end()` 方法
 
 因此，LlamaIndex的源码中，`CallbackManager` 的使用方式一般为：
 
 ```python
-with self.callback_manager.as_trace("query"):  # 设置当前trace ID，
+with self.callback_manager.as_trace("query"):  # 设置当前trace ID
     with self.callback_manager.event(
         event_type=CBEventType.RETRIEVE,
         payload={},
@@ -1186,7 +1189,6 @@ class CBEvent:
 @dataclass
 class EventStats:
     """Time-based Statistics for events."""
-
     total_secs: float
     average_secs: float
     total_count: int
@@ -1242,7 +1244,6 @@ class BaseEvent(BaseModel):
     id_: str = Field(default_factory=lambda: str(uuid4()))
     span_id: Optional[str] = Field(default_factory=active_span_id.get)  # type: ignore
     tags: Dict[str, Any] = Field(default={})
-    
     ...
 ```
 

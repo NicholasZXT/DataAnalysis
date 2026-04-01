@@ -30,7 +30,9 @@ LangChain v0.3版本，官方文档介绍时的第一句话是：
 
 可以看出，**LangChain v1.0 版本的重心应该是向Agent开发框架倾斜了**。
 
-根据官方文档的说明，LangChain v1.0 的重大改变如下：
+根据官方文档 [Release -> What's new in LangChain v1](https://docs.langchain.com/oss/python/releases/langchain-v1) 的说明，LangChain v1.0 的重大改变如下：
+
+> We’ve streamlined the framework around three core improvements：
 
 **一、核心架构变化**
 
@@ -50,28 +52,33 @@ LangChain v0.3版本，官方文档介绍时的第一句话是：
 
 **（3）改进了结构化输出（Structured output）的能力**
 
-结构化输出的生成现在直接在 Agent 的主执行循环中完成，**不再需要额外的 LLM 调用来解析结果**，从而降低了延迟和成本。
+`create_agent()`函数提供的结构化输出的生成现在直接在 Agent 的主执行循环中完成，**不再需要额外的 LLM 调用来解析结果**，从而降低了延迟和成本。
 
 **二、统一模型输出**
 
-- 引入`.content_block`属性，统一了不同模型提供商的消息内容
+LangChain的LLM/ChatModel的Response里，引入`.content_blocks`属性：
+
+- 统一了不同模型提供商的消息内容
+- 提供了类型提示
+- 此属性是延迟加载的，提供了兼容性
 
 **三、简化包结构**
 
 精简了`langchain`包的命名空间，`langchain`包现在聚焦如下几个子module：
 
-- `langchain.messages`
-- `langchain.chat_models`
-- `langchain.tools`
-- `langchian.embeddings`
-- `langchain.agents`
+| Module                  | What’s available                                 | Notes                             |
+| :---------------------- | :----------------------------------------------- | :-------------------------------- |
+| `langchain.messages`    | Message types, `content blocks`, `trim_messages` | Re-exported from `langchain-core` |
+| `langchain.chat_models` | `init_chat_model`, `BaseChatModel`               | Unified model initialization      |
+| `langchain.embeddings`  | `Embeddings`, `init_embeddings`                  | Embedding models                  |
+| `langchain.tools`       | `@tool`, `BaseTool`, injection helpers           | Re-exported from `langchain-core` |
+| `langchain.agents`      | `create_agent`, `AgentState`                     | Core agent creation functionality |
 
 顶层的`__init__.py`里没有引入任何内容。
 
 `langchain-core`包依然存在，并且依旧定义了`langchain`所有抽象组件，包括v0.3版本的`Runnable`接口抽象。
 
-`langchain-community`包也依旧存在，不过一个重要变化是：之前在`langchain`v0.3版本，会直接导入`langchain-community`里的内容，
-v1.0版本不再直接导出了，需要用户手动显式直接从`langchain-community`里导入。
+`langchain-community`包也依旧存在，不过一个重要变化是：之前在`langchain`v0.3版本，会直接导入`langchain-community`里的内容，v1.0版本不再直接导出了，需要用户手动显式直接从`langchain-community`里导入。
 
 
 ------
@@ -82,7 +89,11 @@ v1.0版本不再直接导出了，需要用户手动显式直接从`langchain-co
 - [Release -> What's new in LangGraph v1](https://docs.langchain.com/oss/python/releases/langgraph-v1)
 - [LangGraph v1 migration guide](https://docs.langchain.com/oss/python/migrate/langgraph-v1)
 
-对于LangGraph来说，从v0.6.11版本升级到 v1.0.0 版本，核心架构和组件基本没有什么变化。
+对于LangGraph来说，从v0.6.11版本升级到 v1.0.0 版本：
+
+- **核心架构和组件基本没有什么变化**
+- 提高了执行时的稳定性
+- 和LangChain-V1.x无缝对接
 
 最大的改动就是`langgraph.prebuilt`模块里的`create_react_agent()`函数被标记为废弃，由`langchain.agents`模块统一Agent函数`create_agent()`代替了。
 
@@ -175,7 +186,7 @@ v1.0版本的`langchain`包只有如下模块了。
 - pytyped
 ```
 
-相比于 v0.3.80 版本里，删除了如下模块：
+相比于 **v0.3.80** 版本里，删除了如下模块：
 - `langchain.chains`
 - `langchain.memory`
 - `langchain.callbacks`
@@ -216,7 +227,7 @@ v1.0 里此模块的内容如下：
   - 这里配置的 `state_schema` 会被用作 base schema，**所有middlewares中定义的`state_schema`字段都会被合并到此base schema中**。
   - 预置的Middleware会用到 `AgentState[ResponseT]` 中定义的 `messages` 字段。
   - Middleware 的各类 hook 方法也会使用这个 state_schema
-- `context_schema`: `TypedDict`/`dataclass`/pydantic `BaseModel` **类**，用于定义LangGraph的 `Runtime[ContextT]` 里的 `ContextT` 泛型。
+- `context_schema`: `TypedDict`/`dataclass`/pydantic `BaseModel` **类**（不是对象），用于定义LangGraph的 `Runtime[ContextT]` 里的 `ContextT` 泛型。
   - 这个schema的实例对象可以在调用`CompiledStateGraph.invoke()`方法时作为`context`参数传入，之后可以在LangGraph节点中的`Runtime[ContextT].context`属性获取了。
 - `tools`: 工具列表。
   - 查看源码可以发现，传入的所有tools都被封装到了下面介绍的`tools`模块的 `_ToolNode` 类中。 
@@ -240,8 +251,7 @@ Agent里的middleware调用时机如官方文档图片所示：
 
 <img src="https://mintcdn.com/langchain-5e9cc07a/RAP6mjwE5G00xYsA/oss/images/middleware_final.png?w=840&fit=max&auto=format&n=RAP6mjwE5G00xYsA&q=85&s=e9b14e264f68345de08ae76f032c52d4" alt="AgentMiddleware.hook" style="zoom:80%;" align="left"/>
 
-上述调用的hook方法是由`AgentMiddleware`基类定义的（[官方文档：Custom middleware](https://docs.langchain.com/oss/python/langchain/middleware/custom)），
-所有Middleware都要继承此类。
+上述调用的hook方法是由`AgentMiddleware`基类定义的（[官方文档：Custom middleware](https://docs.langchain.com/oss/python/langchain/middleware/custom)），所有Middleware都要继承此类。
 
 `AgentMiddleware(Generic[StateT, ContextT])` 是一个泛型类，需要`StateT`和`ContextT`两个泛型参数：
 - `StateT`: 传递给Middleware的状态对象schema，需要继承自 `AgentState` 类
@@ -291,7 +301,6 @@ Node-style hook方法的签名为：
 - `@wrap_tool_call`
 
 这些装饰器内部也是将被装饰函数使用动态类定义的技巧封装成`AgentMiddleware`的子类以供使用的。
-
 
 **使用要点**
 
@@ -480,26 +489,38 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 ##### `Runnable`
 
-它是LangChain里大部分对象执行的基本单元对象，是LangChain里的核心抽象基类，
-详细介绍可以参考官方文档[Conceptual Guide -> Runnable interface](https://python.langchain.com/docs/concepts/runnables/).
+它是LangChain里大部分对象执行的基本单元对象，是LangChain里的核心抽象基类，详细介绍可以参考官方文档[Conceptual Guide -> Runnable interface](https://python.langchain.com/docs/concepts/runnables/).
 
 它重载了运算符`|`（重写了`__or__`/`__oro__`方法），并提供了`pipe`方法，为LCEL的 `|` 语法提供了支持。
 
-`Runnable` 是抽象类（继承自`ABC`），同时也是泛型类，定义了泛型`Generic[Input, Output]`。
+`class Runnable(ABC, Generic[Input, Output])` 是抽象类，同时也是泛型类。
+
+一、重要属性
 
 `Runnable`只定义了一个`name`属性，用于标识Runnable对象的名称。
 
+但是定义了如下几个Property：
+
+- `InputType`，对应泛型参数的`Input`类
+- `OutputType`，对应泛型参数的`Output`类
+- `input_schema`，`type[BaseModel]`类
+- `output_schema`，`type[BaseModel]`类
+- `config_specs`
+
+二、接口方法
+
 `Runnable`定义了如下常用的接口方法:
+
 - `invoke`/`ainvoke`: 输入单条，输出结果。这里的 `invoke` 方法被标记为抽象方法，所以继承 `Runnable` 时，必须实现 `invoke` 方法。
 - `batch`/`abatch`: 批量invoke，输出结果
-- `stream`/`astream`: 流式调用invoke
+- `stream`/`astream`: 流式方法，内部会`yield self.invoke()`，所以具体的流式输出逻辑还需要`invoke()`方法的实现支持。
 - `batch_as_completed`/`abatch_as_completed`: 批量invoke直到完成
 - `transform`/`atransform`: 用于将输入转换成输出，底层默认是调用`stream`/`astream`方法
 
 > 上述所有方法中，只有 `invoke` 方法是抽象方法，其他方法都有默认实现，所以如果要继承 `Runnable` 时，必须要实现的方法只有 `invoke`。
 
 此外，`Runnable`还定义了如下几个接口方法，它们均返回`RunnableBinding`对象，对当前Runnable对象进行一些封装并附加一些参数/属性：
-- `bind`: 以关键字参数附加一些参数/属性
+- `bind(self, **kwargs: Any) -> Runnable[Input, Output]`: 以关键字参数附加一些参数/属性
 - `with_config`: 以`RunnableConfig` + 关键字参数附加信息
 - `with_listeners`/`with_alisteners`: 给Runnable对象，添加一些监听器，在运行开始，运行完成时，运行出错后，调用对应的监听回调函数。
 - `with_types`:
@@ -512,7 +533,9 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 ##### `RunnableSerializable`
 
-继承自 `load`模块的`Serializable` + `Runnable`，是大部分LLM/ChatLLM的基类，**注意，它不是抽象类，不过一般不会直接使用**。
+`class RunnableSerializable(Serializable, Runnable[Input, Output])`是大部分LLM/ChatLLM的基类，**注意，它不是抽象类，不过一般不会直接使用**。
+
+其中的`class Serializable(BaseModel, ABC)`是`load`模块里的类。
 
 `RunnableSerializable`定义了如下两个在运行修改配置的接口方法：
 - `configurable_fields`: 
@@ -520,26 +543,28 @@ package名称为`langchain_core`，需要关注的有如下内容。
 
 ##### `RunnableLambda` - KEY
 
-继承自`Runnable`类，用于将任意`Callable`对象封装成`Runnable`对象，很常用。
+`class RunnableLambda(Runnable[Input, Output])`，用于将任意`Callable`对象封装成`Runnable`对象，很常用。
 
 可以对异步或非异步函数进行封装，但**不适合以stream方式返回的函数** —— 这种情况应该使用 `RunnableGenerator`。
 
 ##### `RunnableGenerator`
 
-继承自`Runnable`类，用于将任意`Generator`对象封装成`Runnable`对象，**适合以stream方式返回的函数**。
+`class RunnableGenerator(Runnable[Input, Output])`，用于将任意`Generator`对象封装成`Runnable`对象，**适合以stream方式返回的函数**。
 
 ##### `RunnableBinding` - KEY
 
-用于对`Runnable`对象进行封装并附加一些参数/属性，并返回一个`RunnableBinding`对象 —— 对原有的`Runnable`对象进行了包装。   
+`class RunnableBinding(RunnableBindingBase[Input, Output])`，用于对`Runnable`对象进行封装并附加一些参数/属性，并返回一个`RunnableBinding`对象 —— 对原有的`Runnable`对象进行了包装。
+
 它相当于一个 **Runnable 装饰器**，LangChain框架内部很多地方都用到了它。
 
-它继承自`RunnableBindingBase`类（此类继承自`RunnableSerializable`），该类定义了如下属性：
+它继承自`class RunnableBindingBase(RunnableSerializable[Input, Output])`类，该类定义了如下属性：
 - `bound: Runnable[Input, Output]`，内部包装的 `Runnable` 对象
 - `config: RunnableConfig`，附加到 `bound` 对象的运行配置
 
 `RunnableBindingBase`类还重写了`invoke`, `batch`, `stream` 等方法，将这些方法的调用附加`config`配置后转发给 `bound` 对象，并返回结果。
 
 `RunnableBinding`类定义了如下几个方法，和`Runnable`里的方法对应。
+
 - `bind()`
 - `with_config()`
 - `with_listeners()`
@@ -769,37 +794,41 @@ module主要内容有：
   - `BaseChatModel`，所有聊天模型的基类，定义了使用时的方法。
   - `SimpleChatModel`，继承自`BaseChatModel`，**自定义ChatModel时，应当继承此类**。
 
-
 **使用说明**
 
-`BaseLanguageModel`是所有LLM的基类，它定义了如下常用属性：
+一、`class BaseLanguageModel(RunnableSerializable[LanguageModelInput, LanguageModelOutputVar], ABC)`是所有LLM的基类。
+
+它定义了如下常用属性：
+
 - `metadata`:
 - `tags`:
 - `verbose: bool`: 是否输出详细日志
 - `callbacks`: 回调函数设置，它是一个`Union[list[BaseCallbackHandler], BaseCallbackManager]`，既可以是回调函数列表，也可以是回调管理器。
 - `custom_get_token_ids`:
 
-`BaseLLM`/`BaseChatModel`继承自`BaseLanguageModel`，它新增了如下属性：
-- `callback_manager`: `BaseCallbackManager`类型，回调管理器。   
+二、`BaseLLM`/`BaseChatModel`继承自`BaseLanguageModel`，它新增了如下属性：
+
+- `callback_manager`: `BaseCallbackManager`类型，回调管理器。
+
   不过**这个属性和`BaseLanguageModel`的`callbacks`属性功能重复了，所以被标识为废弃的，建议使用`callback_manager`属性**。
 
+三、使用接口
 
 通常使用时，需要关注的是 `BaseLLM` 和 `BastChatModel` 提供的一些方法，列举如下：
-- `invoke`/`ainvoke`: 输入单条，输出结果
-  - 由`langchain_core/runnables/base.py`的`Runnable`抽象类定义的抽象方法。
-- `batch`/`abatch`: 批量invoke，输出结果
-  - 也是由`Runnable`抽象类定义的抽象方法。
-- `stream`/`astream`: 流式调用invoke
-  - 也是由`Runnable`抽象类定义的抽象方法。
-- `generate_prompt`/`agenerate_prompt`: 
-  - 输入一批prompt，调用模型产生输出，一般不需要手动调用。
-  - 由 `BaseLanguageModel` 定义的抽象方法
-- `predict`/`apredict`: 输入**单条** raw text，调用模型，并以raw text返回结果
-  - 由 `BaseLanguageModel` 定义的抽象方法
-- `predict_messages`/`apredict_messages`: 输入`List[BaseMessage]`，调用模型，并以`BaseMessage`返回结果
-  - 由 `BaseLanguageModel` 定义的抽象方法
-- `generate`/`agenerate`: 调用模型产生输出
-  - 由`BaseLLM`/`BaseChatModel`类实现的方法，比较底层，一般不需要手动调用
+
+- `invoke`/`ainvoke`: 输入单条，输出结果。
+- `stream`/`astream`: 流式调用invoke。
+- `batch`/`abatch`: 批量invoke，输出结果。
+
+> 以上方法由`langchain_core/runnables/base.py`的`Runnable`抽象类定义。
+
+- `generate_prompt`/`agenerate_prompt`: 输入一批prompt，调用模型产生输出，一般不需要手动调用。
+- `predict`/`apredict`: 输入**单条** raw text，调用模型，并以raw text返回结果。
+- `predict_messages`/`apredict_messages`: 输入`List[BaseMessage]`，调用模型，并以`BaseMessage`返回结果。
+
+> 以上方法由 `BaseLanguageModel` 定义。
+
+- `generate`/`agenerate`: 调用模型产生输出。由`BaseLLM`/`BaseChatModel`类实现的方法，比较底层，一般不需要手动调用。
 
 > `BaseLLM` 和 `BastChatModel` 也提供了 `__call__` 方法，支持Callable调用的方式，不过看源码里，这种Callable调用被标记为废弃，后续1.0版本可能会移除掉。
 
@@ -812,6 +841,14 @@ module主要内容有：
 - `_generate`/`_agenerate`: 必须要实现的模型调用方法
 - `_stream`/`_astream`: 可选方法
 
+四、结构化输出
+
+`BastChatModel`类还定义了如下两个抽象方法（`BaseLLM`没有）：
+
+（1）`bind_tools`，封装工具调用。
+
+（2）`with_structured_output`，处理结构化输出。
+
 
 ### `messages`模块
 
@@ -821,7 +858,7 @@ module主要内容有：
 
 > 此模块只在`langchain_core`模块中有，可以直接使用，不需要在`langchain`等模块中继承。
 
-**内容如下**：
+一、**主要内容**
 
 - `base.py`
   - `BaseMessage`，所有消息的基类——注意，**它并不是抽象类**。
@@ -853,33 +890,39 @@ module主要内容有：
   - `ToolMessage`
   - `ToolMessageChunk`
 
-**使用说明**
+二、**使用说明**
 
 `BaseMessage`/`BaseMessageChunk`两个类已经定义好了重要的属性和方法，其他的Message类大部分都是简单的封装。
-- 属性：
-  - `id`: 消息标识符
-  - `name`: 消息名称，可选
-  - `type`: 消息类型，`HumanMessage`/`SystemMessage`等子类会设置这个字段，用于区分不同的消息类型。
-  - `content`: 消息内容——最重要的部分
-  - `role`: 消息角色，这个字段只有`ChatMessage`中有，其他子类没有。
-  - `model_config`:
-  - `response_metadata`:
-- 方法：
-  - `text`: 获取消息内容(`BaseMessage.content`)，返回一个字符串。 
-  - `pretty_repr(html: bool = False)`:
-  - `pretty_print()`:
 
-需要注意的是，`ChatMessage` 是通用 Message 封装类，有一个 `role` 属性。   
-而 `SystemMessage`/`HumanMessage`等专用Message封装类没有这个属性，也能正常调用，   
-是因为根据 `SystemMessage`/`HumanMessage` 来判断 role 类型的逻辑放在了具体的 `BastChatModel` 实现类中。    
+（1）常用属性：
+- `id`: 消息标识符
+- `name`: 消息名称，可选
+- `type`: 消息类型，`HumanMessage`/`SystemMessage`等子类会设置这个字段，用于区分不同的消息类型。
+- `content`: 消息内容——最重要的部分
+- `role`: 消息角色，这个字段只有`ChatMessage`中有，其他子类没有。
+- `model_config`:
+- `response_metadata`:
+
+（2）常用方法：
+- `text`: 获取消息内容(`BaseMessage.content`)，返回一个字符串。 
+- `pretty_repr(html: bool = False)`:
+- `pretty_print()`:
+
+（3）说明：
+
+需要注意的是，`ChatMessage` 是通用 Message 封装类，有一个 `role` 属性。
+
+而 `SystemMessage`/`HumanMessage`等专用Message封装类没有这个属性，也能正常调用，是因为根据 `SystemMessage`/`HumanMessage` 来判断 role 类型的逻辑放在了具体的 `BastChatModel` 实现类中。
+
 举例来说：
+
 - `ChatOllama._generate()` 方法里，最终会调用 `_convert_messages_to_ollama_messages()` 方法，其中就有 role 的判断逻辑；
 - `ChatOpenAI._generate()` 方法里，最终会调用 `_convert_message_to_dict()` 方法，其中有 role 的判断逻辑。
 
 
 ### `prompts`模块
 
-主要内容有：
+一、**主要内容**
 - `base.py`
   - `BasePromptTemplate`, 所有Completion prompt模板的基类，这是个**抽象类**，不能直接使用。
 
@@ -918,11 +961,14 @@ module主要内容有：
     - `ChatPromptTemplate`: 用于组合 多个ChatMessagePromptTemplate 或者其他类型的提示模板（例如文本提示模板），形成一个完整的对话上下文。
       - 持有一个 `messages` 属性，类型是`List[Union[BaseMessagePromptTemplate, BaseMessage, BaseChatPromptTemplate]]` 
 
-> 注意，`ChatMessagePromptTemplate`返回的是`ChatMessage`，有 role 属性，type属性是'chat';
+> 注意：
+>
+> `ChatMessagePromptTemplate`返回的是`ChatMessage`，有 role 属性，type属性是'chat';
+>
 > `HumanMessagePromptTemplate`返回的是`HumanMessage`，type属性是'human'，**没有 role 属性**。
 
 
-**使用说明**
+二、**使用说明**
 
 所有继承`BasePromptTemplate`的类，需要关注如下方法：
 - `invoke`/`ainvoke`: 返回值是`PromptValue`及其子类。
@@ -940,7 +986,7 @@ module主要内容有：
 
 封装了 Prompt Template 的输出值。
 
-内容如下：
+一、**主要内容**
 - `PromptValue`: 封装了 prompt 的输出值，这个类是一个**抽象类**
   - 它继承自`Serializable` —— 也是pydantic的`BaseModel`子类，它也是下面所有类的基类。
   - 主要定义了两个方法：
@@ -998,7 +1044,7 @@ module主要内容有：
 ---------------------------------------------------
 ## Memory相关
 
-官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议转向使用 LangGraph.
+官方文档[How to migrate to LangGraph memory](https://python.langchain.com/docs/versions/migrating_memory/)建议**转向使用 LangGraph**.
 
 根据上面的官方文档，Langchain 里有关 Memory 的设计思路经历了3个阶段：
 1. 基于 `BaseMemory` (`langchain_core.memory.py`) 的早期设计
@@ -1006,23 +1052,23 @@ module主要内容有：
    `BaseChatMessageHistory` (`lanchain_core.chat_history.py`) 的设计，这个设计思路还在沿用，适用于简单的场景
 3. 基于 LangGraph 的思路，这个是后续的发展方向
 
-`BaseChatMessageHistory` 是和 `langchain.memory` 模块的 `ChatBaseMemory` 配合使用的，大致流程是 `ChatBaseMemory` 会
-将历史聊天记录的存储委托给某个 `BaseChatMessageHistory` 实现类来进行。
+`BaseChatMessageHistory` 是和 `langchain.memory` 模块的 `ChatBaseMemory` 配合使用的，大致流程是 `ChatBaseMemory` 会将历史聊天记录的存储委托给某个 `BaseChatMessageHistory` 实现类来进行。
 
 `RunnableWithMessageHistory` 的使用方式不一样，它是**为了和 LangGraph 配合使用，并且支持 LCEL 表达式**。
 
 LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 
-### `memory.py`
+### ~~`memory.py`~~
 
-**从langchain v0.3.3 版本开始，memory模块被表示为废弃，并在 v1.x 版本被移除了**。  
+> **从langchain v0.3.3 版本开始，memory模块被表示为废弃，并在 v1.x 版本被移除了**。  
 
 只提供了一个类：`BaseMemory`，所有memory的基类，提供了一些通用的接口。   
 
 `BaseMemory`继承了`Serializable`，所以也是一个Pydantic的`BaseModel`子类。
 
 `BaseMemory`定义了如下抽象方法：
+
 - `memory_variables`: 返回`list[str]`，表示此memory提供了哪些key给模型使用。
 - `load_memory_variables`/`aload_memory_variables`: 返回一个字典
 - `save_context`/`asave_context`: 保存上下文的输入和输出信息
@@ -1031,7 +1077,7 @@ LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 ### `chat_history.py`
 
-内容如下：
+一、**主要内容**
 - `BaseChatMessageHistory`: 用于表示聊天历史记录的抽象基类
 - `InMemoryChatMessageHistory`: 存放在内存中的聊天历史记录简单实现类
 
@@ -1044,7 +1090,7 @@ LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 `InMemoryChatMessageHistory`就是一个简单的基于内存列表的`BaseChatMessageHistory`实现类。
 
-**使用说明**
+二、**使用说明**
 
 `BaseChatMessageHistory`有两种使用方式：
 1. 配合`langchain.memory.chat_memory.py`里的`BaseChatMemory`一起使用的，这种方式已经不太推荐了。
@@ -1053,13 +1099,17 @@ LangGraph支持多用户的聊天记录管理，也支持容错恢复功能。
 
 ### `runnables.history.py`
 
-此文件里定义了 `RunnableWithMessageHistory` 类，它和上面的 memory 模块、chat_history 模块的使用方式差异很大。
+此文件里定义了 `RunnableWithMessageHistory` 类，**它和上面的 memory 模块、chat_history 模块的使用方式差异很大**。
 
 `RunnableWithMessageHistory` 主要作用是对一个 `Runnable`对象 和它的 对话历史 进行封装管理。
+
 为了管理对话历史，它要求在每次调用时，都提供一个 `session_id` ，用于确定内部的 `Runnable` 对象的对话历史。
 
 它初始化时，需要提供如下参数：
-- `runnable: Runnable`: 需要被包装的 `Runnable` 对象，此对象的输入是 `list[BaseMessage]`，返回值是 `str | BaseMessage | MessagesOrDictWithMessages`
+- `runnable: Runnable`: 需要被包装的 `Runnable` 对象
+  - 输入是 `list[BaseMessage]`
+  - 返回值是 `str | BaseMessage | MessagesOrDictWithMessages`
+
 - `get_session_history`: 一个Callable对象，它的参数一般是一个`session_id`，然后返回该session的 `BaseChatMessageHistory` 对象
 - `input_messages_key`:
 - `output_messages_key`:
@@ -1079,32 +1129,40 @@ LangChain 中将数据检索（RAG）分为以下几个步骤：
 5. Retriever: 向量检索器，统一封装VectorStore的检索功能
 
 > 注意，langchain-core 里的以下模块，从 v0.3.x 到 v1.x 版本的变化不大。
+>
+> 相比之下，**LangChain提供的RAG能力比LlamaIndex弱不少**。
 
 
 ### `documents`模块
 
 定义了LangChain里的文档对象的通用表示。
 
-module内容如下：
+一、**主要内容**
 
 `base.py`
-- `BaseMedia`: 所有 Media 的抽象基类，Media 包括text
-- `Blob`: 文档的二进制数据（raw data）
-- `Document`: 文档的基类，包含text和metadata —— KEY
+- `class BaseMedia(Serializable)`: 所有 Media 的抽象基类，Media 包括text
+- `class Blob(BaseMedia)`: 文档的二进制数据（raw data）
+- `class Document(BaseMedia)`: 文档的基类，包含text和metadata —— KEY
 
 `compressor.py`
+
 - `BaseDocumentCompressor`
 
 `transformers.py`
-- `BaseDocumentTransformer`
 
-**使用说明**
+- `class BaseDocumentTransformer(ABC)`，抽象类，作为接口使用，只有如下两个接口方法
+  - `def transform_documents(self, documents: Sequence[Document], **kwargs: Any) -> Sequence[Document]`，这是抽象方法
+  - `async def atransform_documents()`，异步接口，非抽象方法，内部会使用 `run_in_excutor()` 封装调用上面的方法。
+
+
+二、**使用说明**
 
 `BaseMedia`继承自 `Serializable`，所以也是一个Pydantic的`BaseModel`子类，里面定义了如下两个属性：
 - `id`: 可选str，用于标识文档
 - `metadata`: dict，用于存储文档的元数据
 
 `Document`继承自 `BaseMedia`，新增如下两个属性：
+
 - `type`: 固定是 Document
 - `page_content`: str，文档的文本内容
 
@@ -1113,19 +1171,21 @@ module内容如下：
 
 > 还有一个 `load` 模块，该模块提供了序列化和反序列化相关的工具.
 
-module内容如下：
+一、**主要内容**
 
 `base.py`
 - `BaseLoader`: 所有 Loader 的抽象基类——定义了统一接口
 - `BaseBlobParser`: 
 
 `blob_loaders.py`
+
 - `BlobLoader`
 
 `langsmith.py`
+
 - `LangSmithLoader`
 
-**使用说明**
+二、**使用说明**
 
 `BaseLoader`里定义了如下接口：
 - `load`/`aload`: 加载数据，返回 `List[Document]`
@@ -1137,19 +1197,22 @@ module内容如下：
 
 ### `embeddings`模块
 
-module内容如下：
+一、**主要内容**
 - `embeddings.py`: 只有一个 `Embeddings` 抽象基类
 
-**使用说明**   
+二、**使用说明**   
 
 `Embeddings`是一个抽象基类，定义了如下方法：
+
 - `embed_query`/`aembed_query`: 用于计算query的embedding向量，返回一个 `List[float]`
 - `embed_documents`/`aembed_documents`: 用于**批量计算**query的embedding向量，返回一个 `List[List[float]]`
+
+`Embeddings`类没有定义任何属性，因此实现方式全看子类。
 
 
 ### `vectorstores`模块
 
-module内容如下：
+一、**主要内容**
 
 `base.py`
 - `VectorStore`: 所有 VectorStore 的抽象基类
@@ -1160,7 +1223,7 @@ module内容如下：
 
 `utils.py`
 
-**使用说明**   
+二、**使用说明**   
 
 `VectorStore`抽象基类里定义了如下方法：
 - `add_texts`/`aadd_texts`
@@ -1187,7 +1250,7 @@ module内容如下：
 
 ### `tools`模块
 
-module内容如下：
+一、**主要内容**
 - `base.py`
   - `BaseTool`: 所有工具类的抽象基类，它继承了 `RunnableSerializable`，所以也是一个Pydantic的`BaseModel`子类。    
      它定义了Langchain里Tool需要实现的接口，只有一个抽象方法`_run()`（异步版本的`_arun()`方法底层调用的也是这个）需要子类实现具体的工具调用逻辑
@@ -1200,9 +1263,10 @@ module内容如下：
 - `render.py`
 - `reriever.py`
 
+二、**使用说明**
 
-**使用说明**    
 `BaseTool`类里定义了如下属性（对应于function calling所必须的3个要素）：
+
 - `name`: str类型，工具类的名称，用于标识工具类的唯一性，必须唯一。
 - `description`: str类型，工具类的描述，用于标识工具类的用途。
 - `args_schema`: Pydantic的`BaseModel`子类，用于定义工具类的参数，如果定义了该属性，则该工具类将支持参数校验。
@@ -1234,7 +1298,7 @@ module内容如下：
 - `AgentStep`
 - `AgentFinish`
 
-langchain-core里的agents内容并没有太多，主要在langchain包里。
+> Langchain-core里的agents内容并没有太多，主要在langchain包里。
 
 
 
@@ -1243,7 +1307,7 @@ langchain-core里的agents内容并没有太多，主要在langchain包里。
 
 # LangChain:v0.3
 
-module名称为`langchain`，源码内容如下：
+Module名称为`langchain`，源码内容如下：
 
 ```text
 ## langchain v0.3.27 模块及文件
@@ -1298,21 +1362,22 @@ module名称为`langchain`，源码内容如下：
 所有的模块可以分为如下6大类：
 
 
-## Chain核心模块
+## Chain核心模块-KEY
 
-> langchain_core 没有对应的chains模块，因为chains相关的核心接口/抽象类都在 `langchain_core.runnables` 中定义好了。
-> **`chains` 模块才是 langchain 包的核心内容**。
+> `langchain_core`没有chains模块，因为 `langchain_core.runnables` 定义的就是chains相关的核心接口/抽象类。
+>
+> **`chains` 模块是 langchain 包的核心内容**。
 
-### `chains`模块-KEY
+### `chains`模块-
 
-module内容如下：
+一、**主要内容**
 
 - `base.py`:
   - `Chain`: Chain组件的抽象基类，它继承了 `RunnableSerializable`，所以也是一个Pydantic的`BaseModel`子类。
 
 `chains`模块提供了一系列的Chain组件实现类。
 
-**使用说明**
+二、**使用说明**
 
 抽象基类`Chain`里定义了如下属性（这些属性可以在初始化时传入）：
 
@@ -1355,9 +1420,7 @@ module内容如下：
 ---------------------------------------------------
 ## Model IO模块
 
-> `langchain`模块的`llm`和`chat_models`模块里都只是提供了模型定义、加载初始化的内容，
-> 返回的模型都是 `langchain_core.language_model`模块里抽象类的子类，
-> 所以如果要研究调用过程，应该看`langchain_core.language_model`模块里的源码。
+> `langchain`包的`llm`/`chat_models`模块里都只是提供了模型定义、加载初始化的内容，返回的模型都是 `langchain_core.language_model`模块的抽象类及其子类。研究调用过程，应该看`langchain_core.language_model`模块里的源码。
 
 ### `llms` 模块
 
@@ -1386,14 +1449,12 @@ module内容如下：
 
 ### `prompts`模块
 
-这个模块写的稍微有点搞笑，就是把 `langchain_core.prompts`模块里的对应内容导入过来。
+这个模块写的稍微有点敷衍，就是把 `langchain_core.prompts`模块里的对应内容导入过来。
 
 
 ### `output_parsers`模块
 
 这个模块也是把 `langchain_core.output_parsers` 里的内容导入过来。
-
-
 
 
 
@@ -1405,7 +1466,9 @@ module内容如下：
 
 这个模块混合了早期 **基于`BaseMemory`实现** 思路的Memory组件和 **基于`BaseChatMessageHistory`实现** 思路的Memory组件。
 
-module里 **基于`BaseMemory`实现**的（常用）内容如下：
+一、**主要内容**
+
+提供了**基于`BaseMemory`实现**的（常用）内容：
 - `simple.py`:
   - `SimpleMemory`: 用于（初始化）存储一个固定的聊天记录，只能读，不能修改或者清除。
 - `readonly.py`:
@@ -1426,7 +1489,7 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `combined.py`:
 
 
-**使用说明**
+二、**使用说明**
 
 `BaseChatMemory`抽象类继承了`BaseMemory`类，并在此基础上定义了如下属性：
 - `chat_memory: BaseChatMessageHistory`: 这个就是配合下面的`BaseChatMessageHistory`使用的，它的默认实现就是`InMemoryMessageHistory`。
@@ -1434,12 +1497,10 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `input_key: Optional[str] = None`:
 - `return_messages: bool = False`:
 
-
-**`BaseChatMemory` 底层会将历史消息的读写操作委托给 `BaseChatMessageHistory` 实现类**，具体过程是：
-`save_context`方法里调用`chat_memory: BaseChatMessageHistory`属性对象的`add_messages`方法。
-
+**`BaseChatMemory` 底层会将历史消息的读写操作委托给 `BaseChatMessageHistory` 实现类**，具体过程是：`save_context`方法里调用`chat_memory: BaseChatMessageHistory`属性对象的`add_messages`方法。
 
 **基于`BaseChatMessageHistory`实现** 的组件在`langchain.memory.chat_message_history`模块里。
+
 > 此模块其实只是一个简单导入的封装，实际是从 `langchain_community.chat_message_histories` 模块导入对应的类。
 
 常用的ChatMessageHistory实现类如下：
@@ -1450,10 +1511,16 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 - `ElasticsearchChatMessageHistory`
 
 
+
+------
+
+
 ## 数据检索（RAG）相关模块
 
 > 以下模块，从 v0.3.x 升级到 v1.x 版本，除了 `embeddings` 模块依旧保留外，其他模块都移动到 `langchain_community`包了。
+>
 > 实际上，即使是在 v0.3.x 模块，以下大部分模块也都是从 `langchain_community`包里导入的功能。
+>
 > 由于 `langchain_community` 包并没有升级到 v1.x，所以可以认为 RAG 相关的模块变化不大。
 
 ### `document_loaders`模块
@@ -1528,10 +1595,10 @@ module里 **基于`BaseMemory`实现**的（常用）内容如下：
 ---------------------------------------------------
 ## Agent相关模块
 
-> LangChain的 Agent 相关模块在 0.3 版本之后有较大改动，`langchain.agents`模块里内容是之前构建Agent的方式，已被标记为废弃的，
-> 在 1.0.0 版本之前都会被保留，参加官方文档 [How to migrate from legacy LangChain agents to LangGraph](https://python.langchain.com/docs/how_to/migrate_agent/).
-> 后续LangChain官方推荐转向使用 LangGraph 构建 Agent 应用。
-> 因此这里就**不再详细介绍 agents 模块相关内容了**。
+> LangChain的 Agent 相关模块在 0.3 版本之后有较大改动：
+>
+> - `langchain.agents`模块里内容是之前构建Agent的方式，已被标记为废弃的，在 1.0.0 版本之前都会被保留，参见官方文档 [How to migrate from legacy LangChain agents to LangGraph](https://python.langchain.com/docs/how_to/migrate_agent/).
+> - 后续LangChain官方推荐转向使用 LangGraph 构建 Agent 应用，因此这里就**不再详细介绍 agents 模块相关内容了**。
 
 ### `tools`模块
 
@@ -1590,17 +1657,15 @@ LangChain-Community是一个第三方社区扩展包，提供了一些常用的�
 ---------------------------------------------------
 # LangGraph
 
-> LangGraph 从 v0.6.x 版本升级到 v1.x 版本，核心组件的变化不大。
+> LangGraph 从 **v0.6.x** 版本升级到 **v1.x** 版本，核心组件的变化不大。
 
-首先要明确的是，LangGraph并不依赖LangChain-Core或者LangChain，
-参考官方[FAQ -> Do I need to use LangChain to use LangGraph? What’s the difference?](https://langchain-ai.github.io/langgraph/concepts/faq/#do-i-need-to-use-langchain-to-use-langgraph-whats-the-difference)。
+首先要明确的是，LangGraph并不依赖LangChain-Core或者LangChain，参考官方[FAQ -> Do I need to use LangChain to use LangGraph? What’s the difference?](https://langchain-ai.github.io/langgraph/concepts/faq/#do-i-need-to-use-langchain-to-use-langgraph-whats-the-difference)。
 
-LangGraph更像是一个高度抽象的基于图的Agent调度框架，参考官方文档 [LangGraph Glossary](https://langchain-ai.github.io/langgraph/concepts/low_level/)
-的说法，LangGraph的核心抽象 Graph 有如下3个概念：
+LangGraph更像是一个高度抽象的基于图的Agent调度框架，LangGraph的核心抽象 Graph 有如下3个概念（ [LangGraph Glossary](https://langchain-ai.github.io/langgraph/concepts/low_level/)）：
 
 - `State`: 图的状态，这是 Graph 的核心，本质上就是一个dict，不过通常用 `TypeDict` 类或者 Pydantic的`BaseModel`类表示。
-- `Nodes`: Graph 的计算节点，本质上就是一个Python函数（更广泛一点就是一个Callable对象），可以封装各种逻辑，比如langchain里LLM/ChatModel/Chain的调用
-- `Edges`: Graph 的边，用来连接节点，本质上也是一个Python函数，用于根据当前的`State`判断并返回下一个要执行的`Node`的名称
+- `Nodes`: Graph 的计算节点，本质上就是一个Python函数（更广泛一点就是一个Callable对象），可以封装各种逻辑，比如langchain里LLM/ChatModel/Chain的调用。
+- `Edges`: Graph 的边，用来连接节点，本质上也是一个Python函数，用于根据当前的`State`判断并返回下一个要执行的`Node`的名称。
 
 > 简单来说，Node是实际执行计算的抽象，Edge是控制逻辑的抽象。
 
@@ -1608,6 +1673,7 @@ LangGraph更像是一个高度抽象的基于图的Agent调度框架，参考官
 个人理解，LangGraph是基于图的workflow，不同于常用的图计算的场景，它主要**使用图来描述执行的 Workflow**，关注点是`State`对象。
 
 **`State`被视为整个 Graph Workflow 在某一时刻的状态快照**，原因有如下几点：
+
 - 它作为整个 Graph Workflow 的初始输入
 - workflow的每一步`Node`，都会接受上一个节点的 `State` 作为输入
 - 每个`Node`执行完毕后，都会更新（或者不更新）`State`里的状态
@@ -1746,7 +1812,7 @@ checkpoint里快照的数据结构封装。
 
 触发中断时的数据结构封装，是一个`dataclass`类。
 - 封装了如下属性：
-  - `id`: 标识此次中断的标识符，一般不要手动生成
+  - `id`: 标识此次中断的标识符，一般不需要手动生成
   - `value`: 此次中断的附加信息，用户传入，可以是任何对象
 - 一般推荐通过类方法 `from_ns(value: Any, ns: str)` 来创建，它会自动生成一个唯一的id。 
 
@@ -1779,10 +1845,12 @@ checkpoint里快照的数据结构封装。
   - `Send` / `List[Send]`，使用 `Send` 对象来封装要跳转的节点和参数。
 
 `Command`有如下几个使用场景：
+
 - 作为 Node 节点的返回值 —— 最常见
 - 作为中断恢复执行的传入参数 —— 也常见
 
 `Command` 和 conditional_edges 的使用区别在于：
+
 - 如果要同时更新state，并根据state执行动态控制流，使用 `Command`
 - 如果只是设置节点之间的控制流，使用 conditional_edges
 
@@ -1822,7 +1890,8 @@ checkpoint里快照的数据结构封装。
 
 ### `base`子模块
 
-- `BaseStore`: 所有Store类的抽象基类，定义了如下方法：
+`BaseStore`: 所有Store类的抽象基类，定义了如下方法：
+
 - `put`/`aput`
 - `get`/`aget`
 - `list_namespaces`/`alist_namespaces`
@@ -1917,7 +1986,7 @@ checkpoint里快照的数据结构封装。
 ---------------------------------------------------
 # LangChain-MCP-Adapters
 
-`langchain-mcp-adapters` 专门为 LangChain 提供 MCP 适配的package，使用时的包名为 `langchain_mcp_adapters`。
+`langchain-mcp-adapters` 专门为 LangChain 提供 MCP 适配的package，包名为 `langchain_mcp_adapters`。
 
 此模块提供了将 MCP Tools 包装为 LangChain Tools 的功能，同时它**依赖于MCP官方的Python-SDK `mcp` **。
 
@@ -1931,11 +2000,13 @@ checkpoint里快照的数据结构封装。
 定义了一个 `MultiServerMCPClient`，这个类是 MCP-Adapter 大部分情况下的使用入口。
 
 `MultiServerMCPClient`类 有如下 3个 初始化参数：
+
 - `connections: dict[str, Connection]`, MCP服务器连接信息 —— 最重要的配置
 - `callbacks`:
 - `tool_interceptors`:
 
 `MultiServerMCPClient`类主要提供了如下 3 个方法：
+
 - `get_tools(server_name: str) -> list[Tool]`: 获取指定服务器的 MCP Tools，它会调用下面的 `load_mcp_tools()` 函数。
 - `get_resources(server_name: str, uris: str | list[str]) -> list[Blob]`: 获取指定服务器的 MCP Resources，它会调用下面的 `load_mcp_resources()` 函数。
 - `get_prompts(server_name: str, prompt_name: str,) -> list[HumanMessage | AIMessage]`: 获取指定服务器的 MCP Prompts，它会调用下面的 `load_mcp_prompts()` 函数。
@@ -1983,8 +2054,9 @@ checkpoint里快照的数据结构封装。
 
 有两种使用方式：
 
-（一） 直接使用 `client.py` 里的 `MultiServerMCPClient` 类连接多个MCP服务器，
-然后通过 `get_tools()` 、`get_resources()` 、`get_prompts()` 方法获取 MCP Tools、MCP Resources、MCP Prompts，
-然后将这些 MCP Tools、MCP Resources、MCP Prompts 提供给 LangChain/LangGraph 即可。
+（一） 直接使用 `client.py` 里的 `MultiServerMCPClient` 类连接多个MCP服务器：
+
+1. 通过 `get_tools()` 、`get_resources()` 、`get_prompts()` 方法获取 MCP Tools、MCP Resources、MCP Prompts
+2. 将这些 MCP Tools、MCP Resources、MCP Prompts 提供给 LangChain/LangGraph 即可。
 
 （二）
