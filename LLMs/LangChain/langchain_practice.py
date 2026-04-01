@@ -150,8 +150,7 @@ MODEL = 'qwen-max'
 # MODEL = 'qwen3:14b'
 
 
-# %%
-# ======================= LLM + ChatLLM 模型包装器 使用 =======================
+# %% ======================= LLM + ChatLLM 模型包装器 使用 =======================
 def llm_usage():
     print("===> llm_usage()")
     # client_llm = OpenAI(
@@ -189,7 +188,7 @@ def llm_usage():
     print(res[0])
     print(res[1])
 
-    # 也可以直接使用 __call__ 方法，这是 BaseLLM/BastChatModel 提供的Callable调用，不过后续版本可能会移除此种调用方式
+    # 也可以使用 __call__ 方法，这是 BaseLLM/BastChatModel 提供的Callable调用，不过后续版本可能会移除此种调用方式
     res = client_llm(prompt=input_str)
     print(res)
 
@@ -249,7 +248,7 @@ def chat_llm_usage():
     res = client_chat(messages=msg)
     print(res.content)
 
-# %%
+# %% --------- 工具函数，方便后续使用LLM/ChatLLM --------
 def get_client_llm() -> Union[BaseLLM, LLM]:
     # client_llm = OpenAI(
     #     openai_api_key=API_KEY,
@@ -267,7 +266,6 @@ def get_client_llm() -> Union[BaseLLM, LLM]:
     print(f"\n===> Using model '{MODEL}' with {client_llm.get_name()}\n")
     return client_llm
 
-# %%
 def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
     client_chat = ChatOpenAI(
         openai_api_key=API_KEY,
@@ -289,7 +287,7 @@ def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
     print(f"\n===> Using model '{MODEL}' with {client_chat.get_name()}\n")
     return client_chat
 
-# %%
+# %% --------- ChatLLM调试 -----------
 def simple_chat():
     print("===> simple_chat()")
     client_chat = get_client_chat()
@@ -307,11 +305,10 @@ def simple_chat():
         print(chunk.content, end='')
 
 
-# %%
-# ======================= Message + PromptTemplate 使用 =======================
+# %% ======================= Message + PromptTemplate 使用 =======================
 def message_usage():
     """
-    对于 ChatModel 来说，每次对话的最小单元就是 Message。
+    对于 ChatModel 来说，每次对话的最小单元就是 Message；Completion的LLM模型不需要使用 Message。
     官方文档[Messages](https://python.langchain.com/docs/concepts/messages/)
     展示各类 Message 封装类的使用:
     - ChatMessage: 通用消息 —— 似乎用的不多
@@ -378,7 +375,7 @@ def message_usage():
 # %%
 def prompt_template_usage():
     """
-    Completion模型使用的 PromptTemplate。
+    Completion的LLM模型使用 PromptTemplate。
     """
     print("===> prompt_template_usage()")
     # StringPromptTemplate含有抽象方法，不能实例化
@@ -618,11 +615,11 @@ def pipeline_prompt_usage():
     """
     ...
 
-# ======================= Output Parser + Structured Output =======================
-# %%
+
+# %% ======================= Output Parser + Structured Output =======================
 def output_parser_usage():
     """
-    LangChain的输出解析器是和提示词配合使用的，它会在提示词的末尾增加一段要求大模型输出指定格式的指令。
+    LangChain的输出解析器是和提示词配合使用的，它会**在提示词的末尾增加一段要求大模型输出指定格式的指令**。
     常用的有如下几种Parser:
     - StrOutputParser: 原样返回
     - JsonOutputParser: 以JSON格式返回
@@ -713,10 +710,10 @@ def structured_output_usage():
     3. Pydantic Model
     使用 1和2 返回的是一个 dict，使用 3 返回的是对应 Pydantic Model 的对象
 
-    with_structured_output() 方法的实现交给了具体的模型类，但不是所有的模型类都实现了此方法。
-    特别是 LLM 类的模型，大都没有实现此方法
-    **一般只有 ChatModel 有此方法，因为 BaseChatModel 提供了一个默认实现**。
-    此外，查看源码可以发现，with_structured_output() 需要该模型实现 bind_tools() 方法。
+    with_structured_output() 方法的实现交给了具体的模型类，但不是所有的模型类都支持此方法：
+    - LLM 类模型的基类 BaseLLM 没有定义此方法，因此大部分 LLM 都没有实现此方法。
+    - ChatLLM 类模型的基类 BaseChatModel 提供了一个默认实现，所以大部分 ChatModel 支持方法。
+    此外，查看源码可以发现，with_structured_output() 需要该模型实现 bind_tools() 方法（一般也只有 ChatLLM 类有此方法）。
 
     具体有哪些模型实现了，可以参考 https://python.langchain.com/docs/integrations/chat/#featured-providers 表格。
     """
@@ -739,7 +736,7 @@ def structured_output_usage():
 
     client_chat = get_client_chat()
     print(type(client_chat))
-    # 检查Chat模型类是否实现了 bind_tools 方法
+    # 首先要检查Chat模型类是否实现了 bind_tools 方法 —— 这个是 with_structured_output 的基础
     print(getattr(client_chat, 'bind_tools'))
     # 检查Chat模型类是否实现了 with_structured_output 方法
     print(getattr(client_chat, 'with_structured_output'))
@@ -769,8 +766,7 @@ def structured_output_usage():
     print(res_model['parsed'])
 
 
-# ======================= 工具调用 相关模块使用 =======================
-# %%
+# %% ======================= 工具调用 相关模块使用 =======================
 def tool_wrapper_usage():
     """
     LangChain tool使用，参考官方文档:
@@ -786,7 +782,7 @@ def tool_wrapper_usage():
     - Tool：封装的工具function接收的是 **单个** 字符串格式的参数。
     - StructuredTool: 封装的工具function接收指定格式的 多个 参数，通常由一个Pydantic Model描述 —— 推荐使用这个。
 
-    一般使用 langchain.tools.convert.py 提供的 @tool 装饰器来将一个函数封装为 BaseTool 的子类（Tool、StructuredTool），
+    一般使用 langchain.tools.convert.py 提供的 @tool 装饰器来将一个函数封装为 BaseTool 的子类（Tool、StructuredTool）：
     - 如果 infer_schema=true (默认值) 或者提供了 args_schema 参数，那么就使用 StructuredTool 来封装function；
     - 不满足上面的条件，则使用 Tool 类来封装function，此时会认为该function是一个 “a simple string->string function”
     """
@@ -1092,8 +1088,7 @@ def community_tool_usage():
     print(res)
 
 
-# ======================= Runnable 底层抽象 =======================
-# %%
+# %% ======================= Runnable 底层抽象 =======================
 def runnable_usage():
     """
     Runnable 相关底层类使用
@@ -1200,8 +1195,7 @@ def runnable_other_usage():
     print(output_data)
 
 
-# ======================= Callback 使用 =======================
-# %%
+# %% ======================= Callback 使用 =======================
 class MyCustomHandler(BaseCallbackHandler):
     """
     自定义 CallbackHandler，需要继承 BaseCallbackHandler，并实现某个阶段的回调方法。
@@ -1256,8 +1250,7 @@ def callback_usage():
     print(res)
 
 
-# ======================= Chain 使用（v0.3.x版本） =======================
-# %%
+# %% ======================= Chain 使用（v0.3.x版本） =======================
 def chain_usage():
     """
     v0.3.x 版本提供的 LLMChain 使用，v1.x 版本中已经不推荐使用了，可以使用 RunnableSequence 来代替。
@@ -1301,8 +1294,7 @@ def chain_usage():
     print(res_chat)
 
 
-# ======================= 短期记忆Memory 使用 =======================
-# %%
+# %% ======================= 短期记忆Memory 使用 =======================
 def memory_usage():
     """
     Memory 模块已经不推荐使用了。
@@ -1354,8 +1346,7 @@ def memory_usage():
     print(res2_history)
 
 
-# ======================= 对话历史 =======================
-# %%
+# %% ======================= 对话历史 =======================
 def chat_history_usage():
     """
     BaseChatMessageHistory 使用练习。
@@ -1468,12 +1459,23 @@ def runnable_history_usage():
     print(store.keys())
 
 
-# ======================= 数据检索（RAG）相关模块使用 =======================
-# 整个流程参考 v1.0 版本官方文档 https://docs.langchain.com/oss/python/langchain/retrieval
-# 从 v0.3.x 升级到 v1.x:
-# - langchain-core 里RAG相关的模块变化不大
-# - langchain-community里的相关模块变化也不大，而v0.3.x 版本的langchain RAG相关模块大部分内容就是从 langchain-community 模块导入的
-# 所以可以认为 RAG 部分 v0.3.x 升级到 v1.x 并没有什么变化和影响。
+# %% ======================= 数据检索（RAG）相关模块使用 =======================
+LANGCHAIN_RAG_COMMENT = """
+整个流程参考 v1.0 版本官方文档 https://docs.langchain.com/oss/python/langchain/retrieval
+从 v0.3.x 升级到 v1.x:
+- langchain-core 里RAG相关的模块变化不大
+- langchain-community里的相关模块变化也不大，而v0.3.x 版本的langchain RAG相关模块大部分内容就是从 langchain-community 模块导入的
+所以可以认为 RAG 部分 v0.3.x 升级到 v1.x 并没有什么变化和影响。
+
+LangChain 的 RAG 模块主要分为5步：
+1. Document Loader
+2. Document Transform
+3. Document Embedding
+4. Document Store
+5. Document Retriever
+
+个人感觉，在RAG这方面，LlamaIndex 比 LangChain 好用不少，LlamaIndex的抽象以及封装都方便很多。
+"""
 def document_loader_usage():
     """
     Document loader 使用.
@@ -1615,8 +1617,7 @@ def retriever_usage():
     print(doc)
 
 
-# ======================= Langchain v1.x 的 Agent使用 =======================
-# %%
+# %% ======================= Langchain v1.x 的 Agent使用 =======================
 def auto_agent_usage():
     """
     展示 LangChain-v1.x 的 Agent 使用。
@@ -1780,8 +1781,7 @@ def auto_agent_usage():
     print("agent response model_hook_state: ", agent_response['model_hook_state'])
 
 
-# ======================= Langchain v1.x Auto-Agent 配合 MCP 使用 =======================
-# %%
+# %% ======================= Langchain v1.x Auto-Agent 配合 MCP 使用 =======================
 async def auto_agent_with_mcp_usage() -> None:
     """
     展示 LangChain v1.x auto agent 配合 MCP 使用。
@@ -1920,6 +1920,5 @@ def main():
     asyncio.run(auto_agent_with_mcp_usage())
 
 
-# %%
 if __name__ == '__main__':
     main()

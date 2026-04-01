@@ -76,8 +76,8 @@ def get_client_chat() -> Union[BaseChatModel, SimpleChatModel]:
     )
     return client_chat
 
-# ======================= 无状态图 构建 =======================
-# %%
+
+# %% ======================= 无状态图 构建 =======================
 def stateless_graph_usage():
     """
     Graph / CompiledGraph 只有 v0.4.10 版本之前有，v0.5.0 版本开始删除了这两个类所在的 langgraph.graph.graph.py 文件.
@@ -107,8 +107,7 @@ def stateless_graph_usage():
     # print(result)
 
 
-# ======================= 简单有状态图 构建 =======================
-# %%
+# %% ======================= 简单有状态图 构建 =======================
 def stateful_graph_usage():
     """
     LangGraph 的 StateGraph 基本使用
@@ -196,6 +195,7 @@ def stateful_graph_usage():
     for item in res_batch:
         print(f"final state: {item}")
 
+
 # %%
 def message_graph_usage():
     """
@@ -230,8 +230,7 @@ def message_graph_usage():
     print(res)
 
 
-# ======================= 基于条件动态执行有状态图 =======================
-# %%
+# %% ======================= 基于条件动态执行有状态图 =======================
 def graph_conditional_usage():
     """
     展示有条件动态执行的状态图.
@@ -287,8 +286,7 @@ def graph_conditional_usage():
     print(res2)
 
 
-# ======================= Graph Checkpoint（短期记忆） 使用 =======================
-# %%
+# %% ======================= Graph Checkpoint（短期记忆） 使用 =======================
 def graph_checkpoint_usage():
     """
     checkpoint 机制是 LangGraph 提供的短期记忆机制。
@@ -428,8 +426,7 @@ def graph_checkpoint_usage():
         # print('  checkpoint.parent_config: ', checkpoint.parent_config)
 
 
-# ======================= Graph Store（长期记忆） 使用 =======================
-# %%
+# %% ======================= Graph Store（长期记忆） 使用 =======================
 def graph_store_usage():
     """
     LangGraph 的长期记忆是用于跨用户（thread_id）存储的。
@@ -489,15 +486,13 @@ def graph_store_usage():
         msg.pretty_print()
 
 
-# ======================= Interrupt/Command (HIL) 机制 =======================
+# %% ======================= Interrupt/Command (HIL) 机制 =======================
 # 个人感觉 LangGraph 的HIL机制设计的不是很好用。
 # 因为HIL触发时，会从 graph.invoke() 返回，此时需要用户在这里对返回的内容进行判断是否包含 Interrupt 信息：
 # - 如果包含，则进行 HIL 干预后，再次调用 graph.invoke() 恢复执行
 # - 如果不包含，那么拿到的就是本次输入的最终结果
 # 也就是说，本来是单次调用 invoke() 的流程，现在不得不使用一个 while 循环来处理 invoke() 的 interrupt 流程；
 # 更麻烦的是，如果有多个节点会触发 HIL，那还需要在这个 while 循环里增加一个 if 或者 switch 判断，处理多个 HIL 的情况。
-#
-# %%
 def graph_dynamic_interrupt_usage():
     """
     展示 LangGraph 的 Human-Interrupt 使用 —— 动态断点设置。
@@ -635,8 +630,7 @@ def graph_fixed_interrupt_usage():
     print(f"u1_r1_continue: {u1_r1_continue}")
 
 
-# ======================= 结合 LangChain 的 ChatBot 案例 =======================
-# %%
+# %% ======================= 结合 LangChain 的 ChatBot 案例 =======================
 def chatbot_example():
     class MsgState(TypedDict):
         messages: Annotated[list[Union[str, BaseMessage]], add_messages]
@@ -695,8 +689,7 @@ def chatbot_example():
         print(f"[{index}] {message.content}")
 
 
-# ======================= Tool调用 =======================
-# %%
+# %% ======================= Tool调用 =======================
 def chatbot_tool_usage_manual():
     """
     展示tool调用，这里先手动实现 tool 调用.
@@ -853,8 +846,7 @@ def chatbot_tool_usage_prebuilt():
         msg.pretty_print()
 
 
-# ======================= ReAct Agent 生成 =======================
-# %%
+# %% ======================= ReAct Agent 生成 =======================
 def react_agent_usage():
     """
     API文档: [create_react_agent](https://langchain-ai.github.io/langgraph/reference/agents/#langgraph.prebuilt.chat_agent_executor.create_react_agent)
@@ -900,8 +892,7 @@ def react_agent_usage():
         msg.pretty_print()
 
 
-# ======================= Graph Stream =======================
-# %%
+# %% ======================= Graph Stream =======================
 def graph_stream_usage():
     """
     展示 Graph 的 stream 接口使用。
@@ -967,8 +958,7 @@ def graph_stream_usage():
     #     print(chunk)
 
 
-# ======================= Graph Node 自定义 =======================
-# %%
+# %% ======================= Graph Node 自定义 =======================
 def graph_custom_node_with_class_usage():
     """
     展示如何自定义 Graph 里的node。
@@ -1029,7 +1019,7 @@ def show_graph(graph: CompiledStateGraph):
         print(e)
 
 
-# ======================= Graph Node 自定义 =======================
+# %% ======================= Main =======================
 def main():
     stateful_graph_usage()
     # message_graph_usage()
