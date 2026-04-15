@@ -39,7 +39,7 @@ LangChain v0.3版本，官方文档介绍时的第一句话是：
 **（1）LangGraph 成为基石**
 
 - LangChain-v0.3.x和 LangGraph-v0.6.x版本是相对独立的两个项目，两者没有太多交集和耦合，这也导致LangChain/LangGraph里分别有各自构建Agent的API，过于复杂；
-- 但是从v1.0版本开始，LangChain 和 LangGraph 这两个项目就统一到一起了，**LangGraph正式退居幕后，成为LangChain构建Agent的底层基石**。
+- 但是从v1.0版本开始，LangChain 和 LangGraph 这两个项目开始融合，**LangGraph正式退居幕后，成为LangChain构建Agent的底层基石**。
 - 随着LangGraph成为LangChain构建Agent的底层基石，Agent相关的API也得到了统一
 
 因此LangChain v1.0和LangGraph v1.0 需要相互搭配使用，两者均不适用于 0.x 版本。
@@ -66,15 +66,15 @@ LangChain的LLM/ChatModel的Response里，引入`.content_blocks`属性：
 
 精简了`langchain`包的命名空间，`langchain`包现在聚焦如下几个子module：
 
-| Module                  | What’s available                                 | Notes                             |
-| :---------------------- | :----------------------------------------------- | :-------------------------------- |
-| `langchain.messages`    | Message types, `content blocks`, `trim_messages` | Re-exported from `langchain-core` |
-| `langchain.chat_models` | `init_chat_model`, `BaseChatModel`               | Unified model initialization      |
-| `langchain.embeddings`  | `Embeddings`, `init_embeddings`                  | Embedding models                  |
-| `langchain.tools`       | `@tool`, `BaseTool`, injection helpers           | Re-exported from `langchain-core` |
-| `langchain.agents`      | `create_agent`, `AgentState`                     | Core agent creation functionality |
+| Module                  | What’s available                                 | Notes                                 |
+| :---------------------- | :----------------------------------------------- | :------------------------------------ |
+| `langchain.messages`    | Message types, `content blocks`, `trim_messages` | **Re-exported** from `langchain-core` |
+| `langchain.chat_models` | `init_chat_model`, `BaseChatModel`               | Unified model initialization          |
+| `langchain.embeddings`  | `Embeddings`, `init_embeddings`                  | Embedding models                      |
+| `langchain.tools`       | `@tool`, `BaseTool`, injection helpers           | **Re-exported** from `langchain-core` |
+| **`langchain.agents`**  | `create_agent`, `AgentState`                     | Core agent creation functionality     |
 
-顶层的`__init__.py`里没有引入任何内容。
+`langchain`包顶层的`__init__.py`里没有引入任何内容，`langchain.agents`模块现在是langchain包的核心。
 
 `langchain-core`包依然存在，并且依旧定义了`langchain`所有抽象组件，包括v0.3版本的`Runnable`接口抽象。
 
@@ -97,7 +97,7 @@ LangChain的LLM/ChatModel的Response里，引入`.content_blocks`属性：
 
 最大的改动就是`langgraph.prebuilt`模块里的`create_react_agent()`函数被标记为废弃，由`langchain.agents`模块统一Agent函数`create_agent()`代替了。
 
-不过**由于v1.0的LangChain已经以LangGraph为基石进行了核心组件的重写，官方建议一般直接使用LangChain-v1.0即可，不太需要直接基于LangGraph来构建Agent**。
+不过**由于v1.0的LangChain已经以LangGraph为基石进行了核心组件的重写，官方建议使用LangChain-v1.0提供的API，普通场景下不太需要直接基于LangGraph来构建Agent**。
 
 ------
 ## Deep-Agents
@@ -210,7 +210,7 @@ v1.0版本的`langchain`包只有如下模块了。
 
 v1.0 里此模块的内容如下：
 - `factory.py`: 里面实现了 `create_agent()` 函数用于快速创建 Agent 应用 —— KEY
-- `middleware`包: v1.x 版本配合 `create_agent()` 函数使用的中间件，详细介绍见下面
+- `middleware`包: v1.x 版本配合 `create_agent()` 函数使用的中间件，详细介绍见下面。
 - `structured_outputs.py`: 配合 `create_agent()` 函数，用于处理Agent的结构化输出结果。
 
 ---------------
@@ -230,40 +230,44 @@ v1.0 里此模块的内容如下：
 - `context_schema`: `TypedDict`/`dataclass`/pydantic `BaseModel` **类**（不是对象），用于定义LangGraph的 `Runtime[ContextT]` 里的 `ContextT` 泛型。
   - 这个schema的实例对象可以在调用`CompiledStateGraph.invoke()`方法时作为`context`参数传入，之后可以在LangGraph节点中的`Runtime[ContextT].context`属性获取了。
 - `tools`: 工具列表。
-  - 查看源码可以发现，传入的所有tools都被封装到了下面介绍的`tools`模块的 `_ToolNode` 类中。 
+  - 查看源码可以发现，**传入的所有tools（包括所有middleware的tools）都被封装到了下面介绍的`tools`模块的 `_ToolNode` 类中**。 
 - `middleware`: 中间件配置列表
 - `checkpointer: Checkpointer`: LangGraph Checkpointer 对象
 - `store: BaseStore`: LangGraph Store 对象
-- `response_format`: structured output 相关配置，详细介绍见下面的 `structured_outputs.py` 说明。
+- `response_format`: Structured Output 相关配置，详细介绍见下面的 `structured_outputs.py` 说明。
 - `interrupt_before: list[str]`: 通过name指定要在哪些node **执行前** 触发中断
 - `interrupt_after: list[str]`: 通过name指定要在哪些node **执行后** 触发中断
 - `debug: bool`:
 - `cache: BaseCache`:
 
 ---------------
-### middleware
+### Middleware
 
-middleware 的相关实现在 `langchain.agents.middleware` 中。
+Middleware 的相关实现在 `langchain.agents.middleware` 中。
 
-v1.0版新增的middleware功能是专门配合`create_agent()`使用，此函数内部是基于LangGraph的状态图构建的。
+v1.0版新增的middleware功能是**专门配合`create_agent()`函数使用的，LangGraph框架本身并没有提供中间件这一抽象**。
 
-Agent里的middleware调用时机如官方文档图片所示：
+`creage_agent()`函数是基于LangGraph创建的Agent。
+
+`create_agent()`里的middleware调用时机如官方文档图片所示：
 
 <img src="https://mintcdn.com/langchain-5e9cc07a/RAP6mjwE5G00xYsA/oss/images/middleware_final.png?w=840&fit=max&auto=format&n=RAP6mjwE5G00xYsA&q=85&s=e9b14e264f68345de08ae76f032c52d4" alt="AgentMiddleware.hook" style="zoom:80%;" align="left"/>
 
 上述调用的hook方法是由`AgentMiddleware`基类定义的（[官方文档：Custom middleware](https://docs.langchain.com/oss/python/langchain/middleware/custom)），所有Middleware都要继承此类。
 
 `AgentMiddleware(Generic[StateT, ContextT])` 是一个泛型类，需要`StateT`和`ContextT`两个泛型参数：
+
 - `StateT`: 传递给Middleware的状态对象schema，需要继承自 `AgentState` 类
 - `ContextT`: 底层LangGraph的 `Runtime[ContextT]` 泛型参数
 
 `AgentMiddleware(Generic[StateT, ContextT])` 定义了如下两个属性：
+
 - `state_schema: type(StateT)`: 状态对象的类
 - `tools: List[BaseTool]`: 该 middleware 所附加的工具列表 —— 这个不知道有什么用。
 
 自定义Middleware时，需要继承`AgentMiddleware`并实现其中的某个方法，可实现的hook方法分为如下两类：
 
-（1）Node-style hooks：在固定时机进行调用的hook，一般用于logging、validation、state update等操作。
+**（1）Node-style hooks**：在固定时机进行调用的hook，一般用于logging、validation、state update等操作。
 
 - agent启动停止：每次调用`invoke()`等方法时执行一次
   - `before_agent`/`abefore_agent`
@@ -279,7 +283,7 @@ Node-style hook方法的签名为：
   - `runtime` 就是LangGraph的`Runtime[ContextT]`对象
 - 返回值: `dict[str, Any] | None`
 
-（2）Wrap-style hooks：用于**干预agent执行流程**，一般用于retries、caching等操作。
+（**2）Wrap-style hooks**：用于**干预agent执行流程**，一般用于retries、caching等操作。
 
 - `wrap_model`/`awrap_model`：每次模型调用前后执行，方法签名为：
   - 入参: 
@@ -302,24 +306,7 @@ Node-style hook方法的签名为：
 
 这些装饰器内部也是将被装饰函数使用动态类定义的技巧封装成`AgentMiddleware`的子类以供使用的。
 
-**使用要点**
 
-研究`create_agent()`函数源码可以发现，middleware的使用有如下几个要注意的地方：
-
-- 所有middleware的`wrap_tool_call`方法会被合并成一条链，封装到`ToolNode`里，在每次调用tool前后执行。
-- 所有middleware的`wrap_model_call`方法也会被合并成一条链，封装到一个`model_node`里，在每次模型调用前后执行。
-- 所有middleware的`before_agent`/`after_agent`/`before_model`/`after_model`方法，**各自会被封装成LangGraph里的一个Node**，并依次添加之间的边，在指定时机/条件下执行
-- 同一个middleware不能多次使用，否则会抛异常提醒有重复的middleware
-
-> `create_agent()` 函数内部对所有middleware的 `wrap_tool_call` / `wrap_model_call` 进行合并的
-> `_chain_model_call_handlers()` / `_chain_tool_call_wrappers()` 方法值得看看（涉及到装饰器和绑定方法的使用）。
-
-最重要的原则如下：
-
-> 每个middleware继承`AgentMiddleware`时，**最好只实现其中一个hook方法**——尽量遵守**单一职责**的实践；
->
-> 即使要实现多个hook方法，这些方法之间**不要有关联或者访问共享变量的操作**，因为根据源码里的逻辑，这些方法都是被拆分开使用的，
-> `AgentMiddleware`抽象类及其子类只不过是一个封装方法的容器而已，这也要求`AgentMiddleware`子类里最好不要定义实例属性存放共享状态。
 
 
 ### Built-in Middlewares
@@ -364,14 +351,16 @@ LangChain 默认提供了如下built-in middleware：
 
 `langchain.agents.structured_outputs.py` 用于处理Agent的输出结果。
 
-该文件里定义了如下4种结构化输出处理策略，其中`SchemaT`是泛型表示，需要用户自己定义一个数据类，用于封装结构化输出结果。
+Agent捕获到结构化输出之后，会存放在state对象的`'structured_response'`这个Key中。
+
+该文件里定义了如下4种结构化输出处理策略——对应`create_agent()`方法的`response_format`取值，其中`SchemaT`是泛型表示，需要用户自己定义一个数据类，用于封装结构化输出结果。
 - `None`: 默认值，不处理输出结果
-- `ProviderStrategy[SchemaT]`: 使用模型提供商（Model Provider）原生的结构化输出结构，这是**最可靠的方式**，使用起来也比较简单，推荐优先使用。
-- `ToolStrategy[SchemaT]`: 采用 Tool calling 方式处理结构化输出结果。当模型提供商不支持原生结构化输出时，可以采用此方式，但是不那么稳定。
+- `ProviderStrategy[SchemaT]`: 使用**模型提供商（Model Provider）**原生的结构化输出结构，这是**最可靠的方式**，使用起来也比较简单，推荐优先使用。
+- `ToolStrategy[SchemaT]`: 采用 **Tool calling 方式**处理结构化输出结果。当模型提供商不支持原生结构化输出时，可以采用此方式，但是不那么稳定。
 - `AutoStrategy[SchemaT]`: 自动选择处理策略，此时也可以简单的使用 `type[SchemaT]`
 
 对于 `ToolStrategy[SchemaT]`（它其实是一个`dataclass`类），它定义了如下属性：
-- `schema: type[SchemaT]`: 必填属性，存放结构化输出结果数据类，可以是 `TypedDict`/`dataclass`/pydantic `BaseModel`。
+- `schema: type[SchemaT]`: 必填属性，存放结构化输出结果的数据类，可以是 `TypedDict`/`dataclass`/pydantic `BaseModel`类。
 - `tool_message_content: str`: 自定义文本，**在成功获取结构化结果时，会返回此文本来代替原本的JSON** —— 感觉用处不大
 - `handle_errors`: 在获取结构化结果时，如果发生错误，如何处理。有如下的选项：
   - `True`: 默认值，会使用默认的异常信息模板返回错误信息
@@ -381,7 +370,7 @@ LangChain 默认提供了如下built-in middleware：
   - `Callable[[Exception], str]`: 自定义的异常处理函数，返回处理后的异常信息
 
 ---------------
-## `tools` 模块
+## ~~`tools` 模块~~
 
 > v1.x 版本的 `tools` 模块改动很大，相当于重构了。
 
@@ -392,7 +381,11 @@ LangChain 默认提供了如下built-in middleware：
 - `InjectedState`:
 - `InjectedStore`:
 
-查看`_ToolNode`类的源码可以发现：
+> **从v1.0.3版本开始，`tools`模块里的内容改为从`langgraph.prebuilt.tool_node`里导入**，没有重新实现。
+>
+> 因此下面的说明只适用于 v1.0.3 版本之前，v1.0.3版本开始，此模块就是套壳了。
+
+查看`_ToolNode`类的源码（实际上和`langgraph.prebuilt.tool_node`里的`ToolNode`源码逻辑非常相似）可以发现：
 - 它对传入的tools列表进行封装时，有一个`__tools_by_name: dict[str, BaseTool]`属性，**存储每个tool的name和tool对象的映射关系**
 - 调用`invoke()`方法时，会对传入的`input`进行解析检查，获取其中`AIMessage`对象的`.tool_calls`列表
 - 接着调用`_ToolNode._func()`方法，其中会采用 `executor.map(self._run_one, tool_calls, input_types, tool_runtimes))` 方式**并行调用每个Tool**
@@ -400,7 +393,920 @@ LangChain 默认提供了如下built-in middleware：
 - 调用`_ToolNode._execute_tool_sync()` 方法，其中会调用tool的`invoke()`方法，并传入该tool_call的args
 - 最后将tool的输出结果封装成`ToolMessage`对象并返回
 
-除了使用 `_ToolNode`类封装所有的tools，`factory.py` 里的 `create_agent()` 函数还需要构建 `_ToolNode` 的进入边和输出边：
+
+
+------
+
+## `agents`模块源码研究
+
+### `create_agent()`函数源码注释
+
+基于 LangChain **v1.2.15** 版本。
+
+```python
+def create_agent(
+    model: str | BaseChatModel,
+    tools: Sequence[BaseTool | Callable[..., Any] | dict[str, Any]] | None = None,
+    *,
+    system_prompt: str | SystemMessage | None = None,
+    middleware: Sequence[AgentMiddleware[StateT_co, ContextT]] = (),
+    response_format: ResponseFormat[ResponseT] | type[ResponseT] | dict[str, Any] | None = None,
+    state_schema: type[AgentState[ResponseT]] | None = None,
+    context_schema: type[ContextT] | None = None,
+    checkpointer: Checkpointer | None = None,
+    store: BaseStore | None = None,
+    interrupt_before: list[str] | None = None,
+    interrupt_after: list[str] | None = None,
+    debug: bool = False,
+    name: str | None = None,
+    cache: BaseCache[Any] | None = None,
+) -> CompiledStateGraph[
+    AgentState[ResponseT], ContextT, _InputAgentState, _OutputAgentState[ResponseT]
+]:
+    # init chat model
+    if isinstance(model, str):
+        model = init_chat_model(model)
+
+    # Convert system_prompt to SystemMessage if needed
+    system_message: SystemMessage | None = None
+    if system_prompt is not None:
+        if isinstance(system_prompt, SystemMessage):
+            system_message = system_prompt
+        else:
+            system_message = SystemMessage(content=system_prompt)
+
+    # Handle tools being None or empty
+    if tools is None:
+        tools = []
+
+    # Convert response format and setup structured output tools
+    # Raw schemas are wrapped in AutoStrategy to preserve auto-detection intent.
+    # AutoStrategy is converted to ToolStrategy upfront to calculate tools during agent creation,
+    # but may be replaced with ProviderStrategy later based on model capabilities.
+    initial_response_format: ToolStrategy[Any] | ProviderStrategy[Any] | AutoStrategy[Any] | None
+    if response_format is None:
+        initial_response_format = None
+    elif isinstance(response_format, (ToolStrategy, ProviderStrategy)):
+        # Preserve explicitly requested strategies
+        initial_response_format = response_format
+    elif isinstance(response_format, AutoStrategy):
+        # AutoStrategy provided - preserve it for later auto-detection
+        initial_response_format = response_format
+    else:
+        # Raw schema - wrap in AutoStrategy to enable auto-detection
+        initial_response_format = AutoStrategy(schema=response_format)
+
+    # For AutoStrategy, convert to ToolStrategy to setup tools upfront
+    # (may be replaced with ProviderStrategy later based on model)
+    tool_strategy_for_setup: ToolStrategy[Any] | None = None
+    if isinstance(initial_response_format, AutoStrategy):
+        tool_strategy_for_setup = ToolStrategy(schema=initial_response_format.schema)
+    elif isinstance(initial_response_format, ToolStrategy):
+        tool_strategy_for_setup = initial_response_format
+
+    structured_output_tools: dict[str, OutputToolBinding[Any]] = {}
+    if tool_strategy_for_setup:
+        for response_schema in tool_strategy_for_setup.schema_specs:
+            structured_tool_info = OutputToolBinding.from_schema_spec(response_schema)
+            structured_output_tools[structured_tool_info.tool.name] = structured_tool_info
+            
+    # ---------------------------------------------------------------------------------
+    # 这里收集了所有 middleware 的 tools，注意这使用了两个for循环对每个中间件的tools进行展开
+    middleware_tools = [t for m in middleware for t in getattr(m, "tools", [])]
+
+    # ---------------------------------------------------------------------------------
+    # 接下来收集所有 middleware 的 wrap_tool_call/awrap_tool_call 方法，并封装成串行的wrapper调用函数
+    # Collect middleware with wrap_tool_call or awrap_tool_call hooks
+    # Include middleware with either implementation to ensure NotImplementedError is raised
+    # when middleware doesn't support the execution path
+    middleware_w_wrap_tool_call = [
+        m
+        for m in middleware
+        if m.__class__.wrap_tool_call is not AgentMiddleware.wrap_tool_call
+        or m.__class__.awrap_tool_call is not AgentMiddleware.awrap_tool_call
+    ]
+
+    # Chain all wrap_tool_call handlers into a single composed handler
+    wrap_tool_call_wrapper = None
+    if middleware_w_wrap_tool_call:
+        wrappers = [
+            # traceable 是 LangSmith 提供的可观测性装饰器函数，不影响原有函数逻辑
+            traceable(name=f"{m.name}.wrap_tool_call", process_inputs=_scrub_inputs)(
+                m.wrap_tool_call
+            )
+            for m in middleware_w_wrap_tool_call
+        ]
+        wrap_tool_call_wrapper = _chain_tool_call_wrappers(wrappers)
+
+    # Collect middleware with awrap_tool_call or wrap_tool_call hooks
+    # Include middleware with either implementation to ensure NotImplementedError is raised
+    # when middleware doesn't support the execution path
+    middleware_w_awrap_tool_call = [
+        m
+        for m in middleware
+        if m.__class__.awrap_tool_call is not AgentMiddleware.awrap_tool_call
+        or m.__class__.wrap_tool_call is not AgentMiddleware.wrap_tool_call
+    ]
+
+    # Chain all awrap_tool_call handlers into a single composed async handler
+    awrap_tool_call_wrapper = None
+    if middleware_w_awrap_tool_call:
+        async_wrappers = [
+            traceable(name=f"{m.name}.awrap_tool_call", process_inputs=_scrub_inputs)(
+                m.awrap_tool_call
+            )
+            for m in middleware_w_awrap_tool_call
+        ]
+        awrap_tool_call_wrapper = _chain_async_tool_call_wrappers(async_wrappers)
+
+    # ---------------------------------------------------------------------------------
+    # 配置 tools，这里区分的 内置工具 和 用户工具函数
+    # Setup tools
+    tool_node: ToolNode | None = None
+    # Extract built-in provider tools (dict format) and regular tools (BaseTool/callables)
+    built_in_tools = [t for t in tools if isinstance(t, dict)]
+    regular_tools = [t for t in tools if not isinstance(t, dict)]
+
+    # Tools that require client-side execution (must be in ToolNode)
+    available_tools = middleware_tools + regular_tools
+
+    # ---------------------------------------------------------------------------------
+    # ToolNode 中只封装了 中间件tools 和 regular_tools
+    # Create ToolNode if we have client-side tools OR if middleware defines wrap_tool_call
+    # (which may handle dynamically registered tools)
+    tool_node = (
+        ToolNode(
+            tools=available_tools,
+            wrap_tool_call=wrap_tool_call_wrapper,
+            awrap_tool_call=awrap_tool_call_wrapper,
+        )
+        if available_tools or wrap_tool_call_wrapper or awrap_tool_call_wrapper
+        else None
+    )
+
+    # Default tools for ModelRequest initialization
+    # Use converted BaseTool instances from ToolNode (not raw callables)
+    # Include built-ins and converted tools (can be changed dynamically by middleware)
+    # Structured tools are NOT included - they're added dynamically based on response_format
+    if tool_node:
+        default_tools = list(tool_node.tools_by_name.values()) + built_in_tools
+    else:
+        default_tools = list(built_in_tools)
+
+    # ---------------------------------------------------------------------------------
+    # 检查所有中间件的 before_agent / before_model / after_model / after_agent 方法是自己实现的
+    # validate middleware
+    if len({m.name for m in middleware}) != len(middleware):
+        msg = "Please remove duplicate middleware instances."
+        raise AssertionError(msg)
+    middleware_w_before_agent = [
+        m
+        for m in middleware
+        if m.__class__.before_agent is not AgentMiddleware.before_agent
+        or m.__class__.abefore_agent is not AgentMiddleware.abefore_agent
+    ]
+    middleware_w_before_model = [
+        m
+        for m in middleware
+        if m.__class__.before_model is not AgentMiddleware.before_model
+        or m.__class__.abefore_model is not AgentMiddleware.abefore_model
+    ]
+    middleware_w_after_model = [
+        m
+        for m in middleware
+        if m.__class__.after_model is not AgentMiddleware.after_model
+        or m.__class__.aafter_model is not AgentMiddleware.aafter_model
+    ]
+    middleware_w_after_agent = [
+        m
+        for m in middleware
+        if m.__class__.after_agent is not AgentMiddleware.after_agent
+        or m.__class__.aafter_agent is not AgentMiddleware.aafter_agent
+    ]
+    
+    # ---------------------------------------------------------------------------------
+    # 对所有中间件的 wrap_model_call / awrap_model_call 方法进行 校验 和 chain 封装
+    # Collect middleware with wrap_model_call or awrap_model_call hooks
+    # Include middleware with either implementation to ensure NotImplementedError is raised
+    # when middleware doesn't support the execution path
+    middleware_w_wrap_model_call = [
+        m
+        for m in middleware
+        if m.__class__.wrap_model_call is not AgentMiddleware.wrap_model_call
+        or m.__class__.awrap_model_call is not AgentMiddleware.awrap_model_call
+    ]
+    # Collect middleware with awrap_model_call or wrap_model_call hooks
+    # Include middleware with either implementation to ensure NotImplementedError is raised
+    # when middleware doesn't support the execution path
+    middleware_w_awrap_model_call = [
+        m
+        for m in middleware
+        if m.__class__.awrap_model_call is not AgentMiddleware.awrap_model_call
+        or m.__class__.wrap_model_call is not AgentMiddleware.wrap_model_call
+    ]
+
+    # Compose wrap_model_call handlers into a single middleware stack (sync)
+    wrap_model_call_handler = None
+    if middleware_w_wrap_model_call:
+        sync_handlers = [
+            traceable(name=f"{m.name}.wrap_model_call", process_inputs=_scrub_inputs)(
+                m.wrap_model_call
+            )
+            for m in middleware_w_wrap_model_call
+        ]
+        wrap_model_call_handler = _chain_model_call_handlers(sync_handlers)
+
+    # Compose awrap_model_call handlers into a single middleware stack (async)
+    awrap_model_call_handler = None
+    if middleware_w_awrap_model_call:
+        async_handlers = [
+            traceable(name=f"{m.name}.awrap_model_call", process_inputs=_scrub_inputs)(
+                m.awrap_model_call
+            )
+            for m in middleware_w_awrap_model_call
+        ]
+        awrap_model_call_handler = _chain_async_model_call_handlers(async_handlers)
+
+    # ---------------------------------------------------------------------------------
+    # 去重合并所有中间件的 state_schema
+    state_schemas: set[type] = {m.state_schema for m in middleware}
+    # Use provided state_schema if available, otherwise use base AgentState
+    base_state = state_schema if state_schema is not None else AgentState
+    state_schemas.add(base_state)
+
+    # 此方法会对所有中间的state_schema的字段进行合并，返回 3 个 TypeDict，对应3类 schema
+    resolved_state_schema, input_schema, output_schema = _resolve_schemas(state_schemas)
+
+    # create graph, add nodes
+    graph: StateGraph[
+        AgentState[ResponseT], ContextT, _InputAgentState, _OutputAgentState[ResponseT]
+    ] = StateGraph(
+        state_schema=resolved_state_schema,
+        input_schema=input_schema,
+        output_schema=output_schema,
+        context_schema=context_schema,
+    )
+
+    # ---------------------------------------------------------------------------------
+    # 以下 4 个为闭包函数
+    
+    # 处理模型的结构化输出
+    def _handle_model_output(
+        output: AIMessage, effective_response_format: ResponseFormat[Any] | None
+    ) -> dict[str, Any]:
+        # 使用模型厂商的原生结构化输出结果
+        # Handle structured output with provider strategy
+        if isinstance(effective_response_format, ProviderStrategy):
+            if not output.tool_calls:
+                provider_strategy_binding = ProviderStrategyBinding.from_schema_spec(
+                    effective_response_format.schema_spec
+                )
+                try:
+                    structured_response = provider_strategy_binding.parse(output)
+                except Exception as exc:
+                    schema_name = getattr(
+                        effective_response_format.schema_spec.schema, "__name__", "response_format"
+                    )
+                    validation_error = StructuredOutputValidationError(schema_name, exc, output)
+                    raise validation_error from exc
+                else:
+                    return {"messages": [output], "structured_response": structured_response}
+            return {"messages": [output]}
+        # 使用 tool call 方式获取结构化输出
+        # Handle structured output with tool strategy
+        if (
+            isinstance(effective_response_format, ToolStrategy)
+            and isinstance(output, AIMessage)
+            and output.tool_calls
+        ):
+            structured_tool_calls = [
+                tc for tc in output.tool_calls if tc["name"] in structured_output_tools
+            ]
+
+            if structured_tool_calls:
+                exception: StructuredOutputError | None = None
+                if len(structured_tool_calls) > 1:
+                    # Handle multiple structured outputs error
+                    tool_names = [tc["name"] for tc in structured_tool_calls]
+                    exception = MultipleStructuredOutputsError(tool_names, output)
+                    should_retry, error_message = _handle_structured_output_error(
+                        exception, effective_response_format
+                    )
+                    if not should_retry:
+                        raise exception
+
+                    # Add error messages and retry
+                    tool_messages = [
+                        ToolMessage(
+                            content=error_message,
+                            tool_call_id=tc["id"],
+                            name=tc["name"],
+                        )
+                        for tc in structured_tool_calls
+                    ]
+                    return {"messages": [output, *tool_messages]}
+
+                # Handle single structured output
+                tool_call = structured_tool_calls[0]
+                try:
+                    structured_tool_binding = structured_output_tools[tool_call["name"]]
+                    structured_response = structured_tool_binding.parse(tool_call["args"])
+
+                    tool_message_content = (
+                        effective_response_format.tool_message_content
+                        or f"Returning structured response: {structured_response}"
+                    )
+
+                    return {
+                        "messages": [
+                            output,
+                            ToolMessage(
+                                content=tool_message_content,
+                                tool_call_id=tool_call["id"],
+                                name=tool_call["name"],
+                            ),
+                        ],
+                        "structured_response": structured_response,
+                    }
+                except Exception as exc:
+                    exception = StructuredOutputValidationError(tool_call["name"], exc, output)
+                    should_retry, error_message = _handle_structured_output_error(
+                        exception, effective_response_format
+                    )
+                    if not should_retry:
+                        raise exception from exc
+
+                    return {
+                        "messages": [
+                            output,
+                            ToolMessage(
+                                content=error_message,
+                                tool_call_id=tool_call["id"],
+                                name=tool_call["name"],
+                            ),
+                        ],
+                    }
+
+        return {"messages": [output]}
+
+    # 下面的函数只是为了处理模型的结构化输出，对模型bind了用于处理结构化输出的tool，
+    # 不会bind用户提供的或者是中间件的 tools
+    def _get_bound_model(
+        request: ModelRequest[ContextT],
+    ) -> tuple[Runnable[Any, Any], ResponseFormat[Any] | None]:
+        # Validate ONLY client-side tools that need to exist in tool_node
+        # Skip validation when wrap_tool_call is defined, as middleware may handle
+        # dynamic tools that are added at runtime via wrap_model_call
+        has_wrap_tool_call = wrap_tool_call_wrapper or awrap_tool_call_wrapper
+
+        # Build map of available client-side tools from the ToolNode
+        # (which has already converted callables)
+        available_tools_by_name = {}
+        if tool_node:
+            available_tools_by_name = tool_node.tools_by_name.copy()
+
+        # Check if any requested tools are unknown CLIENT-SIDE tools
+        # Only validate if wrap_tool_call is NOT defined (no dynamic tool handling)
+        if not has_wrap_tool_call:
+            unknown_tool_names = []
+            for t in request.tools:
+                # Only validate BaseTool instances (skip built-in dict tools)
+                if isinstance(t, dict):
+                    continue
+                if isinstance(t, BaseTool) and t.name not in available_tools_by_name:
+                    unknown_tool_names.append(t.name)
+
+            if unknown_tool_names:
+                available_tool_names = sorted(available_tools_by_name.keys())
+                msg = DYNAMIC_TOOL_ERROR_TEMPLATE.format(
+                    unknown_tool_names=unknown_tool_names,
+                    available_tool_names=available_tool_names,
+                )
+                raise ValueError(msg)
+
+        # Normalize raw schemas to AutoStrategy
+        # (handles middleware override with raw Pydantic classes)
+        response_format: ResponseFormat[Any] | Any | None = request.response_format
+        if response_format is not None and not isinstance(
+            response_format, (AutoStrategy, ToolStrategy, ProviderStrategy)
+        ):
+            response_format = AutoStrategy(schema=response_format)
+
+        # Determine effective response format (auto-detect if needed)
+        effective_response_format: ResponseFormat[Any] | None
+        if isinstance(response_format, AutoStrategy):
+            # User provided raw schema via AutoStrategy - auto-detect best strategy based on model
+            if _supports_provider_strategy(request.model, tools=request.tools):
+                # Model supports provider strategy - use it
+                effective_response_format = ProviderStrategy(schema=response_format.schema)
+            elif response_format is initial_response_format and tool_strategy_for_setup is not None:
+                # Model doesn't support provider strategy - use ToolStrategy
+                # Reuse the strategy from setup if possible to preserve tool names
+                effective_response_format = tool_strategy_for_setup
+            else:
+                effective_response_format = ToolStrategy(schema=response_format.schema)
+        else:
+            # User explicitly specified a strategy - preserve it
+            effective_response_format = response_format
+
+        # Build final tools list including structured output tools
+        # request.tools now only contains BaseTool instances (converted from callables)
+        # and dicts (built-ins)
+        final_tools = list(request.tools)
+        if isinstance(effective_response_format, ToolStrategy):
+            # Add structured output tools to final tools list
+            structured_tools = [info.tool for info in structured_output_tools.values()]
+            final_tools.extend(structured_tools)
+
+        # Bind model based on effective response format
+        if isinstance(effective_response_format, ProviderStrategy):
+            # (Backward compatibility) Use OpenAI format structured output
+            kwargs = effective_response_format.to_model_kwargs()
+            return (
+                request.model.bind_tools(
+                    final_tools, strict=True, **kwargs, **request.model_settings
+                ),
+                effective_response_format,
+            )
+
+        if isinstance(effective_response_format, ToolStrategy):
+            # Current implementation requires that tools used for structured output
+            # have to be declared upfront when creating the agent as part of the
+            # response format. Middleware is allowed to change the response format
+            # to a subset of the original structured tools when using ToolStrategy,
+            # but not to add new structured tools that weren't declared upfront.
+            # Compute output binding
+            for tc in effective_response_format.schema_specs:
+                if tc.name not in structured_output_tools:
+                    msg = (
+                        f"ToolStrategy specifies tool '{tc.name}' "
+                        "which wasn't declared in the original "
+                        "response format when creating the agent."
+                    )
+                    raise ValueError(msg)
+
+            # Force tool use if we have structured output tools
+            tool_choice = "any" if structured_output_tools else request.tool_choice
+            return (
+                request.model.bind_tools(
+                    final_tools, tool_choice=tool_choice, **request.model_settings
+                ),
+                effective_response_format,
+            )
+
+        # No structured output - standard model binding
+        if final_tools:
+            return (
+                request.model.bind_tools(
+                    final_tools, tool_choice=request.tool_choice, **request.model_settings
+                ),
+                None,
+            )
+        return request.model.bind(**request.model_settings), None
+
+    # 同步调用模型封装，它会调用上面的  _get_bound_model() + _handle_model_output()
+    def _execute_model_sync(request: ModelRequest[ContextT]) -> ModelResponse:
+        """Execute model and return response.
+
+        This is the core model execution logic wrapped by `wrap_model_call` handlers.
+
+        Raises any exceptions that occur during model invocation.
+        """
+        # Get the bound model (with auto-detection if needed)
+        model_, effective_response_format = _get_bound_model(request)
+        messages = request.messages
+        if request.system_message:
+            messages = [request.system_message, *messages]
+
+        output = model_.invoke(messages)
+        if name:
+            output.name = name
+
+        # Handle model output to get messages and structured_response
+        handled_output = _handle_model_output(output, effective_response_format)
+        messages_list = handled_output["messages"]
+        structured_response = handled_output.get("structured_response")
+
+        return ModelResponse(
+            result=messages_list,
+            structured_response=structured_response,
+        )
+
+    # 同步调用模型Node，它会调用 _execute_model_sync
+    # 然后调用 wrap_model_call_handler，并从response解析生成 Command
+    def model_node(state: AgentState[Any], runtime: Runtime[ContextT]) -> list[Command[Any]]:
+        """Sync model request handler with sequential middleware processing."""
+        request = ModelRequest(
+            model=model,
+            tools=default_tools,
+            system_message=system_message,
+            response_format=initial_response_format,
+            messages=state["messages"],
+            tool_choice=None,
+            state=state,
+            runtime=runtime,
+        )
+
+        if wrap_model_call_handler is None:
+            model_response = _execute_model_sync(request)
+            return _build_commands(model_response)
+
+        result = wrap_model_call_handler(request, _execute_model_sync)
+        return _build_commands(result.model_response, result.commands)
+
+    # 异步调用模型封装，它也会调用上面的  _get_bound_model() + _handle_model_output()
+    async def _execute_model_async(request: ModelRequest[ContextT]) -> ModelResponse:
+        """Execute model asynchronously and return response.
+
+        This is the core async model execution logic wrapped by `wrap_model_call`
+        handlers.
+
+        Raises any exceptions that occur during model invocation.
+        """
+        # Get the bound model (with auto-detection if needed)
+        model_, effective_response_format = _get_bound_model(request)
+        messages = request.messages
+        if request.system_message:
+            messages = [request.system_message, *messages]
+
+        output = await model_.ainvoke(messages)
+        if name:
+            output.name = name
+
+        # Handle model output to get messages and structured_response
+        handled_output = _handle_model_output(output, effective_response_format)
+        messages_list = handled_output["messages"]
+        structured_response = handled_output.get("structured_response")
+
+        return ModelResponse(
+            result=messages_list,
+            structured_response=structured_response,
+        )
+
+    # 异步调用模型Node，它会调用 _execute_model_async
+    # 然后调用 awrap_model_call_handler，并从response解析生成 Command
+    async def amodel_node(state: AgentState[Any], runtime: Runtime[ContextT]) -> list[Command[Any]]:
+        """Async model request handler with sequential middleware processing."""
+        request = ModelRequest(
+            model=model,
+            tools=default_tools,
+            system_message=system_message,
+            response_format=initial_response_format,
+            messages=state["messages"],
+            tool_choice=None,
+            state=state,
+            runtime=runtime,
+        )
+
+        if awrap_model_call_handler is None:
+            model_response = await _execute_model_async(request)
+            return _build_commands(model_response)
+
+        result = await awrap_model_call_handler(request, _execute_model_async)
+        return _build_commands(result.model_response, result.commands)
+
+    # 添加模型（异步/同步）调用节点
+    # Use sync or async based on model capabilities
+    graph.add_node("model", RunnableCallable(model_node, amodel_node, trace=False))
+
+    # ---------------------------------------------------------------------------------
+    # 所有的 tools，都被封装到一个 Node里
+    # Only add tools node if we have tools
+    if tool_node is not None:
+        graph.add_node("tools", tool_node)
+
+    # ---------------------------------------------------------------------------------
+    # 遍历中间件，将所有中间件的 before_agent / before_model / after_model / after_agent 都分别添加为单独的Node
+    # Add middleware nodes
+    for m in middleware:
+        if (
+            m.__class__.before_agent is not AgentMiddleware.before_agent
+            or m.__class__.abefore_agent is not AgentMiddleware.abefore_agent
+        ):
+            # Use RunnableCallable to support both sync and async
+            # Pass None for sync if not overridden to avoid signature conflicts
+            sync_before_agent = (
+                m.before_agent
+                if m.__class__.before_agent is not AgentMiddleware.before_agent
+                else None
+            )
+            async_before_agent = (
+                m.abefore_agent
+                if m.__class__.abefore_agent is not AgentMiddleware.abefore_agent
+                else None
+            )
+            before_agent_node = RunnableCallable(sync_before_agent, async_before_agent, trace=False)
+            graph.add_node(
+                f"{m.name}.before_agent", before_agent_node, input_schema=resolved_state_schema
+            )
+
+        if (
+            m.__class__.before_model is not AgentMiddleware.before_model
+            or m.__class__.abefore_model is not AgentMiddleware.abefore_model
+        ):
+            # Use RunnableCallable to support both sync and async
+            # Pass None for sync if not overridden to avoid signature conflicts
+            sync_before = (
+                m.before_model
+                if m.__class__.before_model is not AgentMiddleware.before_model
+                else None
+            )
+            async_before = (
+                m.abefore_model
+                if m.__class__.abefore_model is not AgentMiddleware.abefore_model
+                else None
+            )
+            before_node = RunnableCallable(sync_before, async_before, trace=False)
+            graph.add_node(
+                f"{m.name}.before_model", before_node, input_schema=resolved_state_schema
+            )
+
+        if (
+            m.__class__.after_model is not AgentMiddleware.after_model
+            or m.__class__.aafter_model is not AgentMiddleware.aafter_model
+        ):
+            # Use RunnableCallable to support both sync and async
+            # Pass None for sync if not overridden to avoid signature conflicts
+            sync_after = (
+                m.after_model
+                if m.__class__.after_model is not AgentMiddleware.after_model
+                else None
+            )
+            async_after = (
+                m.aafter_model
+                if m.__class__.aafter_model is not AgentMiddleware.aafter_model
+                else None
+            )
+            after_node = RunnableCallable(sync_after, async_after, trace=False)
+            graph.add_node(f"{m.name}.after_model", after_node, input_schema=resolved_state_schema)
+
+        if (
+            m.__class__.after_agent is not AgentMiddleware.after_agent
+            or m.__class__.aafter_agent is not AgentMiddleware.aafter_agent
+        ):
+            # Use RunnableCallable to support both sync and async
+            # Pass None for sync if not overridden to avoid signature conflicts
+            sync_after_agent = (
+                m.after_agent
+                if m.__class__.after_agent is not AgentMiddleware.after_agent
+                else None
+            )
+            async_after_agent = (
+                m.aafter_agent
+                if m.__class__.aafter_agent is not AgentMiddleware.aafter_agent
+                else None
+            )
+            after_agent_node = RunnableCallable(sync_after_agent, async_after_agent, trace=False)
+            graph.add_node(
+                f"{m.name}.after_agent", after_agent_node, input_schema=resolved_state_schema
+            )
+
+    # ---------------------------------------------------------------------------------
+    # 确定Graph入口Node，优先级为：第1个before_agent -> 第1个before_model -> model
+    # Determine the entry node (runs once at start): before_agent -> before_model -> model
+    if middleware_w_before_agent:
+        entry_node = f"{middleware_w_before_agent[0].name}.before_agent"
+    elif middleware_w_before_model:
+        entry_node = f"{middleware_w_before_model[0].name}.before_model"
+    else:
+        entry_node = "model"
+
+    # ---------------------------------------------------------------------------------
+    # 确定循环调用的开始节点
+    # Determine the loop entry node (beginning of agent loop, excludes before_agent)
+    # This is where tools will loop back to for the next iteration
+    if middleware_w_before_model:
+        loop_entry_node = f"{middleware_w_before_model[0].name}.before_model"
+    else:
+        loop_entry_node = "model"
+
+    # ---------------------------------------------------------------------------------
+    # 确定循环调用的退出节点
+    # Determine the loop exit node (end of each iteration, can run multiple times)
+    # This is after_model or model, but NOT after_agent
+    if middleware_w_after_model:
+        loop_exit_node = f"{middleware_w_after_model[0].name}.after_model"
+    else:
+        loop_exit_node = "model"
+
+    # ---------------------------------------------------------------------------------
+    # 确定Graph的终止节点
+    # Determine the exit node (runs once at end): after_agent or END
+    if middleware_w_after_agent:
+        exit_node = f"{middleware_w_after_agent[-1].name}.after_agent"
+    else:
+        exit_node = END
+
+    graph.add_edge(START, entry_node)
+    
+    # ---------------------------------------------------------------------------------
+    # 最重要的部分：构建Agent循环中的工具调用和模型调用之间的条件边
+    # add conditional edges only if tools exist
+    if tool_node is not None:
+        # Only include exit_node in destinations if any tool has return_direct=True
+        # or if there are structured output tools
+        tools_to_model_destinations = [loop_entry_node]
+        if (
+            any(tool.return_direct for tool in tool_node.tools_by_name.values())
+            or structured_output_tools
+        ):
+            tools_to_model_destinations.append(exit_node)
+
+        graph.add_conditional_edges(
+            "tools",
+            RunnableCallable(
+                _make_tools_to_model_edge(
+                    tool_node=tool_node,
+                    model_destination=loop_entry_node,
+                    structured_output_tools=structured_output_tools,
+                    end_destination=exit_node,
+                ),
+                trace=False,
+            ),
+            tools_to_model_destinations,
+        )
+
+        # base destinations are tools and exit_node
+        # we add the loop_entry node to edge destinations if:
+        # - there is an after model hook(s) -- allows jump_to to model
+        #   potentially artificially injected tool messages, ex HITL
+        # - there is a response format -- to allow for jumping to model to handle
+        #   regenerating structured output tool calls
+        model_to_tools_destinations = ["tools", exit_node]
+        if response_format or loop_exit_node != "model":
+            model_to_tools_destinations.append(loop_entry_node)
+
+        graph.add_conditional_edges(
+            loop_exit_node,
+            RunnableCallable(
+                _make_model_to_tools_edge(
+                    model_destination=loop_entry_node,
+                    structured_output_tools=structured_output_tools,
+                    end_destination=exit_node,
+                ),
+                trace=False,
+            ),
+            model_to_tools_destinations,
+        )
+    elif len(structured_output_tools) > 0:
+        graph.add_conditional_edges(
+            loop_exit_node,
+            RunnableCallable(
+                _make_model_to_model_edge(
+                    model_destination=loop_entry_node,
+                    end_destination=exit_node,
+                ),
+                trace=False,
+            ),
+            [loop_entry_node, exit_node],
+        )
+    elif loop_exit_node == "model":
+        # If no tools and no after_model, go directly to exit_node
+        graph.add_edge(loop_exit_node, exit_node)
+    # No tools but we have after_model - connect after_model to exit_node
+    else:
+        _add_middleware_edge(
+            graph,
+            name=f"{middleware_w_after_model[0].name}.after_model",
+            default_destination=exit_node,
+            model_destination=loop_entry_node,
+            end_destination=exit_node,
+            can_jump_to=_get_can_jump_to(middleware_w_after_model[0], "after_model"),
+        )
+
+    # ---------------------------------------------------------------------------------
+    # 构建所有中间件内部依次调用 before_agent / before_model / after_model / after_agent 之间的顺序边
+    # Add before_agent middleware edges
+    if middleware_w_before_agent:
+        for m1, m2 in itertools.pairwise(middleware_w_before_agent):
+            _add_middleware_edge(
+                graph,
+                name=f"{m1.name}.before_agent",
+                default_destination=f"{m2.name}.before_agent",
+                model_destination=loop_entry_node,
+                end_destination=exit_node,
+                can_jump_to=_get_can_jump_to(m1, "before_agent"),
+            )
+        # Connect last before_agent to loop_entry_node (before_model or model)
+        _add_middleware_edge(
+            graph,
+            name=f"{middleware_w_before_agent[-1].name}.before_agent",
+            default_destination=loop_entry_node,
+            model_destination=loop_entry_node,
+            end_destination=exit_node,
+            can_jump_to=_get_can_jump_to(middleware_w_before_agent[-1], "before_agent"),
+        )
+
+    # Add before_model middleware edges
+    if middleware_w_before_model:
+        for m1, m2 in itertools.pairwise(middleware_w_before_model):
+            _add_middleware_edge(
+                graph,
+                name=f"{m1.name}.before_model",
+                default_destination=f"{m2.name}.before_model",
+                model_destination=loop_entry_node,
+                end_destination=exit_node,
+                can_jump_to=_get_can_jump_to(m1, "before_model"),
+            )
+        # Go directly to model after the last before_model
+        _add_middleware_edge(
+            graph,
+            name=f"{middleware_w_before_model[-1].name}.before_model",
+            default_destination="model",
+            model_destination=loop_entry_node,
+            end_destination=exit_node,
+            can_jump_to=_get_can_jump_to(middleware_w_before_model[-1], "before_model"),
+        )
+
+    # Add after_model middleware edges
+    if middleware_w_after_model:
+        graph.add_edge("model", f"{middleware_w_after_model[-1].name}.after_model")
+        for idx in range(len(middleware_w_after_model) - 1, 0, -1):
+            m1 = middleware_w_after_model[idx]
+            m2 = middleware_w_after_model[idx - 1]
+            _add_middleware_edge(
+                graph,
+                name=f"{m1.name}.after_model",
+                default_destination=f"{m2.name}.after_model",
+                model_destination=loop_entry_node,
+                end_destination=exit_node,
+                can_jump_to=_get_can_jump_to(m1, "after_model"),
+            )
+        # Note: Connection from after_model to after_agent/END is handled above
+        # in the conditional edges section
+
+    # Add after_agent middleware edges
+    if middleware_w_after_agent:
+        # Chain after_agent middleware (runs once at the very end, before END)
+        for idx in range(len(middleware_w_after_agent) - 1, 0, -1):
+            m1 = middleware_w_after_agent[idx]
+            m2 = middleware_w_after_agent[idx - 1]
+            _add_middleware_edge(
+                graph,
+                name=f"{m1.name}.after_agent",
+                default_destination=f"{m2.name}.after_agent",
+                model_destination=loop_entry_node,
+                end_destination=exit_node,
+                can_jump_to=_get_can_jump_to(m1, "after_agent"),
+            )
+
+        # Connect the last after_agent to END
+        _add_middleware_edge(
+            graph,
+            name=f"{middleware_w_after_agent[0].name}.after_agent",
+            default_destination=END,
+            model_destination=loop_entry_node,
+            end_destination=exit_node,
+            can_jump_to=_get_can_jump_to(middleware_w_after_agent[0], "after_agent"),
+        )
+
+    # 配置完毕，Compile Graph
+    # Set recursion limit to 9_999
+    # https://github.com/langchain-ai/langgraph/issues/7313
+    config: RunnableConfig = {"recursion_limit": 9_999}
+    config["metadata"] = {"ls_integration": "langchain_create_agent"}
+    if name:
+        config["metadata"]["lc_agent_name"] = name
+
+    return graph.compile(
+        checkpointer=checkpointer,
+        store=store,
+        interrupt_before=interrupt_before,
+        interrupt_after=interrupt_after,
+        debug=debug,
+        name=name,
+        cache=cache,
+    ).with_config(config)
+```
+
+
+
+### 源码逻辑重点说明
+
+#### 中间件封装
+
+研究`create_agent()`函数源码可以发现，Middleware的使用有如下几个要注意的地方：
+
+- 所有middleware的`.tools`会被合并到一起，封装到`ToolNode`里
+- 所有middleware的`wrap_tool_call`/`awrap_tool_call`方法会被合并成一条链，封装到`ToolNode`里，在每次调用tool前后执行。
+- 所有middleware的`wrap_model_call`方法也会被合并成一条链，封装到一个`model_node`（对应源码里的`model_node()`闭包函数）里，在每次模型调用前后执行。
+- 所有middleware的`before_agent`/`after_agent`/`before_model`/`after_model`方法，**各自会被封装成LangGraph里的一个Node**，并依次添加之间的边，在指定时机/条件下执行
+- 同一个middleware不能多次使用，否则会抛异常，提醒有重复的middleware
+
+> `create_agent()` 函数内部对所有middleware的 `wrap_tool_call` / `wrap_model_call` 进行合并的
+> `_chain_model_call_handlers()` / `_chain_tool_call_wrappers()` 方法值得看看（涉及到装饰器和绑定方法的使用）。
+
+最重要的原则如下：
+
+> 每个middleware继承`AgentMiddleware`时，**最好只实现其中一个hook方法**——尽量遵守**单一职责**的实践；
+>
+> 即使要实现多个hook方法，这些方法之间**不要有关联或者访问共享变量的操作**，因为根据源码里的逻辑，这些方法都是被拆分开使用的，
+> `AgentMiddleware`抽象类及其子类只不过是一个封装方法的容器而已，这也要求`AgentMiddleware`子类里最好不要定义实例属性存放共享状态。
+
+#### Tools封装
+
+`create_agent()`使用 `_ToolNode`类（v1.0.3版本开始改为LangGraph的`ToolNode`）封装所有的tools，然后还需要构建 `_ToolNode` 的进入边和输出边：
+
 - 输出边是通过 `factory.py` 里的 `_make_tools_to_model_edge()` 方法构建的：
   - source 是 `_ToolNode`，默认名称为 `tools`
   - `_make_tools_to_model_edge()` 作为 `Graph.add_conditional_edge()` 方法的 `path` 参数
@@ -410,6 +1316,10 @@ LangChain 默认提供了如下built-in middleware：
   - `_make_model_to_tools_edge()` 作为 `Graph.add_conditional_edge()` 方法的 `path` 参数
   - 大致逻辑是：从 `state['messages']` 的末尾寻找 AIMessage 对象，如果对象的tool_calls属性有值，则遍历并封装tool_call对象，
     并使用LangGraph的 `Send` 对象封装每个 tool_call 信息，返回一个 `List[Send]`。
+
+
+
+
 
 
 ---------------------------------------------------
@@ -1909,15 +2819,55 @@ checkpoint里快照的数据结构封装。
 
 这个模块提供了一些用于构建 Tool 的预制组件，在 v0.6.x 版本还提供了Agent 的预制组件，但是从 v1.0.0 开始，Agent 的预制组件不推荐使用了。
 
-**`ToolNode`类**
+因此这个模块主要是`tool_node.py`里提供的`ToolNode`相关定义。
 
-封装tool的节点类。
+### `ToolNode`类
 
-**`tools_condition`函数**
+封装所有Tools的节点类，它的初始化签名如下：
+
+```python
+class ToolNode(RunnableCallable):
+    def __init__(
+        self,
+        tools: Sequence[BaseTool | Callable],
+        *,
+        name: str = "tools",
+        tags: list[str] | None = None,
+        handle_tool_errors: bool
+        | str
+        | Callable[..., str]
+        | type[Exception]
+        | tuple[type[Exception], ...] = _default_handle_tool_errors,
+        messages_key: str = "messages",
+        wrap_tool_call: ToolCallWrapper | None = None,
+        awrap_tool_call: AsyncToolCallWrapper | None = None,
+    ) -> None:
+        ...
+```
+
+其中比较重要的几个参数如下：
+
+- `tools`，封装的Tools列表
+- `messages_key`，指定状态中的消息的key
+- `wrap_tool_call`/`awrap_tool_call`，tool调用前后的封装函数
+- `handle_tool_errors`，如何处理工具调用异常，可选值如下：
+  - `False`：不处理错误，允许向上抛出异常
+  - `True`：捕获所有错误，但不抛出，正常返回`ToolMessage`，但是其中包含错误信息
+  - `str`：捕获所有错误，但不抛出，正常返回`ToolMessage`，其中的错误信息使用这里自定义的字符串
+  - `type[Exception]`/`tuple[type[Exception], ...]`，指定要捕获的异常类，可以有多个，为这些异常返回默认信息，其他异常继续抛出
+  - `Callable[..., str]`：自定义异常处理函数
+
+`ToolNode`内部的`_func`/`_afunc`方法，会**并行处理**返回的消息列表中的多个ToolCall。
+
+
+
+### `tools_condition`函数
 
 封装 tool 的条件边，源码里内部逻辑比较简单，就是判断 state 里有没有 messages，并且messages 最后一条是不是 AIMessage，是就调用 Tool，否则转向 END。
 
-~~**`create_react_agent`**~~
+### ~~`create_react_agent`~~
+
+由`chat_agent_executor.py`文件定义。
 
 > v1.0版本开始，此函数被标记为废弃的了。
 
@@ -1980,6 +2930,356 @@ checkpoint里快照的数据结构封装。
 
 ---------------------------------------------------
 ## `managed`模块
+
+
+
+------
+
+# DeepAgents
+
+`deepagents`包是LangChain官方配合LangChain-V1.0提供的用于编写复杂Agent的包，它底层基于`langchain`+`langgraph`包进行的构建。
+
+简单看了下`deepagents`的源码，以**v0.5.2版本**为例，源码内容并不多，不像langchain/langgraph那样复杂，主要内容如下：
+
+```shell
+#v-0.5.2 版本
+deepagents/
+├── graph.py    # 这是最核心的文件， creage_deep_agent() 函数就在此
+ # 定义了虚拟文件系统，抽象接口协议在 protocol.py 中
+├── backends/   
+    ├── __init__.py
+    ├── composite.py
+    ├── filesystem.py
+    ├── langsmith.py
+    ├── local_shell.py
+    ├── protocol.py   # 定义了 backend 类协议
+    ├── sandbox.py
+    ├── state.py
+    ├── store.py
+    └── utils.py
+ # 提供了一些中间件实现，需要特别关注的是skills.py、subagents.py、async_agents.py
+├── middleware/
+    ├── __init__.py
+    ├── _tool_exclusion.py
+    ├── utils.py
+    ├── async_subagents.py
+    ├── filesystem.py
+    ├── memory.py
+    ├── patch_tool_calls.py
+    ├── permissions.py
+    ├── skills.py
+    ├── subagents.py
+    └── summarization.py
+├── profiles/
+    ├── __init__.py
+    ├── _harness_profiles.py
+    ├── _openai.py
+    ├── _openrouter.py
+├── __init__.py
+├── _models.py  # 提供了一些模型解析工具函数
+└── _version.py
+```
+
+
+
+## `graph.py`
+
+这是`deepagents`的核心文件，主要定义了`create_deep_agent()`函数。
+
+### 源码
+
+源码里`create_deep_agent()`的大致逻辑（基于**v0.5.2**版本）如下：
+
+```python
+def create_deep_agent(
+    # 指定模型
+    model: str | BaseChatModel | None = None,
+    # 配置可调用的工具
+    tools: Sequence[BaseTool | Callable | dict[str, Any]] | None = None,
+    *,
+    # 指定整个 Agent 的系统提示词
+    system_prompt: str | SystemMessage | None = None,
+    # 配置中间件
+    middleware: Sequence[AgentMiddleware] = (),
+    # 配置 subagents
+    subagents: Sequence[SubAgent | CompiledSubAgent | AsyncSubAgent] | None = None,
+    skills: list[str] | None = None,
+    memory: list[str] | None = None,
+    permissions: list[FilesystemPermission] | None = None,
+    response_format: ResponseFormat[ResponseT] | type[ResponseT] | dict[str, Any] | None = None,
+    context_schema: type[ContextT] | None = None,
+    checkpointer: Checkpointer | None = None,
+    store: BaseStore | None = None,
+    backend: BackendProtocol | BackendFactory | None = None,
+    interrupt_on: dict[str, bool | InterruptOnConfig] | None = None,
+    debug: bool = False,
+    # Agent 名称
+    name: str | None = None,
+    cache: BaseCache | None = None,
+) -> CompiledStateGraph[AgentState[ResponseT], ContextT, _InputAgentState, _OutputAgentState[ResponseT]]:
+    # ---------------------------------------------------------------------------------
+    # 初始化模型
+    _model_spec: str | None = model if isinstance(model, str) else None
+    model = get_default_model() if model is None else resolve_model(model)
+    
+    # ---------------------------------------------------------------------------------
+    # 这个profile作用有待研究
+    _profile = _harness_profile_for_model(model, _model_spec)
+
+    # ---------------------------------------------------------------------------------
+    # 对传入的 tools 的description 根据上面的profile进行覆盖改写，暂不清楚此操作是为什么
+    # Copy of `tools` with any provider-specific description rewrites.
+    # (Tool exclusion is handled by _ToolExclusionMiddleware which filters
+    # all tools (user-supplied and middleware-injected) in one place.)
+    _tools = _apply_tool_description_overrides(
+        tools,
+        _profile.tool_description_overrides,
+    )
+    
+    # ---------------------------------------------------------------------------------
+    backend = backend if backend is not None else StateBackend()
+
+    # ---------------------------------------------------------------------------------
+    # 这是deepagents内置的一个 General-purpose subagent，下面是配置该subagent的spec
+    # Build general-purpose subagent with default middleware stack
+    gp_middleware: list[AgentMiddleware[Any, Any, Any]] = [
+        # 要注意这个中间件，它生成的 TO-list 就是执行的 plan ----------------- KEY
+        TodoListMiddleware(),
+        FilesystemMiddleware(
+            backend=backend,
+            custom_tool_descriptions=_profile.tool_description_overrides,
+        ),
+        create_summarization_middleware(model, backend),
+        PatchToolCallsMiddleware(),
+    ]
+    if skills is not None:
+        gp_middleware.append(SkillsMiddleware(backend=backend, sources=skills))
+
+    # Add provider-specific middleware, if any
+    gp_middleware.extend(_resolve_extra_middleware(_profile))
+
+    # Strip excluded tools after all tool-injecting middleware has run
+    if _profile.excluded_tools:
+        gp_middleware.append(_ToolExclusionMiddleware(excluded=_profile.excluded_tools))
+    # Prompt caching is unconditional: "ignore" silently skips non-Anthropic models
+    gp_middleware.append(AnthropicPromptCachingMiddleware(unsupported_model_behavior="ignore"))
+
+    # Permissions must be last so they see all tools from prior middleware
+    if permissions:
+        gp_middleware.append(_PermissionMiddleware(rules=permissions, backend=backend))
+
+    general_purpose_spec: SubAgent = {  # ty: ignore[missing-typed-dict-key]
+        **GENERAL_PURPOSE_SUBAGENT,
+        "model": model,
+        "tools": _tools or [],
+        "middleware": gp_middleware,
+    }
+    if interrupt_on is not None:
+        general_purpose_spec["interrupt_on"] = interrupt_on
+
+    # ---------------------------------------------------------------------------------
+    # 配置用户提供的 subagents 的 spec
+    # Set up subagent middleware
+    inline_subagents: list[SubAgent | CompiledSubAgent] = []
+    async_subagents: list[AsyncSubAgent] = []
+    # 遍历用户提供的 subagents
+    for spec in subagents or []:
+        if "graph_id" in spec:
+            # Then spec is an AsyncSubAgent
+            async_subagents.append(cast("AsyncSubAgent", spec))
+            continue
+        if "runnable" in spec:
+            # CompiledSubAgent - use as-is
+            inline_subagents.append(spec)
+        else:
+            # 此时用户提供的subagent是以dict形式给出的配置，对这些配置进行处理
+            # SubAgent - fill in defaults and prepend base middleware
+            raw_subagent_model = spec.get("model", model)
+            subagent_model = resolve_model(raw_subagent_model)
+
+            _subagent_spec = raw_subagent_model if isinstance(raw_subagent_model, str) else None
+            _subagent_profile = _harness_profile_for_model(subagent_model, _subagent_spec)
+
+            # Resolve permissions: subagent's own rules take priority, else inherit parent's
+            subagent_permissions = spec.get("permissions", permissions)
+
+            # Build middleware: base stack + skills (if specified) + user's middleware
+            subagent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
+                # 用户subagent里，也使用了这些中间件
+                TodoListMiddleware(),
+                FilesystemMiddleware(
+                    backend=backend,
+                    custom_tool_descriptions=_subagent_profile.tool_description_overrides,
+                ),
+                create_summarization_middleware(subagent_model, backend),
+                PatchToolCallsMiddleware(),
+            ]
+            subagent_skills = spec.get("skills")
+            if subagent_skills:
+                subagent_middleware.append(SkillsMiddleware(backend=backend, sources=subagent_skills))
+            subagent_middleware.extend(spec.get("middleware", []))
+
+            # Provider-specific middleware for this subagent's model
+            subagent_middleware.extend(_resolve_extra_middleware(_subagent_profile))
+            if _subagent_profile.excluded_tools:
+                subagent_middleware.append(_ToolExclusionMiddleware(excluded=_subagent_profile.excluded_tools))
+
+            # Prompt caching
+            subagent_middleware.append(AnthropicPromptCachingMiddleware(unsupported_model_behavior="ignore"))
+            if subagent_permissions:
+                subagent_middleware.append(_PermissionMiddleware(rules=subagent_permissions, backend=backend))
+
+            subagent_interrupt_on = spec.get("interrupt_on", interrupt_on)
+
+            # Inherit parent tools unless the subagent declares its own.
+            # Descriptions are rewritten; exclusion is handled by middleware.
+            raw_subagent_tools = spec.get("tools") if "tools" in spec else tools
+            subagent_tools = _apply_tool_description_overrides(
+                raw_subagent_tools,
+                _subagent_profile.tool_description_overrides,
+            )
+
+            processed_spec: SubAgent = {  # ty: ignore[missing-typed-dict-key]
+                **spec,
+                "model": subagent_model,
+                "tools": subagent_tools or [],
+                "middleware": subagent_middleware,
+            }
+            if subagent_interrupt_on is not None:
+                processed_spec["interrupt_on"] = subagent_interrupt_on
+            inline_subagents.append(processed_spec)
+
+    # ---------------------------------------------------------------------------------
+    # 把内置的 General-Purpose Agent 放到第1位
+    # If an agent with general purpose name already exists in subagents, then don't add it
+    # This is how you overwrite/configure general purpose subagent
+    if not any(spec["name"] == GENERAL_PURPOSE_SUBAGENT["name"] for spec in inline_subagents):
+        # Add a general purpose subagent if it doesn't exist yet
+        inline_subagents.insert(0, general_purpose_spec)
+
+    # ---------------------------------------------------------------------------------
+    # 开始构建 主Agent 的 spec
+    # Build main agent middleware stack
+    deepagent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
+        # 主Agent也使用了这个 Todo 中间件，用于生成 plan
+        TodoListMiddleware(),
+    ]
+    if skills is not None:
+        deepagent_middleware.append(SkillsMiddleware(backend=backend, sources=skills))
+    deepagent_middleware.extend(
+        [
+            FilesystemMiddleware(
+                backend=backend,
+                custom_tool_descriptions=_profile.tool_description_overrides,
+            ),
+            # ---------------------------------------------------------------------------
+            # 注意，所有的subagent，都是借助这个中间件来插入的 ----------------------------- KEY
+            SubAgentMiddleware(
+                backend=backend,
+                subagents=inline_subagents,
+                # Overrides the task tool description. Value should include
+                # {available_agents} — a format placeholder replaced with the
+                # subagent name/description list. Without it the model can't
+                # see which subagents exist. None (default) uses the built-in
+                # template. Stale keys silently no-op if the tool is renamed.
+                task_description=_profile.tool_description_overrides.get("task"),
+            ),
+            # ---------------------------------------------------------------------------
+            create_summarization_middleware(model, backend),
+            PatchToolCallsMiddleware(),
+        ]
+    )
+
+    if async_subagents:
+        # Async here means that we run these subagents in a non-blocking manner.
+        # Currently this supports agents deployed via LangSmith deployments.
+        deepagent_middleware.append(AsyncSubAgentMiddleware(async_subagents=async_subagents))
+
+    if middleware:
+        deepagent_middleware.extend(middleware)
+    # Provider-specific middleware goes between user middleware and memory so
+    # that memory updates (which change the system prompt) don't invalidate the
+    # Anthropic prompt cache prefix.
+    deepagent_middleware.extend(_resolve_extra_middleware(_profile))
+    if _profile.excluded_tools:
+        deepagent_middleware.append(_ToolExclusionMiddleware(excluded=_profile.excluded_tools))
+    # Unconditional prompt caching (see general-purpose subagent comment).
+    deepagent_middleware.append(AnthropicPromptCachingMiddleware(unsupported_model_behavior="ignore"))
+    if memory is not None:
+        deepagent_middleware.append(MemoryMiddleware(backend=backend, sources=memory))
+    if interrupt_on is not None:
+        deepagent_middleware.append(HumanInTheLoopMiddleware(interrupt_on=interrupt_on))
+    # _PermissionMiddleware must be last so it sees all tools from prior middleware
+    if permissions:
+        deepagent_middleware.append(_PermissionMiddleware(rules=permissions, backend=backend))
+
+    # ---------------------------------------------------------------------------------
+    # 配置基础提示词
+    # Assemble base prompt: use _profile.base_system_prompt if set, else
+    # BASE_AGENT_PROMPT, then append profile suffix if present.
+    # Finally prepend user system_prompt (handled below).
+    base_prompt = _profile.base_system_prompt if _profile.base_system_prompt is not None else BASE_AGENT_PROMPT
+    if _profile.system_prompt_suffix is not None:
+        base_prompt = base_prompt + "\n\n" + _profile.system_prompt_suffix
+    if system_prompt is None:
+        final_system_prompt: str | SystemMessage = base_prompt
+    elif isinstance(system_prompt, SystemMessage):
+        final_system_prompt = SystemMessage(content_blocks=[*system_prompt.content_blocks, {"type": "text", "text": f"\n\n{base_prompt}"}])
+    else:
+        # String: simple concatenation
+        final_system_prompt = system_prompt + "\n\n" + base_prompt
+
+    # ---------------------------------------------------------------------------------
+    # 直接调用 langchain.agents 模块提供的 create_agent() 函数
+    return create_agent(
+        model,
+        system_prompt=final_system_prompt,
+        # tools 还是用户传入的 tools，不过description可能被改写了
+        tools=_tools,
+        # Agent执行plan生成 + subagent 执行，都是以中间件的形式工作的 -------------------- KEY
+        middleware=deepagent_middleware,
+        response_format=response_format,
+        context_schema=context_schema,
+        checkpointer=checkpointer,
+        store=store,
+        debug=debug,
+        name=name,
+        cache=cache,
+    ).with_config(
+        {
+            "recursion_limit": 9_999,  # 限制一下Agent的最大迭代次数
+            "metadata": {
+                "ls_integration": "deepagents",
+                "versions": {"deepagents": __version__},
+                "lc_agent_name": name,
+            },
+        }
+    )
+```
+
+### 重点说明
+
+所谓的DeepAgent，其中的执行计划生成 + SubAgent，都是以中间件形式实现的。
+
+
+
+------
+
+## `profiles`模块
+
+
+
+------
+
+## `middleware`模块
+
+
+
+------
+
+## `backends`模块
+
+
 
 
 
