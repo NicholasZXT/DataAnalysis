@@ -1233,7 +1233,12 @@ Event 和 Span 的区别在于：
 
 从源码里来看，两者比较独立，相互交互的情况很少，所以可以各自使用。
 
-Instrumentation的主要逻辑在 `BaseSpanHandler` 和 `Dispatcher` 中。
+**Instrumentation的主要逻辑在两个地方**：
+
+- `span_handlers` 模块定义的 `BaseSpanHandler` 及其子类实现中；
+- `dispatcher.py` 文件定义的 `Dispatcher` 中。
+
+其他模块（`base`, `events`, `span`, `event_handlers`）都是一些模型类定义和抽象类定义。
 
 ## `base`模块
 
@@ -1332,7 +1337,7 @@ class SimpleSpan(BaseSpan):
     metadata: Optional[Dict] = Field(default=None)
 ```
 
-## `span_handler`模块
+## `span_handler`模块 - KEY
 
 作用：
 - 接收 Span 的开始和结束事件
@@ -1341,8 +1346,6 @@ class SimpleSpan(BaseSpan):
 
 （1）`base.py`定义了抽象基类 `class BaseSpanHandler(BaseModel, Generic[T])`。
 
-（2）具体实现类有 `class SimpleSpanHandler(BaseSpanHandler[SimpleSpan])` 和 `class NullSpanHandler(BaseSpanHandler[BaseSpan])`。
-
 `BaseSpanHandler`里主要的方法如下：
 - `span_enter()`，进入Span时调用，内部会调用**待实现的抽象方法`new_span()`**
 - `span_exit()`，Span正常结束时调用，内部会调用**待实现的抽象方法`prepare_to_exit_span()`**
@@ -1350,7 +1353,14 @@ class SimpleSpan(BaseSpan):
 
 `BaseSpanHandler`也是一个泛型类，它的泛型参数就是该SpanHandler对应要处理的 Span类型（`BaseSpan`子类）。
 
-## `dispatcher.py`
+（2）具体实现类有 `class SimpleSpanHandler(BaseSpanHandler[SimpleSpan])` 和 `class NullSpanHandler(BaseSpanHandler[BaseSpan])`。
+
+`NullSpanHandler`是一个空实现，被用作默认的处理器。
+
+`SimpleSpanHandler`是一个简单的实现，只是创建一个 SimpleSpan 对象，并返回给调用方，背后没有对接 OTel 等可观测性系统。
+
+
+## `dispatcher.py` - KEY
 
 作用：
 - 维护全局或局部的事件处理链
@@ -1386,7 +1396,7 @@ class SimpleSpan(BaseSpan):
 - `span_exit()` -> `BaseSpanHandler.span_exit()`
 - `span_drop()` -> `BaseSpanHandler.span_drop()`
 
-上述3个方法里，会遍历SpanHandler列表，调用每个SpanHandler的对应方法，还会检查是否要调用父级Dispatcher的方法——Propogate行为。
+上述3个方法里，**会遍历SpanHandler列表，调用每个SpanHandler的对应方法**，还会检查是否要调用父级Dispatcher的方法——Propagate行为。
 
 手动调用上面Span各个阶段的方法很繁琐，还涉及到上下文管理，因此`Dispatcher`提供了一个重要方法 `span()`，**此方法是一个装饰器，用于装饰某个`Callable`对象，也就是该`Callable`对象的一次调用就被视为一个Span**。
 
@@ -1397,13 +1407,47 @@ class SimpleSpan(BaseSpan):
 整个模块的使用流程可以总结为如下：
 
 （1）使用`llama_index_instrumentation.__init__.py` 里提供的 `get_dispatcher(name: str = "root") -> Dispatcher` 工具函数获取一个`Dispatcher`对象。
-- `__init__.py` 里定义了一个 `root_dispatcher` 和 `root_manager: Manager = Manager(root_dispatcher)` 对象
-- `get_dispatcher()` 函数会尝试根据传入的名称从 `root_manager` 里获取已有的Dispatcher，或者是创建一个新的
-- 这个dispatcher对象通常是源文件/模块级别的“全局对象”
+- `__init__.py` 里定义了一个 名为`root` 的 `root_dispatcher`，该 `Dispatcher` 注册了一个 `NullEventHandler` 和 `NullSpanHandler`；
+- 创建 `root_manager: Manager = Manager(root_dispatcher)`对象，将`root_dispatcher` 添加到 `root_manager` 里，作为默认的Dispatcher；
+- `get_dispatcher()` 函数会尝试根据传入的名称从 `root_manager` 里获取已有的 `Dispatcher`，或者是创建一个新的；
+- 这个 `dispatcher` 对象通常是源文件/模块级别的“全局对象”。
 
 （2）获得 dispatcher 对象后：
 - 使用`@dispatcher.span`装饰器来装饰需要监控的方法/函数调用
 - 在任意地方使用 `dispatcher.event()`/`dispatcher.aevent()` 方法触发对应事件
+
+（3）对接OpenTelemetry
+- llama-index-instrumentation 包并没有依赖或引入 OTel-API，它的默认实现是一个空实现，**不会向外部系统发送任何数据**。
+- 如果需要对接OTel，需要安装`pip install llama-index-observability-otel`，该包提供了OTel的集成，包括`SpanHandler` 和 `EventHandler` 的OTel实现。
+- 然后进行如下配置：
+
+```python
+# ------ 简单版本配置 ------
+from llama_index.observability.otel import LlamaIndexOpenTelemetry
+# initialize the instrumentation object
+instrumentor = LlamaIndexOpenTelemetry()
+if __name__ == "__main__":
+    # start listening!
+    instrumentor.start_registering()
+
+# ------ 高级配置 ------
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from llama_index.observability.otel import LlamaIndexOpenTelemetry
+# define a custom span exporter
+span_exporter = OTLPSpanExporter("http://0.0.0.0:4318/v1/traces")
+# initialize the instrumentation object
+instrumentor = LlamaIndexOpenTelemetry(
+    service_name_or_resource="my.test.service.1",
+    span_exporter=span_exporter,
+    debug=True,
+)
+
+if __name__ == "__main__":
+    instrumentor.start_registering()
+    # ... your code here
+```
+
+
 
 ------
 # Llama-Agent

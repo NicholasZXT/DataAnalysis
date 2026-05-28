@@ -173,6 +173,10 @@ uv_rag = [
     "markitdown[pdf, docx, pptx, xlsx, xls]",
     "chromadb",
 ]
+uv_other = [
+	"llama-index-observability-otel",
+	"opentelemetry-exporter-otlp-proto-http"
+]
 
 # ------------------------------------ UV 配置 ------------------------------------
 # 使用方式1： uv sync
@@ -190,7 +194,8 @@ default-groups = [
     "uv_db", "uv_ml", "uv_graph", "uv_jupyter",
 #    "uv_torch_13",
     "uv_torch_2x",
-    "uv_nlp", "uv_llm", "uv_rag"
+    "uv_nlp", "uv_llm", "uv_rag",
+	"uv_other"
 ]
 
 #[tool.uv.dependency-groups]
@@ -262,7 +267,8 @@ group = [
     "uv_db", "uv_ml", "uv_graph", "uv_jupyter",
 #    "uv_torch_13",
     "uv_torch_2x",
-    "uv_nlp", "uv_llm", "uv_rag"
+    "uv_nlp", "uv_llm", "uv_rag",
+	"uv_other"
 ]
 # PyTorch index 设置
 torch-backend = "auto"
