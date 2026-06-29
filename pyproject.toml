@@ -174,8 +174,8 @@ uv_rag = [
     "chromadb",
 ]
 uv_other = [
-	"llama-index-observability-otel",
-	"opentelemetry-exporter-otlp-proto-http"
+#	"llama-index-observability-otel",
+#	"opentelemetry-exporter-otlp-proto-http"
 ]
 
 # ------------------------------------ UV 配置 ------------------------------------
@@ -194,7 +194,8 @@ default-groups = [
     "uv_db", "uv_ml", "uv_graph", "uv_jupyter",
 #    "uv_torch_13",
     "uv_torch_2x",
-    "uv_nlp", "uv_llm", "uv_rag",
+    "uv_nlp",
+#	"uv_llm", "uv_rag",
 	"uv_other"
 ]
 
@@ -267,7 +268,8 @@ group = [
     "uv_db", "uv_ml", "uv_graph", "uv_jupyter",
 #    "uv_torch_13",
     "uv_torch_2x",
-    "uv_nlp", "uv_llm", "uv_rag",
+    "uv_nlp",
+#	"uv_llm", "uv_rag",
 	"uv_other"
 ]
 # PyTorch index 设置

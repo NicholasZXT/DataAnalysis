@@ -1,7 +1,8 @@
 # 忽略任何目录下的.ipynb_checkpoints文件夹
 .ipynb_checkpoints/
 # 忽略IDE的文件夹
-/.idea
+.idea
+.vscode
 # 忽略任何目录下的 dataset 文件夹
 dataset/
 /datasets/
